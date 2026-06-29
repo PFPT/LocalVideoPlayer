@@ -1,0 +1,148 @@
+package com.zhaoshuo.localvideoplayer.ui.components
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.zhaoshuo.localvideoplayer.ui.theme.LumenAccentText
+import com.zhaoshuo.localvideoplayer.ui.theme.LumenBackground
+import com.zhaoshuo.localvideoplayer.ui.theme.LumenOnSurfaceMuted
+import com.zhaoshuo.localvideoplayer.ui.theme.LumenSurface
+import com.zhaoshuo.localvideoplayer.ui.theme.LumenThumbCorner
+import com.zhaoshuo.localvideoplayer.util.VideoThumbnailCache
+
+@Composable
+fun LumenMediaCard(
+    title: String,
+    subtitle: String,
+    videoId: Long?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    progress: Float? = null,
+    thumbnailContent: (@Composable () -> Unit)? = null,
+    clickable: Boolean = true,
+    opaqueBackground: Boolean = false,
+) {
+    val backgroundColor = if (opaqueBackground) {
+        LumenBackground
+    } else {
+        LumenSurface.copy(alpha = 0.35f)
+    }
+    val rowModifier = modifier
+        .fillMaxWidth()
+        .clip(RoundedCornerShape(LumenThumbCorner))
+        .then(if (clickable) Modifier.clickable(onClick = onClick) else Modifier)
+        .background(backgroundColor)
+        .padding(12.dp)
+
+    Row(
+        modifier = rowModifier,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .width(96.dp)
+                .height(72.dp)
+                .clip(RoundedCornerShape(LumenThumbCorner)),
+        ) {
+            if (thumbnailContent != null) {
+                thumbnailContent()
+            } else if (videoId != null) {
+                MediaThumbnail(videoId = videoId, modifier = Modifier.fillMaxSize())
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(LumenSurface),
+                )
+            }
+            if (progress != null && progress > 0.01f) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .background(Color.Black.copy(alpha = 0.4f)),
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth(progress.coerceIn(0f, 1f))
+                        .height(3.dp)
+                        .background(LumenAccentText),
+                )
+            }
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 12.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = LumenOnSurfaceMuted,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
+}
+
+@Composable
+fun MediaThumbnail(
+    videoId: Long,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    var thumbnail by remember(videoId) { mutableStateOf(VideoThumbnailCache.peek(videoId)) }
+
+    LaunchedEffect(videoId) {
+        thumbnail = VideoThumbnailCache.load(context, videoId)
+    }
+
+    Box(
+        modifier = modifier.background(LumenSurface),
+        contentAlignment = Alignment.Center,
+    ) {
+        val bitmap: ImageBitmap? = thumbnail
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        }
+    }
+}

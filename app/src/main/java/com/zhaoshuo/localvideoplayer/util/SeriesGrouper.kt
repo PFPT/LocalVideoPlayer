@@ -1,0 +1,359 @@
+package com.zhaoshuo.localvideoplayer.util
+
+import com.zhaoshuo.localvideoplayer.model.VideoItem
+import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
+import com.zhaoshuo.localvideoplayer.model.VideoSeries
+
+object SeriesGrouper {
+
+    private const val MIN_GROUP_KEY_LENGTH = 3
+    private const val HIGH_SIMILARITY = 0.88
+    private const val MEDIUM_SIMILARITY = 0.72
+
+    fun groupVideos(videos: List<VideoItem>): List<VideoLibraryEntry> {
+        val parsed = videos.map { video ->
+            val parsedTitle = TitleParser.parse(video.title)
+            video.copy(
+                season = parsedTitle.season,
+                episode = parsedTitle.episode,
+            ) to parsedTitle
+        }
+
+        val assigned = BooleanArray(parsed.size)
+        val entries = mutableListOf<VideoLibraryEntry>()
+
+        groupByFolder(parsed, assigned, entries)
+        groupBySeriesName(parsed, assigned, entries)
+        groupBySimilarName(parsed, assigned, entries)
+
+        parsed.forEachIndexed { index, (video, _) ->
+            if (!assigned[index]) {
+                entries.add(VideoLibraryEntry.Single(video))
+            }
+        }
+
+        return entries
+    }
+
+    private fun groupByFolder(
+        parsed: List<Pair<VideoItem, ParsedTitle>>,
+        assigned: BooleanArray,
+        entries: MutableList<VideoLibraryEntry>,
+    ) {
+        val folderGroups = mutableMapOf<String, MutableList<Int>>()
+
+        parsed.forEachIndexed { index, (video, _) ->
+            if (assigned[index]) return@forEachIndexed
+            val folderKey = parentFolderKey(video) ?: return@forEachIndexed
+            folderGroups.getOrPut(folderKey) { mutableListOf() }.add(index)
+        }
+
+        folderGroups.values
+            .filter { it.size >= 2 }
+            .forEach { indices ->
+                val clusters = clusterIndices(indices) { left, right ->
+                    shouldGroup(parsed[left].second, parsed[right].second)
+                }
+                clusters
+                    .filter { it.size >= 2 }
+                    .forEach { cluster ->
+                        val groupVideos = cluster.map { parsed[it].first }
+                        val parsedTitles = cluster.map { parsed[it].second }
+                        if (!canGroupAsSeries(parsedTitles)) return@forEach
+                        val title = resolveSeriesTitle(
+                            groupVideos,
+                            parsedTitles,
+                            folderKey = parentFolderKey(groupVideos.first()),
+                        )
+                        val seriesKey = "folder:${parentFolderKey(groupVideos.first())}:$title"
+                        addSeries(entries, cluster, assigned, groupVideos, title, seriesKey)
+                    }
+            }
+    }
+
+    private fun groupBySeriesName(
+        parsed: List<Pair<VideoItem, ParsedTitle>>,
+        assigned: BooleanArray,
+        entries: MutableList<VideoLibraryEntry>,
+    ) {
+        val nameGroups = mutableMapOf<String, MutableList<Int>>()
+
+        parsed.forEachIndexed { index, (_, parsedTitle) ->
+            if (assigned[index]) return@forEachIndexed
+            val nameKey = TitleParser.normalizeForGrouping(parsedTitle.seriesName)
+            if (nameKey.length < MIN_GROUP_KEY_LENGTH) return@forEachIndexed
+            nameGroups.getOrPut(nameKey) { mutableListOf() }.add(index)
+        }
+
+        nameGroups.values
+            .filter { it.size >= 2 }
+            .forEach { indices ->
+                val groupVideos = indices.map { parsed[it].first }
+                val parsedTitles = indices.map { parsed[it].second }
+                val title = resolveSeriesTitle(groupVideos, parsedTitles, folderKey = null)
+                val seriesKey = "name:${TitleParser.normalizeForGrouping(title)}"
+                addSeries(entries, indices, assigned, groupVideos, title, seriesKey)
+            }
+    }
+
+    private fun groupBySimilarName(
+        parsed: List<Pair<VideoItem, ParsedTitle>>,
+        assigned: BooleanArray,
+        entries: MutableList<VideoLibraryEntry>,
+    ) {
+        val indices = parsed.indices.filter { !assigned[it] }
+        if (indices.size < 2) return
+
+        val clusters = clusterIndices(indices) { left, right ->
+            shouldGroup(parsed[left].second, parsed[right].second)
+        }
+
+        clusters
+            .filter { it.size >= 2 }
+            .forEach { cluster ->
+                val groupVideos = cluster.map { parsed[it].first }
+                val parsedTitles = cluster.map { parsed[it].second }
+                val title = resolveSeriesTitle(groupVideos, parsedTitles, folderKey = null)
+                val seriesKey = "fuzzy:${TitleParser.normalizeForGrouping(title)}"
+                addSeries(entries, cluster, assigned, groupVideos, title, seriesKey)
+            }
+    }
+
+    private fun addSeries(
+        entries: MutableList<VideoLibraryEntry>,
+        indices: List<Int>,
+        assigned: BooleanArray,
+        videos: List<VideoItem>,
+        title: String,
+        seriesKey: String,
+    ) {
+        indices.forEach { assigned[it] = true }
+        val sortedEpisodes = sortEpisodes(
+            videos.map { it.copy(seriesKey = seriesKey) },
+        )
+        entries.add(
+            VideoLibraryEntry.Series(
+                VideoSeries(
+                    id = seriesKey.hashCode().toUInt().toString(16),
+                    title = title,
+                    episodes = sortedEpisodes,
+                ),
+            ),
+        )
+    }
+
+    private fun resolveSeriesTitle(
+        videos: List<VideoItem>,
+        parsedTitles: List<ParsedTitle>,
+        folderKey: String?,
+    ): String {
+        val commonName = parsedTitles
+            .map { it.seriesName }
+            .filter { it.isNotBlank() }
+            .groupingBy { it }
+            .eachCount()
+            .maxByOrNull { it.value }
+            ?.key
+
+        if (!commonName.isNullOrBlank()) return commonName
+
+        val normalizedCounts = parsedTitles
+            .map { TitleParser.normalizeForGrouping(it.seriesName) }
+            .filter { it.isNotBlank() }
+            .groupingBy { it }
+            .eachCount()
+        val topNormalized = normalizedCounts.maxByOrNull { it.value }?.key
+        if (topNormalized != null) {
+            parsedTitles
+                .map { it.seriesName }
+                .firstOrNull { TitleParser.normalizeForGrouping(it) == topNormalized }
+                ?.let { return it }
+        }
+
+        folderKey?.substringAfterLast('/')?.trim('/')?.let { folderName ->
+            if (folderName.isNotBlank() && folderName != ".") return folderName
+        }
+
+        videos.first().bucketName?.let { bucket ->
+            if (bucket.isNotBlank()) return bucket
+        }
+
+        return videos.first().title.substringBeforeLast('.')
+    }
+
+    private fun canGroupAsSeries(parsedTitles: List<ParsedTitle>): Boolean {
+        if (parsedTitles.size < 2) return false
+        if (parsedTitles.count { it.episode != null } >= 2) return true
+
+        val names = parsedTitles
+            .map { it.seriesName.trim() }
+            .filter { it.isNotBlank() }
+        if (names.size < 2) return false
+
+        for (i in names.indices) {
+            for (j in i + 1 until names.size) {
+                if (nameSimilarity(names[i], names[j]) >= MEDIUM_SIMILARITY) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private fun shouldGroup(left: ParsedTitle, right: ParsedTitle): Boolean {
+        val normA = TitleParser.normalizeForGrouping(left.seriesName)
+        val normB = TitleParser.normalizeForGrouping(right.seriesName)
+        if (hasDistinguishingSuffix(normA, normB)) return false
+
+        val score = nameSimilarity(left.seriesName, right.seriesName)
+        if (score >= HIGH_SIMILARITY) return true
+        if (score >= MEDIUM_SIMILARITY) {
+            return left.episode != null || right.episode != null || score >= 0.8
+        }
+        if (score >= 0.62) {
+            return left.episode != null && right.episode != null
+        }
+        return false
+    }
+
+    private fun hasDistinguishingSuffix(a: String, b: String): Boolean {
+        val tokensA = a.split(Regex("\\s+")).filter { it.isNotBlank() }
+        val tokensB = b.split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (tokensA.size != tokensB.size || tokensA.size < 2) return false
+        if (tokensA.dropLast(1) != tokensB.dropLast(1)) return false
+        val lastA = tokensA.last()
+        val lastB = tokensB.last()
+        return lastA != lastB && lastA.length <= 4 && lastB.length <= 4
+    }
+
+    private fun nameSimilarity(rawA: String, rawB: String): Double {
+        val a = TitleParser.normalizeForGrouping(rawA)
+        val b = TitleParser.normalizeForGrouping(rawB)
+        if (a == b) return 1.0
+        if (a.isBlank() || b.isBlank()) return 0.0
+        if (a.length < MIN_GROUP_KEY_LENGTH || b.length < MIN_GROUP_KEY_LENGTH) return 0.0
+
+        val shorter = if (a.length <= b.length) a else b
+        val longer = if (a.length <= b.length) b else a
+
+        if (longer.startsWith(shorter)) {
+            return shorter.length.toDouble() / longer.length
+        }
+
+        val prefixLen = a.commonPrefixWith(b).length
+        val prefixRatio = prefixLen.toDouble() / shorter.length
+        val tokenScore = tokenJaccard(a, b)
+        val editScore = levenshteinRatio(a, b)
+        val charScore = if (hasCjk(a) || hasCjk(b)) charBigramJaccard(a, b) else 0.0
+
+        return maxOf(editScore, tokenScore, prefixRatio, charScore)
+    }
+
+    private fun hasCjk(text: String): Boolean =
+        text.any { it.code in 0x2E80..0x9FFF }
+
+    private fun tokenJaccard(a: String, b: String): Double {
+        val tokensA = a.split(Regex("\\s+")).filter { it.length >= 2 }.toSet()
+        val tokensB = b.split(Regex("\\s+")).filter { it.length >= 2 }.toSet()
+        if (tokensA.isEmpty() || tokensB.isEmpty()) return 0.0
+        val intersection = tokensA.intersect(tokensB).size
+        val union = tokensA.union(tokensB).size
+        return intersection.toDouble() / union
+    }
+
+    private fun charBigramJaccard(a: String, b: String): Double {
+        val compactA = a.replace(" ", "")
+        val compactB = b.replace(" ", "")
+        if (compactA == compactB) return 1.0
+        if (compactA.length < 2 || compactB.length < 2) {
+            return levenshteinRatio(compactA, compactB)
+        }
+        val bigramsA = (0 until compactA.length - 1).map { compactA.substring(it, it + 2) }.toSet()
+        val bigramsB = (0 until compactB.length - 1).map { compactB.substring(it, it + 2) }.toSet()
+        val intersection = bigramsA.intersect(bigramsB).size
+        val union = bigramsA.union(bigramsB).size
+        return intersection.toDouble() / union
+    }
+
+    private fun levenshteinRatio(a: String, b: String): Double {
+        val maxLen = maxOf(a.length, b.length)
+        if (maxLen == 0) return 1.0
+        return 1.0 - levenshteinDistance(a, b).toDouble() / maxLen
+    }
+
+    private fun levenshteinDistance(a: String, b: String): Int {
+        if (a == b) return 0
+        if (a.isEmpty()) return b.length
+        if (b.isEmpty()) return a.length
+
+        val prev = IntArray(b.length + 1) { it }
+        val curr = IntArray(b.length + 1)
+
+        for (i in a.indices) {
+            curr[0] = i + 1
+            for (j in b.indices) {
+                val cost = if (a[i] == b[j]) 0 else 1
+                curr[j + 1] = minOf(
+                    curr[j] + 1,
+                    prev[j + 1] + 1,
+                    prev[j] + cost,
+                )
+            }
+            prev.indices.forEach { idx -> prev[idx] = curr[idx] }
+        }
+        return prev[b.length]
+    }
+
+    private fun clusterIndices(
+        indices: List<Int>,
+        shouldMerge: (Int, Int) -> Boolean,
+    ): List<List<Int>> {
+        if (indices.size < 2) return listOf(indices)
+
+        val parent = IntArray(indices.size) { it }
+
+        fun find(i: Int): Int {
+            var root = i
+            while (parent[root] != root) {
+                parent[root] = parent[parent[root]]
+                root = parent[root]
+            }
+            return root
+        }
+
+        fun union(i: Int, j: Int) {
+            val rootI = find(i)
+            val rootJ = find(j)
+            if (rootI != rootJ) parent[rootJ] = rootI
+        }
+
+        for (i in indices.indices) {
+            for (j in i + 1 until indices.size) {
+                if (shouldMerge(indices[i], indices[j])) {
+                    union(i, j)
+                }
+            }
+        }
+
+        return indices.indices
+            .groupBy { find(it) }
+            .values
+            .map { positions -> positions.map { indices[it] } }
+    }
+
+    private fun parentFolderKey(video: VideoItem): String? {
+        val relativePath = video.relativePath ?: return video.bucketName?.let { "bucket:$it" }
+        val trimmed = relativePath.trimEnd('/')
+        val lastSlash = trimmed.lastIndexOf('/')
+        if (lastSlash <= 0) return video.bucketName?.let { "bucket:$it" }
+        return trimmed.substring(0, lastSlash)
+    }
+
+    fun sortEpisodes(videos: List<VideoItem>): List<VideoItem> {
+        return videos.sortedWith(
+            compareBy<VideoItem> { it.season ?: Int.MAX_VALUE }
+                .thenBy { it.episode ?: Int.MAX_VALUE }
+                .thenBy { it.title.lowercase() },
+        )
+    }
+}
