@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -55,7 +56,7 @@ import com.zhaoshuo.localvideoplayer.ui.components.displayVideoSize
 import com.zhaoshuo.localvideoplayer.ui.components.SeekPreviewOverlay
 import com.zhaoshuo.localvideoplayer.ui.components.SpeedSelectorSheet
 import com.zhaoshuo.localvideoplayer.ui.components.VideoPlayerGesture
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenBackground
+import com.zhaoshuo.localvideoplayer.ui.theme.LumenAccentText
 import com.zhaoshuo.localvideoplayer.util.OrientationController
 import com.zhaoshuo.localvideoplayer.util.PlaybackSystemControls
 import com.zhaoshuo.localvideoplayer.util.toMediaItem
@@ -493,7 +494,7 @@ fun PlayerScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(LumenBackground),
+            .background(MaterialTheme.colorScheme.background),
     ) {
         when {
             isInPipMode -> {
@@ -598,7 +599,9 @@ fun PlayerScreen(
                     },
                     onRotateClick = {
                         resetControlsTimer()
-                        orientationController?.togglePortraitLandscape()
+                        if (!controlsLocked) {
+                            orientationController?.togglePortraitLandscape()
+                        }
                     },
                     onSpeedClick = {
                         resetControlsTimer()
@@ -874,7 +877,6 @@ private fun LandscapePlayerContent(
         onSpeedClick = onSpeedClick,
         onLoopClick = onLoopClick,
         onEpisodePickerClick = onEpisodePickerClick,
-        onBackgroundTap = { onTap(Offset.Zero, 0f, 0f) },
         modifier = Modifier.fillMaxSize(),
     )
     }

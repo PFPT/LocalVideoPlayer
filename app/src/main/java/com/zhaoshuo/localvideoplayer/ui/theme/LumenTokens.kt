@@ -16,6 +16,7 @@ val LumenMetadataGradientStart = Color(0xFF5C4B8A)
 val LumenMetadataGradientEnd = Color(0xFF1A8A7D)
 val LumenOnBackground = Color.White
 val LumenPrimary = LumenAccentText
+val LumenDelete = Color(0xFFE53935)
 
 val LumenVideoCorner = 20.dp
 val LumenThumbCorner = 12.dp

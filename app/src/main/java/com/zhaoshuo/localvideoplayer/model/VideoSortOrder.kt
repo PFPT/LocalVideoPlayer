@@ -7,6 +7,7 @@ enum class VideoSortOrder {
     NAME_DESC,
     DURATION_DESC,
     DURATION_ASC,
+    POPULARITY_DESC,
 }
 
 fun sortVideos(videos: List<VideoItem>, order: VideoSortOrder): List<VideoItem> {
@@ -17,10 +18,15 @@ fun sortVideos(videos: List<VideoItem>, order: VideoSortOrder): List<VideoItem> 
         VideoSortOrder.NAME_DESC -> videos.sortedByDescending { it.title.lowercase() }
         VideoSortOrder.DURATION_DESC -> videos.sortedByDescending { it.durationMs }
         VideoSortOrder.DURATION_ASC -> videos.sortedBy { it.durationMs }
+        VideoSortOrder.POPULARITY_DESC -> videos
     }
 }
 
-fun sortLibrary(entries: List<VideoLibraryEntry>, order: VideoSortOrder): List<VideoLibraryEntry> {
+fun sortLibrary(
+    entries: List<VideoLibraryEntry>,
+    order: VideoSortOrder,
+    playCounts: Map<String, Int> = emptyMap(),
+): List<VideoLibraryEntry> {
     return when (order) {
         VideoSortOrder.DATE_DESC -> entries.sortedByDescending { entrySortDate(it) }
         VideoSortOrder.DATE_ASC -> entries.sortedBy { entrySortDate(it) }
@@ -28,6 +34,7 @@ fun sortLibrary(entries: List<VideoLibraryEntry>, order: VideoSortOrder): List<V
         VideoSortOrder.NAME_DESC -> entries.sortedByDescending { entrySortName(it).lowercase() }
         VideoSortOrder.DURATION_DESC -> entries.sortedByDescending { entrySortDuration(it) }
         VideoSortOrder.DURATION_ASC -> entries.sortedBy { entrySortDuration(it) }
+        VideoSortOrder.POPULARITY_DESC -> entries.sortedByDescending { playCounts[entryKey(it)] ?: 0 }
     }
 }
 

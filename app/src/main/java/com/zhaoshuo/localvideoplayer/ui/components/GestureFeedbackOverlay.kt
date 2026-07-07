@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -31,6 +32,7 @@ import com.zhaoshuo.localvideoplayer.ui.theme.LumenAccentText
 private val BarHeight = 132.dp
 private val BarWidth = 6.dp
 private val PanelWidth = 40.dp
+private val EdgeHorizontalInset = 28.dp
 
 @Composable
 fun BrightnessFeedbackOverlay(
@@ -42,7 +44,7 @@ fun BrightnessFeedbackOverlay(
         visible = visible,
         fraction = brightnessFraction,
         contentAlignment = Alignment.CenterStart,
-        edgePadding = Modifier.padding(start = 12.dp),
+        edgePadding = Modifier.padding(start = EdgeHorizontalInset),
         gradient = Brush.horizontalGradient(
             colors = listOf(Color.Black.copy(alpha = 0.35f), Color.Transparent),
         ),
@@ -67,7 +69,7 @@ fun VolumeFeedbackOverlay(
         visible = visible,
         fraction = volumeFraction,
         contentAlignment = Alignment.CenterEnd,
-        edgePadding = Modifier.padding(end = 12.dp),
+        edgePadding = Modifier.padding(end = EdgeHorizontalInset),
         gradient = Brush.horizontalGradient(
             colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f)),
         ),
@@ -97,11 +99,11 @@ private fun EdgeLevelFeedbackOverlay(
         visible = visible,
         enter = fadeIn(),
         exit = fadeOut(),
-        modifier = modifier.fillMaxHeight(),
+        modifier = modifier.fillMaxSize(),
     ) {
         Box(
             modifier = Modifier
-                .fillMaxHeight()
+                .fillMaxSize()
                 .then(edgePadding),
             contentAlignment = contentAlignment,
         ) {

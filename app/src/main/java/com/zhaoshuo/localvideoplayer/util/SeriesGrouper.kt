@@ -1,14 +1,31 @@
 package com.zhaoshuo.localvideoplayer.util
 
+import com.zhaoshuo.localvideoplayer.model.SeriesGroupKind
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
 import com.zhaoshuo.localvideoplayer.model.VideoSeries
+import java.util.Calendar
+import java.util.Locale
 
 object SeriesGrouper {
 
     private const val MIN_GROUP_KEY_LENGTH = 3
     private const val HIGH_SIMILARITY = 0.88
     private const val MEDIUM_SIMILARITY = 0.72
+    private const val SHORT_CLIP_MAX_MS = 60_000L
+    private const val MIN_GROUP_SIZE = 2
+    private const val MIN_SHORT_MONTH_GROUP = 3
+
+    private val GENERIC_FOLDER_NAMES = setOf(
+        "camera",
+        "dcim",
+        "download",
+        "downloads",
+        "movies",
+        "video",
+        "videos",
+        "相册",
+    )
 
     fun groupVideos(videos: List<VideoItem>): List<VideoLibraryEntry> {
         val parsed = videos.map { video ->
@@ -25,6 +42,9 @@ object SeriesGrouper {
         groupByFolder(parsed, assigned, entries)
         groupBySeriesName(parsed, assigned, entries)
         groupBySimilarName(parsed, assigned, entries)
+        groupByDirectoryLoose(parsed, assigned, entries)
+        groupByBucket(parsed, assigned, entries)
+        groupShortClipsByMonth(parsed, assigned, entries)
 
         parsed.forEachIndexed { index, (video, _) ->
             if (!assigned[index]) {
@@ -66,7 +86,15 @@ object SeriesGrouper {
                             folderKey = parentFolderKey(groupVideos.first()),
                         )
                         val seriesKey = "folder:${parentFolderKey(groupVideos.first())}:$title"
-                        addSeries(entries, cluster, assigned, groupVideos, title, seriesKey)
+                        addSeries(
+                            entries,
+                            cluster,
+                            assigned,
+                            groupVideos,
+                            title,
+                            seriesKey,
+                            SeriesGroupKind.EPISODE,
+                        )
                     }
             }
     }
@@ -92,7 +120,114 @@ object SeriesGrouper {
                 val parsedTitles = indices.map { parsed[it].second }
                 val title = resolveSeriesTitle(groupVideos, parsedTitles, folderKey = null)
                 val seriesKey = "name:${TitleParser.normalizeForGrouping(title)}"
-                addSeries(entries, indices, assigned, groupVideos, title, seriesKey)
+                addSeries(
+                    entries,
+                    indices,
+                    assigned,
+                    groupVideos,
+                    title,
+                    seriesKey,
+                    SeriesGroupKind.EPISODE,
+                )
+            }
+    }
+
+    private fun groupByDirectoryLoose(
+        parsed: List<Pair<VideoItem, ParsedTitle>>,
+        assigned: BooleanArray,
+        entries: MutableList<VideoLibraryEntry>,
+    ) {
+        val folderGroups = mutableMapOf<String, MutableList<Int>>()
+
+        parsed.forEachIndexed { index, (video, _) ->
+            if (assigned[index]) return@forEachIndexed
+            val folderKey = parentFolderKey(video) ?: return@forEachIndexed
+            if (folderKey.startsWith("bucket:")) return@forEachIndexed
+            if (isGenericFolderName(folderLeafName(folderKey))) return@forEachIndexed
+            folderGroups.getOrPut(folderKey) { mutableListOf() }.add(index)
+        }
+
+        folderGroups.values
+            .filter { it.size >= MIN_GROUP_SIZE }
+            .forEach { indices ->
+                val groupVideos = indices.map { parsed[it].first }
+                val folderKey = parentFolderKey(groupVideos.first()) ?: return@forEach
+                val title = folderLeafName(folderKey).ifBlank {
+                    groupVideos.first().bucketName ?: folderKey
+                }
+                val seriesKey = "dir:$folderKey"
+                addSeries(
+                    entries,
+                    indices,
+                    assigned,
+                    groupVideos,
+                    title,
+                    seriesKey,
+                    SeriesGroupKind.DIRECTORY,
+                )
+            }
+    }
+
+    private fun groupByBucket(
+        parsed: List<Pair<VideoItem, ParsedTitle>>,
+        assigned: BooleanArray,
+        entries: MutableList<VideoLibraryEntry>,
+    ) {
+        val bucketGroups = mutableMapOf<String, MutableList<Int>>()
+
+        parsed.forEachIndexed { index, (video, _) ->
+            if (assigned[index]) return@forEachIndexed
+            val bucket = video.bucketName?.trim()?.takeIf { it.isNotBlank() } ?: return@forEachIndexed
+            if (isGenericFolderName(bucket)) return@forEachIndexed
+            bucketGroups.getOrPut(bucket) { mutableListOf() }.add(index)
+        }
+
+        bucketGroups.values
+            .filter { it.size >= MIN_GROUP_SIZE }
+            .forEach { indices ->
+                val groupVideos = indices.map { parsed[it].first }
+                val bucket = groupVideos.first().bucketName?.trim().orEmpty()
+                val seriesKey = "bucket:$bucket"
+                addSeries(
+                    entries,
+                    indices,
+                    assigned,
+                    groupVideos,
+                    bucket,
+                    seriesKey,
+                    SeriesGroupKind.BUCKET,
+                )
+            }
+    }
+
+    private fun groupShortClipsByMonth(
+        parsed: List<Pair<VideoItem, ParsedTitle>>,
+        assigned: BooleanArray,
+        entries: MutableList<VideoLibraryEntry>,
+    ) {
+        val monthGroups = mutableMapOf<String, MutableList<Int>>()
+
+        parsed.forEachIndexed { index, (video, _) ->
+            if (assigned[index]) return@forEachIndexed
+            if (video.durationMs > SHORT_CLIP_MAX_MS) return@forEachIndexed
+            monthGroups.getOrPut(monthKey(video.dateAdded)) { mutableListOf() }.add(index)
+        }
+
+        monthGroups.entries
+            .filter { it.value.size >= MIN_SHORT_MONTH_GROUP }
+            .forEach { (month, indices) ->
+                val groupVideos = indices.map { parsed[it].first }
+                val title = formatShortClipsMonthTitle(month)
+                val seriesKey = "shorts:$month"
+                addSeries(
+                    entries,
+                    indices,
+                    assigned,
+                    groupVideos,
+                    title,
+                    seriesKey,
+                    SeriesGroupKind.SHORT_CLIPS,
+                )
             }
     }
 
@@ -115,7 +250,15 @@ object SeriesGrouper {
                 val parsedTitles = cluster.map { parsed[it].second }
                 val title = resolveSeriesTitle(groupVideos, parsedTitles, folderKey = null)
                 val seriesKey = "fuzzy:${TitleParser.normalizeForGrouping(title)}"
-                addSeries(entries, cluster, assigned, groupVideos, title, seriesKey)
+                addSeries(
+                    entries,
+                    cluster,
+                    assigned,
+                    groupVideos,
+                    title,
+                    seriesKey,
+                    SeriesGroupKind.EPISODE,
+                )
             }
     }
 
@@ -126,6 +269,7 @@ object SeriesGrouper {
         videos: List<VideoItem>,
         title: String,
         seriesKey: String,
+        groupKind: SeriesGroupKind,
     ) {
         indices.forEach { assigned[it] = true }
         val sortedEpisodes = sortEpisodes(
@@ -137,9 +281,42 @@ object SeriesGrouper {
                     id = seriesKey.hashCode().toUInt().toString(16),
                     title = title,
                     episodes = sortedEpisodes,
+                    groupKind = groupKind,
                 ),
             ),
         )
+    }
+
+    private fun isGenericFolderName(name: String): Boolean {
+        return name.trim().lowercase(Locale.ROOT) in GENERIC_FOLDER_NAMES
+    }
+
+    private fun folderLeafName(folderKey: String): String {
+        return if (folderKey.startsWith("bucket:")) {
+            folderKey.removePrefix("bucket:")
+        } else {
+            folderKey.substringAfterLast('/').trim('/')
+        }
+    }
+
+    private fun monthKey(dateAdded: Long): String {
+        val millis = if (dateAdded < 1_000_000_000_000L) dateAdded * 1000 else dateAdded
+        val calendar = Calendar.getInstance()
+        calendar.timeInMillis = millis
+        return String.format(
+            Locale.US,
+            "%04d-%02d",
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH) + 1,
+        )
+    }
+
+    private fun formatShortClipsMonthTitle(monthKey: String): String {
+        val parts = monthKey.split("-")
+        if (parts.size != 2) return "短视频"
+        val year = parts[0].toIntOrNull() ?: return "短视频"
+        val month = parts[1].toIntOrNull() ?: return "短视频"
+        return "短视频 · ${year}年${month}月"
     }
 
     private fun resolveSeriesTitle(

@@ -17,9 +17,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.ui.draw.clip
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -32,14 +35,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
 import com.zhaoshuo.localvideoplayer.model.PlaybackRecord
+import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenAccentText
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenBackground
+import com.zhaoshuo.localvideoplayer.ui.theme.LumenDelete
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenOnSurfaceMuted
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenSurface
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenThumbCorner
 
 @Composable
@@ -87,12 +91,13 @@ private fun RecentPlaybackCard(
         }
     }
 
+    val theme = LocalLumenTheme.current
     Column(
         modifier = modifier
             .width(120.dp)
             .clip(RoundedCornerShape(LumenThumbCorner))
             .clickable(onClick = onClick)
-            .background(LumenSurface.copy(alpha = 0.35f))
+            .background(theme.surface.copy(alpha = 0.35f))
             .padding(8.dp),
     ) {
         Box(
@@ -111,7 +116,7 @@ private fun RecentPlaybackCard(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(LumenSurface),
+                        .background(theme.surface),
                 )
             }
             if (progress != null && progress > 0.01f) {
@@ -179,6 +184,8 @@ fun SwipeableListItem(
         }
     }
 
+    val theme = LocalLumenTheme.current
+    val opaqueBackground = theme.background.copy(alpha = 1f)
     SwipeToDismissBox(
         state = dismissState,
         enableDismissFromStartToEnd = false,
@@ -187,20 +194,40 @@ fun SwipeableListItem(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(LumenThumbCorner))
-                    .background(Color(0xFFE53935))
-                    .padding(horizontal = 20.dp),
+                    .background(LumenDelete),
                 contentAlignment = Alignment.CenterEnd,
             ) {
-                Text(
-                    text = stringResource(R.string.delete),
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                )
+                Column(
+                    modifier = Modifier
+                        .width(80.dp)
+                        .fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = stringResource(R.string.delete),
+                        tint = Color.White,
+                        modifier = Modifier.height(24.dp),
+                    )
+                    Text(
+                        text = stringResource(R.string.delete),
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
             }
         },
         modifier = modifier.clip(RoundedCornerShape(LumenThumbCorner)),
     ) {
-        Box(modifier = Modifier.background(LumenBackground)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(opaqueBackground),
+        ) {
             content()
         }
     }

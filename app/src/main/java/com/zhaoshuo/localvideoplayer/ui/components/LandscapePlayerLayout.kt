@@ -53,7 +53,6 @@ fun LandscapePlayerLayout(
     onSpeedClick: () -> Unit,
     onLoopClick: () -> Unit,
     onEpisodePickerClick: () -> Unit,
-    onBackgroundTap: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (isFullscreen) {
@@ -82,7 +81,6 @@ fun LandscapePlayerLayout(
             onSpeedClick = onSpeedClick,
             onLoopClick = onLoopClick,
             onEpisodePickerClick = onEpisodePickerClick,
-            onBackgroundTap = onBackgroundTap,
             modifier = modifier,
         )
         return

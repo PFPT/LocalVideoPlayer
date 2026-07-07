@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,6 +30,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
 import com.zhaoshuo.localvideoplayer.data.HiddenVideosStore
+import com.zhaoshuo.localvideoplayer.data.PlayCountStore
 import com.zhaoshuo.localvideoplayer.data.PlaybackStore
 import com.zhaoshuo.localvideoplayer.data.VideoRepository
 import com.zhaoshuo.localvideoplayer.model.PlaybackRecord
@@ -37,6 +40,7 @@ import com.zhaoshuo.localvideoplayer.ui.components.DeleteVideoDialog
 import com.zhaoshuo.localvideoplayer.ui.components.EpisodeListItem
 import com.zhaoshuo.localvideoplayer.ui.components.LumenListHeader
 import com.zhaoshuo.localvideoplayer.ui.components.SelectionTopBar
+import com.zhaoshuo.localvideoplayer.ui.components.rememberPlaybackProgress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -49,6 +53,7 @@ fun SeriesDetailScreen(
     repository: VideoRepository,
     hiddenVideosStore: HiddenVideosStore,
     playbackStore: PlaybackStore,
+    playCountStore: PlayCountStore,
     onBack: () -> Unit,
     onPlayEpisode: (PlaylistState) -> Unit,
     onVideosRemoved: (List<Uri>) -> Unit,
@@ -106,6 +111,7 @@ fun SeriesDetailScreen(
     val deleteFromDevice = rememberVideoDeleter(
         playbackStore = playbackStore,
         hiddenVideosStore = hiddenVideosStore,
+        playCountStore = playCountStore,
         onVideosRemoved = onVideosRemoved,
         onDeleteStarted = { isDeleting = true },
         onDeleteFinished = {
@@ -120,6 +126,7 @@ fun SeriesDetailScreen(
             withContext(Dispatchers.IO) {
                 hiddenVideosStore.hideAll(uris)
                 playbackStore.removeRecords(uris)
+                playCountStore.removeForUris(uris)
             }
             onVideosRemoved(uris)
             exitSelectionMode()
@@ -178,8 +185,14 @@ fun SeriesDetailScreen(
             )
         }
 
+        val listState = rememberLazyListState()
+        val isListScrolling by remember {
+            derivedStateOf { listState.isScrollInProgress }
+        }
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
+            state = listState,
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -189,13 +202,15 @@ fun SeriesDetailScreen(
             ) { index, episode ->
                 val uriKey = episode.uri.toString()
                 val isSelected = uriKey in selectedUris
+                val progress = rememberPlaybackProgress(uriKey, playbackRecords)
 
                 EpisodeListItem(
                     episode = episode,
                     episodeNumber = episode.episode,
-                    playbackRecord = playbackRecords[uriKey],
+                    progress = progress,
                     selectionMode = selectionMode,
                     selected = isSelected,
+                    deferThumbnailLoad = isListScrolling,
                     onClick = {
                         if (selectionMode) {
                             selectedUris = if (isSelected) {
@@ -204,6 +219,9 @@ fun SeriesDetailScreen(
                                 selectedUris + uriKey
                             }
                         } else {
+                            scope.launch(Dispatchers.IO) {
+                                playCountStore.increment("series:${series.id}")
+                            }
                             onPlayEpisode(
                                 PlaylistState(
                                     items = visibleEpisodes,

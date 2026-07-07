@@ -7,18 +7,22 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 
 object VideoThumbnailCache {
     private const val MAX_ENTRIES = 128
+    private const val MAX_CONCURRENT_LOADS = 3
 
     private val cache = object : LruCache<Long, ImageBitmap>(MAX_ENTRIES) {
         override fun sizeOf(key: Long, value: ImageBitmap) = 1
     }
 
     private val locks = ConcurrentHashMap<Long, Mutex>()
+    private val loadSemaphore = Semaphore(MAX_CONCURRENT_LOADS)
 
     fun peek(videoId: Long): ImageBitmap? = cache.get(videoId)
 
@@ -26,8 +30,10 @@ object VideoThumbnailCache {
         cache.get(videoId)?.let { return it }
         val lock = locks.getOrPut(videoId) { Mutex() }
         return lock.withLock {
-            cache.get(videoId) ?: withContext(Dispatchers.IO) {
-                loadThumbnail(context.applicationContext, videoId)?.also { cache.put(videoId, it) }
+            cache.get(videoId) ?: loadSemaphore.withPermit {
+                withContext(Dispatchers.IO) {
+                    loadThumbnail(context.applicationContext, videoId)?.also { cache.put(videoId, it) }
+                }
             }
         }.also {
             locks.remove(videoId)

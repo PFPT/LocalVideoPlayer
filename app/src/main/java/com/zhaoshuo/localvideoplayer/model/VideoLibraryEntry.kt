@@ -7,6 +7,38 @@ sealed class VideoLibraryEntry {
     data class Single(val video: VideoItem) : VideoLibraryEntry()
 }
 
+fun entryKey(entry: VideoLibraryEntry): String {
+    return when (entry) {
+        is VideoLibraryEntry.Series -> "series:${entry.series.id}"
+        is VideoLibraryEntry.Single -> "single:${entry.video.uri}"
+    }
+}
+
+data class LibrarySections(
+    val episodes: List<VideoLibraryEntry.Series>,
+    val folders: List<VideoLibraryEntry.Series>,
+    val shortClips: List<VideoLibraryEntry.Series>,
+    val singles: List<VideoLibraryEntry.Single>,
+)
+
+fun partitionLibrary(entries: List<VideoLibraryEntry>): LibrarySections {
+    val episodes = mutableListOf<VideoLibraryEntry.Series>()
+    val folders = mutableListOf<VideoLibraryEntry.Series>()
+    val shortClips = mutableListOf<VideoLibraryEntry.Series>()
+    val singles = mutableListOf<VideoLibraryEntry.Single>()
+    for (entry in entries) {
+        when (entry) {
+            is VideoLibraryEntry.Single -> singles.add(entry)
+            is VideoLibraryEntry.Series -> when (entry.series.groupKind) {
+                SeriesGroupKind.EPISODE -> episodes.add(entry)
+                SeriesGroupKind.DIRECTORY, SeriesGroupKind.BUCKET -> folders.add(entry)
+                SeriesGroupKind.SHORT_CLIPS -> shortClips.add(entry)
+            }
+        }
+    }
+    return LibrarySections(episodes, folders, shortClips, singles)
+}
+
 fun List<VideoLibraryEntry>.withoutUris(uris: Collection<Uri>): List<VideoLibraryEntry> {
     if (uris.isEmpty()) return this
     val uriSet = uris.map { it.toString() }.toSet()

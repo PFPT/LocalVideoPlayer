@@ -4,8 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,24 +60,10 @@ internal fun FullscreenPlayerLayout(
     onSpeedClick: () -> Unit,
     onLoopClick: () -> Unit,
     onEpisodePickerClick: () -> Unit,
-    onBackgroundTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val backgroundInteractionSource = remember { MutableInteractionSource() }
     Box(
-        modifier = modifier
-            .fillMaxSize()
-            .then(
-                if (!controlsVisible) {
-                    Modifier.clickable(
-                        indication = null,
-                        interactionSource = backgroundInteractionSource,
-                        onClick = onBackgroundTap,
-                    )
-                } else {
-                    Modifier
-                },
-            ),
+        modifier = modifier.fillMaxSize(),
     ) {
         AnimatedVisibility(
             visible = controlsVisible,

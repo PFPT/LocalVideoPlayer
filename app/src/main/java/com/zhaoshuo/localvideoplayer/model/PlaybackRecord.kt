@@ -1,7 +1,9 @@
 package com.zhaoshuo.localvideoplayer.model
 
 import android.net.Uri
+import androidx.compose.runtime.Immutable
 
+@Immutable
 data class PlaybackRecord(
     val uri: Uri,
     val title: String,

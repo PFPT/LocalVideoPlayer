@@ -1,7 +1,9 @@
 package com.zhaoshuo.localvideoplayer.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -26,6 +28,7 @@ import com.zhaoshuo.localvideoplayer.R
 fun LumenListHeader(
     title: String,
     modifier: Modifier = Modifier,
+    titleContent: (@Composable () -> Unit)? = null,
     onBack: (() -> Unit)? = null,
     applyStatusBarPadding: Boolean = true,
     actions: @Composable () -> Unit = {},
@@ -55,22 +58,36 @@ fun LumenListHeader(
                     tint = MaterialTheme.colorScheme.onBackground,
                 )
             }
+        } else if (titleContent != null) {
+            titleContent()
         } else {
             Box(modifier = Modifier.size(24.dp))
         }
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 8.dp),
-        )
-        Box(
-            modifier = Modifier.size(24.dp),
-            contentAlignment = Alignment.CenterEnd,
+        if (titleContent != null && onBack == null) {
+            Spacer(modifier = Modifier.weight(1f))
+        } else {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (titleContent != null) {
+                    titleContent()
+                } else {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             actions()
         }

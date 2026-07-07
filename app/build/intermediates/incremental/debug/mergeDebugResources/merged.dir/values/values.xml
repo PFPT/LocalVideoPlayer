@@ -117,6 +117,7 @@
     <string name="cast">投屏</string>
     <string name="close_drawer">"Close navigation menu"</string>
     <string name="close_sheet">"Close sheet"</string>
+    <string name="collapse_singles">折叠单集视频</string>
     <string name="coming_soon">即将推出</string>
     <string name="default_error_message">"Invalid input"</string>
     <string name="default_popup_window_title" ns1:ignore="ExtraTranslation">"Pop-Up Window"</string>
@@ -127,6 +128,7 @@
     <string name="delete_video_message">选择从列表移除，或从设备中永久删除文件。</string>
     <string name="delete_video_title">删除视频</string>
     <string name="delete_videos_title">删除 %d 个视频</string>
+    <string name="display">显示</string>
     <string name="dropdown_menu">"Dropdown menu"</string>
     <string name="empty_video_hint">点击右下角按钮选择视频文件，或下拉刷新重新扫描</string>
     <string name="empty_video_list">未找到视频</string>
@@ -145,6 +147,19 @@
     <string name="exo_download_paused_for_wifi">Downloads waiting for WiFi</string>
     <string name="exo_download_removing">Removing downloads</string>
     <string name="favorite">收藏</string>
+    <string name="filter">筛选</string>
+    <string name="filter_date_all">全部日期</string>
+    <string name="filter_date_month">近 30 天</string>
+    <string name="filter_date_today">今天</string>
+    <string name="filter_date_week">近 7 天</string>
+    <string name="filter_date_year">今年</string>
+    <string name="filter_duration_all">全部时长</string>
+    <string name="filter_duration_long">10 分钟以上</string>
+    <string name="filter_duration_medium">1–10 分钟</string>
+    <string name="filter_duration_min_20">20 分钟以上</string>
+    <string name="filter_duration_min_25">25 分钟以上</string>
+    <string name="filter_duration_short">1 分钟以内</string>
+    <string name="folder_subtitle">%1$d 个视频 · %2$s</string>
     <string name="fullscreen">全屏</string>
     <string name="grant_permission">授予权限</string>
     <string name="hide_from_list">从列表移除</string>
@@ -152,6 +167,7 @@
     <string name="indeterminate">Partially checked</string>
     <string name="info">信息</string>
     <string name="landscape_mode">横屏</string>
+    <string name="library_options">列表选项</string>
     <string name="library_up_to_date">已是最新</string>
     <string name="lock_controls">锁定方向</string>
     <string name="loop">循环</string>
@@ -216,9 +232,11 @@
     <string name="m3c_time_picker_pm">PM</string>
     <string name="m3c_tooltip_long_press_label">Show tooltip</string>
     <string name="m3c_tooltip_pane_description">Tooltip</string>
+    <string name="mark">标记</string>
     <string name="more_options">更多选项</string>
     <string name="navigation_menu">"Navigation menu"</string>
     <string name="next">下一集</string>
+    <string name="no_filter_results">无匹配视频</string>
     <string name="not_selected">Not selected</string>
     <string name="pause">暂停</string>
     <string name="permission_required">需要存储权限以扫描本地视频</string>
@@ -239,6 +257,11 @@
     <string name="replay">重播</string>
     <string name="rotate_screen">旋转屏幕</string>
     <string name="scroll_to_top">回到顶部</string>
+    <string name="section_episodes">剧集</string>
+    <string name="section_folders">文件夹</string>
+    <string name="section_other_videos">其他视频 (%d)</string>
+    <string name="section_pinned">标记</string>
+    <string name="section_short_clips">短视频</string>
     <string name="seek_forward">快进</string>
     <string name="seek_forward_desc">快进10秒</string>
     <string name="select_all">全选</string>
@@ -257,6 +280,7 @@
     <string name="sort_duration_desc">按时长（最长）</string>
     <string name="sort_name_asc">按名称（A-Z）</string>
     <string name="sort_name_desc">按名称（Z-A）</string>
+    <string name="sort_popularity_desc">按热度</string>
     <string name="speed_boost_active">2x 倍速</string>
     <string name="speed_format">%sx</string>
     <string name="state_empty">Empty</string>
@@ -266,18 +290,40 @@
     <string name="subtitles">字幕</string>
     <string name="switch_role">Switch</string>
     <string name="tab">Tab</string>
+    <string name="tab_all">全部</string>
+    <string name="tab_episodes">剧集</string>
+    <string name="tab_folders">文件夹</string>
+    <string name="tab_marked">标记</string>
+    <string name="tab_short_clips">短视频</string>
+    <string name="tab_singles">单集</string>
     <string name="template_percent"><ns2:g id="percentage">%1$d</ns2:g> percent.</string>
+    <string name="theme_alpha">透明度</string>
+    <string name="theme_background">背景</string>
+    <string name="theme_cancel">取消</string>
+    <string name="theme_color">主题颜色</string>
+    <string name="theme_current_color">当前颜色</string>
+    <string name="theme_list_option">列表选项</string>
+    <string name="theme_preview">预览</string>
+    <string name="theme_reset_all">全部恢复默认</string>
+    <string name="theme_reset_default">恢复默认</string>
+    <string name="theme_save">保存</string>
+    <string name="theme_text">文字</string>
     <string name="tooltip_description">tooltip</string>
     <string name="tooltip_label">show tooltip</string>
     <string name="total_duration">总时长 %s</string>
     <string name="unlock_controls">解锁方向</string>
+    <string name="unmark">取消标记</string>
     <string name="up_next">即将播放</string>
     <string name="video_list_title">本地视频</string>
     <string name="video_track">视轨</string>
     <string name="view_all">查看全部</string>
+    <string name="view_flat">平铺视图</string>
+    <string name="view_layout">布局</string>
+    <string name="view_sectioned">分区视图</string>
     <string name="volume_label">音量</string>
     <string name="watched_episodes">已看 %1$d/%2$d 集</string>
     <string name="watched_percent">已看 %d%%</string>
+    <string name="watched_videos">已看 %1$d/%2$d 个</string>
     <style name="DialogWindowTheme">
         <item name="android:windowClipToOutline">false</item>
     </style>

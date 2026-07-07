@@ -7,6 +7,8 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -22,14 +24,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,44 +47,61 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
 import com.zhaoshuo.localvideoplayer.data.HiddenVideosStore
+import com.zhaoshuo.localvideoplayer.data.PinnedItemsStore
+import com.zhaoshuo.localvideoplayer.data.PlayCountStore
 import com.zhaoshuo.localvideoplayer.data.PlaybackStore
+import com.zhaoshuo.localvideoplayer.data.ThemePreferencesStore
 import com.zhaoshuo.localvideoplayer.data.VideoRepository
+import com.zhaoshuo.localvideoplayer.model.LibraryFilter
+import com.zhaoshuo.localvideoplayer.model.LibraryTypeTab
+import com.zhaoshuo.localvideoplayer.model.LibraryViewLayout
 import com.zhaoshuo.localvideoplayer.model.PlaybackRecord
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
 import com.zhaoshuo.localvideoplayer.model.VideoSortOrder
+import com.zhaoshuo.localvideoplayer.model.applyTypeTab
+import com.zhaoshuo.localvideoplayer.model.entryKey
+import com.zhaoshuo.localvideoplayer.model.filterLibrary
+import com.zhaoshuo.localvideoplayer.model.partitionWithPinned
 import com.zhaoshuo.localvideoplayer.model.sortLibrary
 import com.zhaoshuo.localvideoplayer.model.withoutUris
 import com.zhaoshuo.localvideoplayer.player.PlaylistState
 import com.zhaoshuo.localvideoplayer.ui.components.DeleteVideoDialog
+import com.zhaoshuo.localvideoplayer.ui.components.LibraryOptionsBottomSheet
+import com.zhaoshuo.localvideoplayer.ui.components.LumenLibraryTabBar
 import com.zhaoshuo.localvideoplayer.ui.components.LumenListHeader
 import com.zhaoshuo.localvideoplayer.ui.components.RecentPlaybackSection
 import com.zhaoshuo.localvideoplayer.ui.components.SelectionTopBar
 import com.zhaoshuo.localvideoplayer.ui.components.SeriesFolderItem
-import com.zhaoshuo.localvideoplayer.ui.components.SortBottomSheet
+import com.zhaoshuo.localvideoplayer.ui.components.ThemeColorBottomSheet
 import com.zhaoshuo.localvideoplayer.ui.components.VideoListItem
+import com.zhaoshuo.localvideoplayer.ui.components.rememberEpisodeProgressList
+import com.zhaoshuo.localvideoplayer.ui.components.rememberPlaybackProgress
 import com.zhaoshuo.localvideoplayer.ui.components.rememberSeriesPlaybackStats
+import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenAccentText
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenBackground
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenOnSurfaceMuted
+import com.zhaoshuo.localvideoplayer.ui.theme.LumenThemeColors
 import com.zhaoshuo.localvideoplayer.util.M3uPlaylistParser
-import com.zhaoshuo.localvideoplayer.util.Permissions
 import com.zhaoshuo.localvideoplayer.util.isM3u8Title
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -102,7 +125,11 @@ fun VideoListScreen(
     repository: VideoRepository,
     hiddenVideosStore: HiddenVideosStore,
     playbackStore: PlaybackStore,
-    onPermissionGranted: () -> Unit,
+    pinnedItemsStore: PinnedItemsStore,
+    playCountStore: PlayCountStore,
+    themeStore: ThemePreferencesStore,
+    savedThemeColors: LumenThemeColors,
+    onRequestPermission: () -> Unit,
     onPlayVideo: (PlaylistState) -> Unit,
     onOpenSeries: (String) -> Unit,
     onVideosRemoved: (List<Uri>) -> Unit,
@@ -112,7 +139,12 @@ fun VideoListScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var sortOrder by rememberSaveable { mutableStateOf(VideoSortOrder.DATE_DESC) }
-    var showSortSheet by rememberSaveable { mutableStateOf(false) }
+    var collapseSingles by rememberSaveable { mutableStateOf(false) }
+    var viewLayout by rememberSaveable { mutableStateOf(LibraryViewLayout.SECTIONED) }
+    var libraryFilter by remember { mutableStateOf(LibraryFilter()) }
+    var selectedTypeTab by rememberSaveable { mutableStateOf(LibraryTypeTab.ALL) }
+    var showOptionsSheet by rememberSaveable { mutableStateOf(false) }
+    var showThemeSheet by rememberSaveable { mutableStateOf(false) }
     var selectionMode by rememberSaveable { mutableStateOf(false) }
     var selectedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     var pendingDeleteUris by remember { mutableStateOf<List<Uri>?>(null) }
@@ -120,43 +152,79 @@ fun VideoListScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        if (granted) onPermissionGranted()
-    }
+    val pinnedKeys by pinnedItemsStore.pinnedKeys.collectAsState(initial = emptySet())
+    val playCounts by playCountStore.playCounts.collectAsState(initial = emptyMap())
 
-    LaunchedEffect(Unit) {
-        val granted = androidx.core.content.ContextCompat.checkSelfPermission(
-            context,
-            Permissions.readVideoPermission,
-        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        if (granted) {
-            onPermissionGranted()
-        } else {
-            permissionLauncher.launch(Permissions.readVideoPermission)
-        }
-    }
-
-    val sortedLibrary by produceState(
+    val processedLibrary by produceState(
         initialValue = libraryEntries,
         libraryEntries,
         sortOrder,
+        libraryFilter,
+        selectedTypeTab,
+        pinnedKeys,
+        playCounts,
     ) {
         value = withContext(Dispatchers.Default) {
-            sortLibrary(libraryEntries, sortOrder)
+            var list = filterLibrary(libraryEntries, libraryFilter)
+            list = applyTypeTab(list, selectedTypeTab, pinnedKeys)
+            list = sortLibrary(list, sortOrder, playCounts)
+            list
         }
     }
+    val displayLibrary = if (processedLibrary.isNotEmpty() || libraryEntries.isEmpty()) {
+        processedLibrary
+    } else {
+        libraryEntries
+    }
+    val pinnedSections = remember(displayLibrary, pinnedKeys, viewLayout) {
+        if (viewLayout == LibraryViewLayout.SECTIONED) {
+            partitionWithPinned(displayLibrary, pinnedKeys)
+        } else {
+            null
+        }
+    }
+    val flatLibrary = remember(displayLibrary, viewLayout) {
+        if (viewLayout == LibraryViewLayout.FLAT) {
+            displayLibrary
+        } else {
+            emptyList()
+        }
+    }
+    val hasActiveOptions = viewLayout != LibraryViewLayout.SECTIONED ||
+        libraryFilter != LibraryFilter() ||
+        sortOrder != VideoSortOrder.DATE_DESC ||
+        selectedTypeTab == LibraryTypeTab.MARKED
+    val typeTabs = remember {
+        listOf(
+            LibraryTypeTab.ALL,
+            LibraryTypeTab.EPISODES,
+            LibraryTypeTab.FOLDERS,
+            LibraryTypeTab.SHORT_CLIPS,
+            LibraryTypeTab.SINGLES,
+            LibraryTypeTab.MARKED,
+        )
+    }
+    val isMarkedTabActive = selectedTypeTab == LibraryTypeTab.MARKED
+    val isSortingLibrary = libraryEntries.isNotEmpty() && processedLibrary.isEmpty()
     val listState = rememberLazyListState()
-    val showScrollToTop by remember {
+
+    LaunchedEffect(selectedTypeTab) {
+        listState.animateScrollToItem(0)
+    }
+    val isListScrolling by remember {
+        derivedStateOf { listState.isScrollInProgress }
+    }
+    val isListScrolled by remember {
         derivedStateOf {
-            !selectionMode &&
-                !isLibraryLoading &&
-                hasPermission &&
-                (sortedLibrary.isNotEmpty() || recentRecords.isNotEmpty()) &&
-                (listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0)
+            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
         }
     }
+    val showScrollToTop =
+        !selectionMode &&
+            !isLibraryLoading &&
+            hasPermission &&
+            (displayLibrary.isNotEmpty() || recentRecords.isNotEmpty()) &&
+            isListScrolled
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
@@ -187,10 +255,9 @@ fun VideoListScreen(
         }
     }
 
-    fun entryKey(entry: VideoLibraryEntry): String {
-        return when (entry) {
-            is VideoLibraryEntry.Series -> "series:${entry.series.id}"
-            is VideoLibraryEntry.Single -> "single:${entry.video.uri}"
+    fun toggleMark(key: String) {
+        scope.launch(Dispatchers.IO) {
+            pinnedItemsStore.toggle(key)
         }
     }
 
@@ -202,7 +269,7 @@ fun VideoListScreen(
     }
 
     fun urisForKeys(keys: Set<String>): List<Uri> {
-        return sortedLibrary
+        return displayLibrary
             .filter { entryKey(it) in keys }
             .flatMap { urisForEntry(it) }
     }
@@ -259,6 +326,7 @@ fun VideoListScreen(
     val deleteFromDevice = rememberVideoDeleter(
         playbackStore = playbackStore,
         hiddenVideosStore = hiddenVideosStore,
+        playCountStore = playCountStore,
         onVideosRemoved = onVideosRemoved,
         onDeleteStarted = { isDeleting = true },
         onDeleteFinished = {
@@ -267,12 +335,132 @@ fun VideoListScreen(
         },
     )
 
+    fun playCountKeyForVideo(video: VideoItem): String {
+        val targetUri = video.uri.toString()
+        libraryEntries.forEach { entry ->
+            when (entry) {
+                is VideoLibraryEntry.Single -> {
+                    if (entry.video.uri.toString() == targetUri) return entryKey(entry)
+                }
+                is VideoLibraryEntry.Series -> {
+                    if (entry.series.episodes.any { it.uri.toString() == targetUri }) {
+                        return entryKey(entry)
+                    }
+                }
+            }
+        }
+        return "single:${video.uri}"
+    }
+
+    fun incrementPlayCount(key: String) {
+        scope.launch(Dispatchers.IO) {
+            playCountStore.increment(key)
+        }
+    }
+
     fun playVideoItem(video: VideoItem) {
+        incrementPlayCount(playCountKeyForVideo(video))
         scope.launch {
             val state = withContext(Dispatchers.IO) {
                 repository.playlistStateFor(video, libraryEntries)
             }
             onPlayVideo(state)
+        }
+    }
+
+    val libraryEntriesState by rememberUpdatedState(libraryEntries)
+    val onPlayVideoState by rememberUpdatedState(onPlayVideo)
+    val playVideoHandler = remember(scope, repository) {
+        { video: VideoItem ->
+            incrementPlayCount(playCountKeyForVideo(video))
+            scope.launch {
+                val state = withContext(Dispatchers.IO) {
+                    repository.playlistStateFor(video, libraryEntriesState)
+                }
+                onPlayVideoState(state)
+            }
+        }
+    }
+    val openSeriesHandler = remember(onOpenSeries) { { seriesId: String -> onOpenSeries(seriesId) } }
+    val openDeleteHandler = remember { { uris: List<Uri> -> openDeleteDialog(uris) } }
+    val toggleSelectionHandler = remember {
+        { key: String, isSelected: Boolean ->
+            selectedKeys = if (isSelected) selectedKeys - key else selectedKeys + key
+        }
+    }
+    val enterSelectionHandler = remember {
+        { key: String ->
+            selectionMode = true
+            selectedKeys = setOf(key)
+        }
+    }
+
+    @Composable
+    fun SeriesLibraryRow(entry: VideoLibraryEntry.Series) {
+        val key = entryKey(entry)
+        val isSelected = key in selectedKeys
+        val episodeProgress = rememberEpisodeProgressList(
+            series = entry.series,
+            playbackRecords = playbackRecords,
+        )
+        val playbackStats = rememberSeriesPlaybackStats(
+            series = entry.series,
+            episodeProgress = episodeProgress,
+        )
+        SeriesFolderItem(
+            series = entry.series,
+            playbackStats = playbackStats,
+            selectionMode = selectionMode,
+            selected = isSelected,
+            deferThumbnailLoad = isListScrolling,
+            marked = key in pinnedKeys,
+            onToggleMark = { toggleMark(key) },
+            onClick = {
+                if (selectionMode) {
+                    toggleSelectionHandler(key, isSelected)
+                } else {
+                    incrementPlayCount(key)
+                    openSeriesHandler(entry.series.id)
+                }
+            },
+            onLongClick = { enterSelectionHandler(key) },
+            onSwipeDelete = { openDeleteHandler(urisForEntry(entry)) },
+        )
+    }
+
+    @Composable
+    fun SingleLibraryRow(entry: VideoLibraryEntry.Single) {
+        val key = entryKey(entry)
+        val isSelected = key in selectedKeys
+        val progress = rememberPlaybackProgress(
+            uriKey = entry.video.uri.toString(),
+            playbackRecords = playbackRecords,
+        )
+        VideoListItem(
+            video = entry.video,
+            progress = progress,
+            selectionMode = selectionMode,
+            selected = isSelected,
+            deferThumbnailLoad = isListScrolling,
+            marked = key in pinnedKeys,
+            onToggleMark = { toggleMark(key) },
+            onClick = {
+                if (selectionMode) {
+                    toggleSelectionHandler(key, isSelected)
+                } else {
+                    playVideoHandler(entry.video)
+                }
+            },
+            onLongClick = { enterSelectionHandler(key) },
+            onSwipeDelete = { openDeleteHandler(listOf(entry.video.uri)) },
+        )
+    }
+
+    @Composable
+    fun AnyLibraryRow(entry: VideoLibraryEntry) {
+        when (entry) {
+            is VideoLibraryEntry.Series -> SeriesLibraryRow(entry)
+            is VideoLibraryEntry.Single -> SingleLibraryRow(entry)
         }
     }
 
@@ -305,6 +493,7 @@ fun VideoListScreen(
             withContext(Dispatchers.IO) {
                 hiddenVideosStore.hideAll(uris)
                 playbackStore.removeRecords(uris)
+                playCountStore.removeForUris(uris)
             }
             onVideosRemoved(uris)
             exitSelectionMode()
@@ -312,11 +501,29 @@ fun VideoListScreen(
         }
     }
 
-    if (showSortSheet) {
-        SortBottomSheet(
+    if (showOptionsSheet) {
+        LibraryOptionsBottomSheet(
             currentOrder = sortOrder,
+            viewLayout = viewLayout,
+            libraryFilter = libraryFilter,
+            collapseSingles = collapseSingles,
             onOrderSelected = { sortOrder = it },
-            onDismiss = { showSortSheet = false },
+            onViewLayoutSelected = { viewLayout = it },
+            onFilterChanged = { libraryFilter = it },
+            onCollapseSinglesChanged = { collapseSingles = it },
+            onDismiss = { showOptionsSheet = false },
+        )
+    }
+
+    if (showThemeSheet) {
+        ThemeColorBottomSheet(
+            initialColors = savedThemeColors,
+            onSave = { colors ->
+                scope.launch {
+                    themeStore.saveThemeColors(colors)
+                }
+            },
+            onDismiss = { showThemeSheet = false },
         )
     }
 
@@ -337,15 +544,15 @@ fun VideoListScreen(
     Scaffold(
         modifier = modifier,
         contentWindowInsets = WindowInsets.safeDrawing,
-        containerColor = LumenBackground,
+        containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
             if (!selectionMode) {
                 Column(
                     horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (showScrollToTop) {
-                        FloatingActionButton(
+                        VideoListFab(
                             onClick = {
                                 scope.launch {
                                     val layoutInfo = listState.layoutInfo
@@ -371,27 +578,15 @@ fun VideoListScreen(
                                     )
                                 }
                             },
-                            containerColor = LumenAccentText.copy(alpha = 0.15f),
-                            contentColor = LumenAccentText,
-                            modifier = Modifier.clip(CircleShape),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowUp,
-                                contentDescription = stringResource(R.string.scroll_to_top),
-                            )
-                        }
-                    }
-                    FloatingActionButton(
-                        onClick = { filePickerLauncher.launch(VIDEO_PICKER_MIME_TYPES) },
-                        containerColor = LumenAccentText.copy(alpha = 0.15f),
-                        contentColor = LumenAccentText,
-                        modifier = Modifier.clip(CircleShape),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = stringResource(R.string.pick_video),
+                            icon = Icons.Default.ExpandLess,
+                            contentDescription = stringResource(R.string.scroll_to_top),
                         )
                     }
+                    VideoListFab(
+                        onClick = { filePickerLauncher.launch(VIDEO_PICKER_MIME_TYPES) },
+                        icon = Icons.Default.Add,
+                        contentDescription = stringResource(R.string.pick_video),
+                    )
                 }
             }
         },
@@ -404,9 +599,9 @@ fun VideoListScreen(
             if (selectionMode) {
                 SelectionTopBar(
                     selectedCount = selectedKeys.size,
-                    totalCount = sortedLibrary.size,
+                    totalCount = displayLibrary.size,
                     onSelectAll = {
-                        selectedKeys = sortedLibrary.map { entryKey(it) }.toSet()
+                        selectedKeys = displayLibrary.map { entryKey(it) }.toSet()
                     },
                     onDelete = {
                         openDeleteDialog(urisForKeys(selectedKeys))
@@ -416,17 +611,62 @@ fun VideoListScreen(
             } else {
                 LumenListHeader(
                     title = stringResource(R.string.video_list_title),
+                    titleContent = {
+                        Icon(
+                            imageVector = Icons.Filled.VideoLibrary,
+                            contentDescription = stringResource(R.string.video_list_title),
+                            tint = MaterialTheme.colorScheme.onBackground,
+                        )
+                    },
                     applyStatusBarPadding = false,
                     actions = {
                         IconButton(
-                            onClick = { showSortSheet = true },
-                            modifier = Modifier.size(24.dp),
+                            onClick = {
+                                selectedTypeTab = if (isMarkedTabActive) {
+                                    LibraryTypeTab.ALL
+                                } else {
+                                    LibraryTypeTab.MARKED
+                                }
+                            },
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Sort,
-                                contentDescription = stringResource(R.string.sort),
+                                imageVector = if (isMarkedTabActive) {
+                                    Icons.Filled.Star
+                                } else {
+                                    Icons.Outlined.StarOutline
+                                },
+                                contentDescription = stringResource(R.string.tab_marked),
+                                tint = if (isMarkedTabActive) {
+                                    LumenAccentText
+                                } else {
+                                    MaterialTheme.colorScheme.onBackground
+                                },
+                            )
+                        }
+                        IconButton(onClick = { showThemeSheet = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Palette,
+                                contentDescription = stringResource(R.string.theme_color),
                                 tint = MaterialTheme.colorScheme.onBackground,
                             )
+                        }
+                        IconButton(onClick = { showOptionsSheet = true }) {
+                            Box {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Sort,
+                                    contentDescription = stringResource(R.string.library_options),
+                                    tint = MaterialTheme.colorScheme.onBackground,
+                                )
+                                if (hasActiveOptions) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(LumenAccentText),
+                                    )
+                                }
+                            }
                         }
                     },
                 )
@@ -449,9 +689,7 @@ fun VideoListScreen(
                                 style = MaterialTheme.typography.titleMedium,
                             )
                             TextButton(
-                                onClick = {
-                                    permissionLauncher.launch(Permissions.readVideoPermission)
-                                },
+                                onClick = onRequestPermission,
                             ) {
                                 Text(stringResource(R.string.grant_permission))
                             }
@@ -463,7 +701,7 @@ fun VideoListScreen(
                                 .fillMaxSize()
                                 .pullToRefresh(
                                     state = pullRefreshState,
-                                    isRefreshing = isRefreshing || isLibraryLoading,
+                                    isRefreshing = isRefreshing,
                                     onRefresh = onPullRefresh,
                                     enabled = !selectionMode,
                                 ),
@@ -483,7 +721,21 @@ fun VideoListScreen(
                                     }
                                 }
 
-                                if (isLibraryLoading && sortedLibrary.isEmpty()) {
+                                if (!selectionMode) {
+                                    item(key = "library-tabs") {
+                                        LumenLibraryTabBar(
+                                            tabs = typeTabs,
+                                            selectedTab = selectedTypeTab,
+                                            onTabSelected = { selectedTypeTab = it },
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(bottom = 4.dp),
+                                        )
+                                    }
+                                }
+
+                                if ((isLibraryLoading || isSortingLibrary) && displayLibrary.isEmpty() && libraryEntries.isEmpty()) {
                                     item(key = "library-loading") {
                                         Box(
                                             modifier = Modifier
@@ -496,7 +748,7 @@ fun VideoListScreen(
                                     }
                                 }
 
-                                if (!isLibraryLoading && sortedLibrary.isEmpty() && recentRecords.isEmpty()) {
+                                if (!isLibraryLoading && !isSortingLibrary && libraryEntries.isEmpty() && recentRecords.isEmpty()) {
                                     item(key = "empty") {
                                         Column(
                                             modifier = Modifier
@@ -518,82 +770,124 @@ fun VideoListScreen(
                                     }
                                 }
 
-                                items(
-                                    items = sortedLibrary,
-                                    key = { entry -> entryKey(entry) },
-                                    contentType = { entry ->
-                                        when (entry) {
-                                            is VideoLibraryEntry.Series -> 0
-                                            is VideoLibraryEntry.Single -> 1
+                                if (
+                                    !isLibraryLoading &&
+                                    !isSortingLibrary &&
+                                    displayLibrary.isEmpty() &&
+                                    libraryEntries.isNotEmpty()
+                                ) {
+                                    item(key = "no-filter-results") {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillParentMaxWidth()
+                                                .padding(vertical = 48.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Text(
+                                                text = stringResource(R.string.no_filter_results),
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                color = LumenOnSurfaceMuted,
+                                            )
                                         }
-                                    },
-                                ) { entry ->
-                                    val key = entryKey(entry)
-                                    val isSelected = key in selectedKeys
+                                    }
+                                }
 
-                                    when (entry) {
-                                        is VideoLibraryEntry.Series -> {
-                                            val playbackStats = rememberSeriesPlaybackStats(
-                                                series = entry.series,
-                                                playbackRecords = playbackRecords,
-                                            )
-                                            SeriesFolderItem(
-                                                series = entry.series,
-                                                playbackStats = playbackStats,
-                                                selectionMode = selectionMode,
-                                                selected = isSelected,
-                                                onClick = {
-                                                    if (selectionMode) {
-                                                        selectedKeys = if (isSelected) {
-                                                            selectedKeys - key
-                                                        } else {
-                                                            selectedKeys + key
-                                                        }
-                                                    } else {
-                                                        onOpenSeries(entry.series.id)
+                                if (viewLayout == LibraryViewLayout.FLAT) {
+                                    items(
+                                        items = flatLibrary,
+                                        key = { entry -> "flat-${viewLayout.name}-${entryKey(entry)}" },
+                                        contentType = { entry ->
+                                            when (entry) {
+                                                is VideoLibraryEntry.Series -> 0
+                                                is VideoLibraryEntry.Single -> 1
+                                            }
+                                        },
+                                    ) { entry ->
+                                        AnyLibraryRow(entry)
+                                    }
+                                } else {
+                                    val sections = pinnedSections
+                                    if (sections != null) {
+                                        if (sections.pinned.isNotEmpty()) {
+                                            item(key = "header-pinned-${viewLayout.name}") {
+                                                LibrarySectionHeader(stringResource(R.string.section_pinned))
+                                            }
+                                            items(
+                                                items = sections.pinned,
+                                                key = { entry -> "sectioned-${viewLayout.name}-${entryKey(entry)}" },
+                                                contentType = { entry ->
+                                                    when (entry) {
+                                                        is VideoLibraryEntry.Series -> 0
+                                                        is VideoLibraryEntry.Single -> 1
                                                     }
                                                 },
-                                                onLongClick = {
-                                                    selectionMode = true
-                                                    selectedKeys = setOf(key)
-                                                },
-                                                onSwipeDelete = {
-                                                    openDeleteDialog(urisForEntry(entry))
-                                                },
-                                            )
+                                            ) { entry ->
+                                                AnyLibraryRow(entry)
+                                            }
                                         }
-                                        is VideoLibraryEntry.Single -> {
-                                            VideoListItem(
-                                                video = entry.video,
-                                                playbackRecord = playbackRecords[entry.video.uri.toString()],
-                                                selectionMode = selectionMode,
-                                                selected = isSelected,
-                                                onClick = {
-                                                    if (selectionMode) {
-                                                        selectedKeys = if (isSelected) {
-                                                            selectedKeys - key
-                                                        } else {
-                                                            selectedKeys + key
-                                                        }
-                                                    } else {
-                                                        playVideoItem(entry.video)
-                                                    }
-                                                },
-                                                onLongClick = {
-                                                    selectionMode = true
-                                                    selectedKeys = setOf(key)
-                                                },
-                                                onSwipeDelete = {
-                                                    openDeleteDialog(listOf(entry.video.uri))
-                                                },
-                                            )
+
+                                        if (sections.episodes.isNotEmpty()) {
+                                            item(key = "header-episodes") {
+                                                LibrarySectionHeader(stringResource(R.string.section_episodes))
+                                            }
+                                            items(
+                                                items = sections.episodes,
+                                                key = { entry -> entryKey(entry) },
+                                                contentType = { 0 },
+                                            ) { entry ->
+                                                SeriesLibraryRow(entry)
+                                            }
+                                        }
+
+                                        if (sections.folders.isNotEmpty()) {
+                                            item(key = "header-folders") {
+                                                LibrarySectionHeader(stringResource(R.string.section_folders))
+                                            }
+                                            items(
+                                                items = sections.folders,
+                                                key = { entry -> entryKey(entry) },
+                                                contentType = { 0 },
+                                            ) { entry ->
+                                                SeriesLibraryRow(entry)
+                                            }
+                                        }
+
+                                        if (sections.shortClips.isNotEmpty()) {
+                                            item(key = "header-short-clips") {
+                                                LibrarySectionHeader(stringResource(R.string.section_short_clips))
+                                            }
+                                            items(
+                                                items = sections.shortClips,
+                                                key = { entry -> entryKey(entry) },
+                                                contentType = { 0 },
+                                            ) { entry ->
+                                                SeriesLibraryRow(entry)
+                                            }
+                                        }
+
+                                        if (sections.singles.isNotEmpty() && !collapseSingles) {
+                                            item(key = "header-singles") {
+                                                LibrarySectionHeader(
+                                                    stringResource(
+                                                        R.string.section_other_videos,
+                                                        sections.singles.size,
+                                                    ),
+                                                )
+                                            }
+                                            items(
+                                                items = sections.singles,
+                                                key = { entry -> entryKey(entry) },
+                                                contentType = { 1 },
+                                            ) { entry ->
+                                                SingleLibraryRow(entry)
+                                            }
                                         }
                                     }
                                 }
                             }
                             PullToRefreshDefaults.Indicator(
                                 modifier = Modifier.align(Alignment.TopCenter),
-                                isRefreshing = isRefreshing || isLibraryLoading,
+                                isRefreshing = isRefreshing,
                                 state = pullRefreshState,
                             )
                         }
@@ -601,5 +895,39 @@ fun VideoListScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LibrarySectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelLarge,
+        color = LumenOnSurfaceMuted,
+        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+    )
+}
+
+@Composable
+private fun VideoListFab(
+    onClick: () -> Unit,
+    icon: ImageVector,
+    contentDescription: String,
+) {
+    val theme = LocalLumenTheme.current
+    Box(
+        modifier = Modifier
+            .size(56.dp)
+            .clip(CircleShape)
+            .background(theme.surface.copy(alpha = 1f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = LumenAccentText,
+            modifier = Modifier.size(24.dp),
+        )
     }
 }

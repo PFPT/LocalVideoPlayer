@@ -28,7 +28,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenBuffered
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenSurface
 import com.zhaoshuo.localvideoplayer.util.formatDuration
 
 @Composable
@@ -96,7 +95,7 @@ fun PlayerProgressBar(
                         .fillMaxWidth()
                         .height(3.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(LumenSurface.copy(alpha = 0.6f)),
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)),
                 )
                 Box(
                     modifier = Modifier

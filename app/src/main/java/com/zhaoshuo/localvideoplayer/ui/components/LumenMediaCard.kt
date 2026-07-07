@@ -29,10 +29,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenAccentText
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenBackground
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenOnSurfaceMuted
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenSurface
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenThumbCorner
 import com.zhaoshuo.localvideoplayer.util.VideoThumbnailCache
 
@@ -47,11 +45,14 @@ fun LumenMediaCard(
     thumbnailContent: (@Composable () -> Unit)? = null,
     clickable: Boolean = true,
     opaqueBackground: Boolean = false,
+    deferThumbnailLoad: Boolean = false,
+    trailingContent: (@Composable () -> Unit)? = null,
 ) {
+    val theme = LocalLumenTheme.current
     val backgroundColor = if (opaqueBackground) {
-        LumenBackground
+        theme.background.copy(alpha = 1f)
     } else {
-        LumenSurface.copy(alpha = 0.35f)
+        theme.surface.copy(alpha = 0.35f)
     }
     val rowModifier = modifier
         .fillMaxWidth()
@@ -73,12 +74,16 @@ fun LumenMediaCard(
             if (thumbnailContent != null) {
                 thumbnailContent()
             } else if (videoId != null) {
-                MediaThumbnail(videoId = videoId, modifier = Modifier.fillMaxSize())
+                MediaThumbnail(
+                    videoId = videoId,
+                    modifier = Modifier.fillMaxSize(),
+                    deferLoad = deferThumbnailLoad,
+                )
             } else {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(LumenSurface),
+                        .background(theme.surface),
                 )
             }
             if (progress != null && progress > 0.01f) {
@@ -112,10 +117,11 @@ fun LumenMediaCard(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = LumenOnSurfaceMuted,
+                color = theme.onSurfaceMuted,
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
+        trailingContent?.invoke()
     }
 }
 
@@ -123,16 +129,22 @@ fun LumenMediaCard(
 fun MediaThumbnail(
     videoId: Long,
     modifier: Modifier = Modifier,
+    deferLoad: Boolean = false,
 ) {
     val context = LocalContext.current
     var thumbnail by remember(videoId) { mutableStateOf(VideoThumbnailCache.peek(videoId)) }
 
-    LaunchedEffect(videoId) {
-        thumbnail = VideoThumbnailCache.load(context, videoId)
+    LaunchedEffect(videoId, deferLoad) {
+        if (deferLoad) return@LaunchedEffect
+        val loaded = VideoThumbnailCache.load(context, videoId)
+        if (loaded != null) {
+            thumbnail = loaded
+        }
     }
 
+    val theme = LocalLumenTheme.current
     Box(
-        modifier = modifier.background(LumenSurface),
+        modifier = modifier.background(theme.surface),
         contentAlignment = Alignment.Center,
     ) {
         val bitmap: ImageBitmap? = thumbnail

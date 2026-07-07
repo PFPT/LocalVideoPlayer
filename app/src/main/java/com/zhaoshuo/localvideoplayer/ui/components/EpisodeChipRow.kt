@@ -21,7 +21,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenAccentText
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenSurface
 
 @Composable
 fun EpisodeChipRow(
@@ -49,7 +48,7 @@ fun EpisodeChipRow(
                         if (isSelected) {
                             Color.White.copy(alpha = 0.2f)
                         } else {
-                            LumenSurface.copy(alpha = 0.5f)
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
                         },
                     )
                     .clickable { onEpisodeSelected(index) },

@@ -15,18 +15,17 @@ class OrientationController(private val activity: Activity) {
     }
 
     fun lockCurrentOrientation() {
-        activity.requestedOrientation = if (isLandscape()) {
-            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        } else {
-            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        }
+        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LOCKED
     }
 
     fun togglePortraitLandscape() {
+        if (activity.requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_LOCKED) {
+            return
+        }
         activity.requestedOrientation = if (isLandscape()) {
             ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         } else {
-            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         }
     }
 

@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.zhaoshuo.localvideoplayer.R
 import com.zhaoshuo.localvideoplayer.data.HiddenVideosStore
+import com.zhaoshuo.localvideoplayer.data.PlayCountStore
 import com.zhaoshuo.localvideoplayer.data.PlaybackStore
 import com.zhaoshuo.localvideoplayer.util.MediaDeleteHelper
 import com.zhaoshuo.localvideoplayer.util.UriConfirmRequest
@@ -28,6 +29,7 @@ import kotlinx.coroutines.withContext
 fun rememberVideoDeleter(
     playbackStore: PlaybackStore,
     hiddenVideosStore: HiddenVideosStore,
+    playCountStore: PlayCountStore,
     onVideosRemoved: (List<Uri>) -> Unit,
     onDeleteStarted: () -> Unit = {},
     onDeleteFinished: () -> Unit = {},
@@ -44,6 +46,7 @@ fun rememberVideoDeleter(
         withContext(Dispatchers.IO) {
             hiddenVideosStore.hideAll(uris)
             playbackStore.removeRecords(uris)
+            playCountStore.removeForUris(uris)
         }
         onVideosRemoved(uris)
     }
