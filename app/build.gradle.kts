@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -58,4 +59,13 @@ dependencies {
     implementation(libs.media3.exoplayer.hls)
     implementation(libs.media3.ui.compose)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+    implementation(libs.ffmpeg.kit.min)
+    implementation(libs.smart.exception.java)
+    implementation(libs.okhttp)
+
+    testImplementation("junit:junit:4.13.2")
 }

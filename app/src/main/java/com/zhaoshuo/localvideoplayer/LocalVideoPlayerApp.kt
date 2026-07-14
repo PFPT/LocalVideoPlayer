@@ -1,6 +1,7 @@
 package com.zhaoshuo.localvideoplayer
 
 import android.content.pm.PackageManager
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -18,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -31,12 +33,15 @@ import com.zhaoshuo.localvideoplayer.data.LibraryCacheStore
 import com.zhaoshuo.localvideoplayer.data.PlaybackStore
 import com.zhaoshuo.localvideoplayer.data.ThemePreferencesStore
 import com.zhaoshuo.localvideoplayer.data.VideoRepository
+import com.zhaoshuo.localvideoplayer.download.DownloadManager
+import com.zhaoshuo.localvideoplayer.download.DownloadTask
 import com.zhaoshuo.localvideoplayer.model.PlaybackRecord
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
 import com.zhaoshuo.localvideoplayer.model.withoutUris
 import com.zhaoshuo.localvideoplayer.player.PlaylistState
 import com.zhaoshuo.localvideoplayer.ui.PlayerScreen
+import com.zhaoshuo.localvideoplayer.ui.DownloadManagerScreen
 import com.zhaoshuo.localvideoplayer.ui.SeriesDetailScreen
 import com.zhaoshuo.localvideoplayer.ui.VideoListScreen
 import com.zhaoshuo.localvideoplayer.ui.theme.LocalVideoPlayerTheme
@@ -55,13 +60,19 @@ import kotlinx.coroutines.withContext
 private const val ROUTE_VIDEO_LIST = "video_list"
 private const val ROUTE_SERIES = "series/{seriesId}"
 private const val ROUTE_PLAYER = "player"
+private const val ROUTE_DOWNLOADS = "downloads"
 
 @Composable
-fun LocalVideoPlayerApp() {
+fun LocalVideoPlayerApp(
+    sharedDownloadText: String? = null,
+    onSharedDownloadConsumed: () -> Unit = {},
+    downloadsNavigationTick: Int = 0,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val navController = rememberNavController()
     val repository = remember { VideoRepository(context) }
+    val downloadManager = remember { DownloadManager.get(context) }
     val playbackStore = remember { PlaybackStore(context) }
     val hiddenVideosStore = remember { HiddenVideosStore(context) }
     val pinnedItemsStore = remember { PinnedItemsStore(context) }
@@ -89,6 +100,12 @@ fun LocalVideoPlayerApp() {
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
         hasPermission = granted
+    }
+
+    LaunchedEffect(downloadsNavigationTick) {
+        if (downloadsNavigationTick > 0) {
+            navController.navigate(ROUTE_DOWNLOADS)
+        }
     }
 
     suspend fun scanVideosWithRetry(): List<VideoItem> {
@@ -204,6 +221,24 @@ fun LocalVideoPlayerApp() {
         }
     }
 
+    LaunchedEffect(downloadManager, hasPermission) {
+        var knownCompleted = downloadManager.tasks.value
+            .filter { it.status.name == "COMPLETED" }
+            .map { it.id }
+            .toSet()
+        downloadManager.tasks.collect { tasks ->
+            val completed = tasks.filter { it.status.name == "COMPLETED" }.map { it.id }.toSet()
+            if (hasPermission && (completed - knownCompleted).isNotEmpty()) {
+                refreshLibrary()
+            }
+            knownCompleted = completed
+        }
+    }
+
+    LaunchedEffect(sharedDownloadText) {
+        if (sharedDownloadText != null) navController.navigate(ROUTE_DOWNLOADS)
+    }
+
     LaunchedEffect(Unit) {
         if (!hasPermission) {
             permissionLauncher.launch(Permissions.readVideoPermission)
@@ -264,6 +299,7 @@ fun LocalVideoPlayerApp() {
                         onOpenSeries = { seriesId ->
                             navController.navigate("series/$seriesId")
                         },
+                        onOpenDownloads = { navController.navigate(ROUTE_DOWNLOADS) },
                         onVideosRemoved = { uris -> removeVideosFromLibrary(uris) },
                         onPullRefresh = { refreshLibrary(fromPull = true) },
                     )
@@ -311,7 +347,47 @@ fun LocalVideoPlayerApp() {
                         )
                     }
                 }
+                composable(ROUTE_DOWNLOADS) {
+                    DownloadManagerScreen(
+                        manager = downloadManager,
+                        initialShareText = sharedDownloadText,
+                        onInitialShareConsumed = onSharedDownloadConsumed,
+                        onOpenCompleted = { task ->
+                            openCompletedDownload(context, task, navController) { playlistState = it }
+                        },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
             }
         }
     }
+}
+
+private fun openCompletedDownload(
+    context: android.content.Context,
+    task: DownloadTask,
+    navController: NavHostController,
+    onPlaylistReady: (PlaylistState) -> Unit,
+) {
+    val uri = task.outputUri?.let { runCatching { Uri.parse(it) }.getOrNull() } ?: return
+    val durationMs = queryDownloadDurationMs(context, uri)
+    val video = VideoItem(
+        id = uri.hashCode().toLong(),
+        uri = uri,
+        title = task.fileName,
+        durationMs = durationMs,
+        dateAdded = task.createdAt / 1000,
+        thumbnailUri = null,
+    )
+    onPlaylistReady(PlaylistState(items = listOf(video), currentIndex = 0))
+    navController.navigate(ROUTE_PLAYER)
+}
+
+private fun queryDownloadDurationMs(context: android.content.Context, uri: Uri): Long {
+    return runCatching {
+        MediaMetadataRetriever().use { retriever ->
+            retriever.setDataSource(context, uri)
+            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+        }
+    }.getOrDefault(0L)
 }

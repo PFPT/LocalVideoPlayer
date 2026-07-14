@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -132,6 +133,7 @@ fun VideoListScreen(
     onRequestPermission: () -> Unit,
     onPlayVideo: (PlaylistState) -> Unit,
     onOpenSeries: (String) -> Unit,
+    onOpenDownloads: () -> Unit,
     onVideosRemoved: (List<Uri>) -> Unit,
     onPullRefresh: () -> Unit,
     modifier: Modifier = Modifier,
@@ -620,6 +622,13 @@ fun VideoListScreen(
                     },
                     applyStatusBarPadding = false,
                     actions = {
+                        IconButton(onClick = onOpenDownloads) {
+                            Icon(
+                                imageVector = Icons.Filled.Download,
+                                contentDescription = "Downloads",
+                                tint = MaterialTheme.colorScheme.onBackground,
+                            )
+                        }
                         IconButton(
                             onClick = {
                                 selectedTypeTab = if (isMarkedTabActive) {
