@@ -2,6 +2,7 @@ package com.zhaoshuo.localvideoplayer.ui.components
 
 import android.content.ClipboardManager
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,9 +14,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -31,7 +33,6 @@ import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
 import com.zhaoshuo.localvideoplayer.download.DownloadManager
 import com.zhaoshuo.localvideoplayer.download.DownloadNameResolver
-import com.zhaoshuo.localvideoplayer.download.DownloadUrlClassifier
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,25 +52,23 @@ fun AddDownloadBottomSheet(
     var saveToMovies by remember { mutableStateOf(false) }
     var inputError by remember { mutableStateOf<String?>(null) }
     var fileNameEdited by remember { mutableStateOf(false) }
+    var autoFilledFileName by remember { mutableStateOf(false) }
+    var pendingShareTitle by remember { mutableStateOf<String?>(null) }
     val invalidUrl = stringResource(R.string.download_invalid_url)
     val invalidHeaders = stringResource(R.string.download_invalid_headers)
     val defaultFileName = stringResource(R.string.download_default_file_name)
 
+    fun trustedShareTitle(title: String?, sharedUrl: String): String {
+        val raw = title?.trim().orEmpty()
+        if (raw.isEmpty()) return ""
+        return raw.takeIf { DownloadNameResolver.titleMatchesDownload(raw, sharedUrl) }.orEmpty()
+    }
+
     fun applySharedText(text: String, showClipboardToast: Boolean) {
         val parsed = DownloadNameResolver.parseSharedText(text)
         parsed.url?.let { sharedUrl ->
+            pendingShareTitle = trustedShareTitle(parsed.title, sharedUrl).ifBlank { null }
             url = sharedUrl
-            if (!fileNameEdited) {
-                scope.launch {
-                    val resolved = DownloadNameResolver.resolveForEnqueue(
-                        sharedUrl,
-                        parsed.title.orEmpty(),
-                        defaultFileName,
-                    )
-                    fileName = resolved
-                    if (parsed.title != null) fileNameEdited = true
-                }
-            }
             if (showClipboardToast) {
                 Toast.makeText(context, context.getString(R.string.download_clipboard_filled), Toast.LENGTH_SHORT).show()
             }
@@ -95,10 +94,20 @@ fun AddDownloadBottomSheet(
 
     LaunchedEffect(url) {
         val trimmed = url.trim()
-        if (trimmed.isEmpty() || fileNameEdited) return@LaunchedEffect
-        val resolved = DownloadNameResolver.resolveForEnqueue(trimmed, "", defaultFileName)
-        if (resolved != defaultFileName || DownloadUrlClassifier.isHlsDownloadUrl(trimmed)) {
-            fileName = resolved
+        if (trimmed.isEmpty()) {
+            autoFilledFileName = false
+            pendingShareTitle = null
+            return@LaunchedEffect
+        }
+        if (fileNameEdited && !autoFilledFileName) return@LaunchedEffect
+        val shareTitle = pendingShareTitle.orEmpty().also { pendingShareTitle = null }
+        val resolved = runCatching {
+            DownloadNameResolver.resolveForEnqueue(trimmed, shareTitle, defaultFileName, context)
+        }.getOrDefault(defaultFileName)
+        fileName = resolved
+        autoFilledFileName = true
+        if (shareTitle.isNotBlank()) {
+            fileNameEdited = true
         }
     }
 
@@ -111,20 +120,23 @@ fun AddDownloadBottomSheet(
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(
                 text = stringResource(R.string.download_add),
                 style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 4.dp),
+                modifier = Modifier.padding(bottom = 2.dp),
             )
             OutlinedTextField(
                 value = url,
                 onValueChange = {
                     url = it
                     inputError = null
-                    if (it.isBlank()) fileNameEdited = false
+                    if (it.isBlank()) {
+                        fileNameEdited = false
+                        autoFilledFileName = false
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text(stringResource(R.string.download_url_label)) },
@@ -136,7 +148,9 @@ fun AddDownloadBottomSheet(
                 value = fileName,
                 onValueChange = {
                     fileName = it
-                    fileNameEdited = it.isNotBlank()
+                    val edited = it.isNotBlank()
+                    fileNameEdited = edited
+                    if (edited) autoFilledFileName = false
                 },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text(stringResource(R.string.download_file_name_label)) },
@@ -149,15 +163,29 @@ fun AddDownloadBottomSheet(
                 label = { Text(stringResource(R.string.download_headers_label)) },
                 minLines = 2,
             )
-            Row {
-                Checkbox(checked = saveToMovies, onCheckedChange = { saveToMovies = it })
-                Text(stringResource(R.string.download_save_movies), modifier = Modifier.padding(top = 12.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { saveToMovies = !saveToMovies }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(
+                    checked = saveToMovies,
+                    onCheckedChange = { saveToMovies = it },
+                )
+                Text(
+                    text = stringResource(R.string.download_save_movies),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
             }
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                TextButton(
+                OutlinedButton(
                     onClick = {
                         scope.launch {
                             sheetState.hide()
@@ -166,7 +194,7 @@ fun AddDownloadBottomSheet(
                     },
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text(stringResource(R.string.theme_cancel))
+                    Text(stringResource(R.string.cancel))
                 }
                 Button(
                     onClick = {
@@ -194,7 +222,7 @@ fun AddDownloadBottomSheet(
                             onDismiss()
                         }
                     },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1.4f),
                 ) {
                     Text(stringResource(R.string.download_add_queue))
                 }

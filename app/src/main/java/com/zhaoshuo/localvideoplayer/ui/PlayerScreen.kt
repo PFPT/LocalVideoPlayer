@@ -56,7 +56,6 @@ import com.zhaoshuo.localvideoplayer.ui.components.displayVideoSize
 import com.zhaoshuo.localvideoplayer.ui.components.SeekPreviewOverlay
 import com.zhaoshuo.localvideoplayer.ui.components.SpeedSelectorSheet
 import com.zhaoshuo.localvideoplayer.ui.components.VideoPlayerGesture
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenAccentText
 import com.zhaoshuo.localvideoplayer.util.OrientationController
 import com.zhaoshuo.localvideoplayer.util.PlaybackSystemControls
 import com.zhaoshuo.localvideoplayer.util.toMediaItem

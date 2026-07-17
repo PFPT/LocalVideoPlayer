@@ -1,15 +1,20 @@
 package com.zhaoshuo.localvideoplayer
 
 import android.content.pm.PackageManager
+import android.graphics.Color as AndroidColor
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,7 +50,8 @@ import com.zhaoshuo.localvideoplayer.ui.DownloadManagerScreen
 import com.zhaoshuo.localvideoplayer.ui.SeriesDetailScreen
 import com.zhaoshuo.localvideoplayer.ui.VideoListScreen
 import com.zhaoshuo.localvideoplayer.ui.theme.LocalVideoPlayerTheme
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenThemeColors
+import com.zhaoshuo.localvideoplayer.ui.theme.ThemeMode
+import com.zhaoshuo.localvideoplayer.ui.theme.ThemeState
 import com.zhaoshuo.localvideoplayer.util.Permissions
 import com.zhaoshuo.localvideoplayer.util.SeriesGrouper
 import kotlinx.coroutines.async
@@ -79,7 +85,19 @@ fun LocalVideoPlayerApp(
     val playCountStore = remember { PlayCountStore(context) }
     val libraryCacheStore = remember { LibraryCacheStore(context) }
     val themeStore = remember { ThemePreferencesStore(context) }
-    val savedThemeColors by themeStore.themeColors.collectAsState(initial = LumenThemeColors.default())
+    val themeState by themeStore.themeState.collectAsState(initial = ThemeState())
+    val activity = context as? ComponentActivity
+    SideEffect {
+        val barStyle = if (themeState.mode == ThemeMode.Light) {
+            SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT)
+        } else {
+            SystemBarStyle.dark(AndroidColor.TRANSPARENT)
+        }
+        activity?.enableEdgeToEdge(
+            statusBarStyle = barStyle,
+            navigationBarStyle = barStyle,
+        )
+    }
 
     var playlistState by remember { mutableStateOf<PlaylistState?>(null) }
     var libraryEntries by remember { mutableStateOf<List<VideoLibraryEntry>>(emptyList()) }
@@ -153,11 +171,7 @@ fun LocalVideoPlayerApp(
                 video.uri.toString() !in hiddenUris
             }
             if (videos.isEmpty()) return@coroutineScope
-
-            libraryEntries = videos.map { VideoLibraryEntry.Single(it) }
-            libraryEntries = withContext(Dispatchers.Default) {
-                SeriesGrouper.groupVideos(videos)
-            }
+            applyVideos(videos, hiddenUris = emptySet())
         }
     }
 
@@ -192,6 +206,9 @@ fun LocalVideoPlayerApp(
         try {
             val hiddenUris = hiddenVideosStore.getHiddenUris()
             val scanned = scanVideosWithRetry()
+            if (scanned.isEmpty() && libraryEntries.isNotEmpty() && !fromPull) {
+                return
+            }
             applyVideos(scanned, hiddenUris)
             if (scanned.isNotEmpty() || fromPull) {
                 withContext(Dispatchers.IO) {
@@ -251,6 +268,7 @@ fun LocalVideoPlayerApp(
             loadLibraryFromCache()
         } catch (_: Exception) {
         }
+        performLibraryRefresh(showLoading = libraryEntries.isEmpty())
     }
 
     LaunchedEffect(playbackStore) {
@@ -268,7 +286,10 @@ fun LocalVideoPlayerApp(
             }
     }
 
-    LocalVideoPlayerTheme(savedThemeColors) {
+    LocalVideoPlayerTheme(
+        mode = themeState.mode,
+        colors = themeState.colors,
+    ) {
         Surface(modifier = Modifier.fillMaxSize()) {
             NavHost(
                 navController = navController,
@@ -288,7 +309,7 @@ fun LocalVideoPlayerApp(
                         pinnedItemsStore = pinnedItemsStore,
                         playCountStore = playCountStore,
                         themeStore = themeStore,
-                        savedThemeColors = savedThemeColors,
+                        themeState = themeState,
                         onRequestPermission = {
                             permissionLauncher.launch(Permissions.readVideoPermission)
                         },

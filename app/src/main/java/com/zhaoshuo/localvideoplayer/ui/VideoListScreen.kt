@@ -31,6 +31,8 @@ import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -88,6 +90,7 @@ import com.zhaoshuo.localvideoplayer.model.withoutUris
 import com.zhaoshuo.localvideoplayer.player.PlaylistState
 import com.zhaoshuo.localvideoplayer.ui.components.DeleteVideoDialog
 import com.zhaoshuo.localvideoplayer.ui.components.LibraryOptionsBottomSheet
+import com.zhaoshuo.localvideoplayer.ui.components.LumenEmptyState
 import com.zhaoshuo.localvideoplayer.ui.components.LumenLibraryTabBar
 import com.zhaoshuo.localvideoplayer.ui.components.LumenListHeader
 import com.zhaoshuo.localvideoplayer.ui.components.RecentPlaybackSection
@@ -99,9 +102,8 @@ import com.zhaoshuo.localvideoplayer.ui.components.rememberEpisodeProgressList
 import com.zhaoshuo.localvideoplayer.ui.components.rememberPlaybackProgress
 import com.zhaoshuo.localvideoplayer.ui.components.rememberSeriesPlaybackStats
 import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenAccentText
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenOnSurfaceMuted
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenThemeColors
+import com.zhaoshuo.localvideoplayer.ui.theme.ThemeMode
+import com.zhaoshuo.localvideoplayer.ui.theme.ThemeState
 import com.zhaoshuo.localvideoplayer.util.M3uPlaylistParser
 import com.zhaoshuo.localvideoplayer.util.isM3u8Title
 import kotlinx.coroutines.Dispatchers
@@ -129,7 +131,7 @@ fun VideoListScreen(
     pinnedItemsStore: PinnedItemsStore,
     playCountStore: PlayCountStore,
     themeStore: ThemePreferencesStore,
-    savedThemeColors: LumenThemeColors,
+    themeState: ThemeState,
     onRequestPermission: () -> Unit,
     onPlayVideo: (PlaylistState) -> Unit,
     onOpenSeries: (String) -> Unit,
@@ -140,6 +142,7 @@ fun VideoListScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val theme = LocalLumenTheme.current
     var sortOrder by rememberSaveable { mutableStateOf(VideoSortOrder.DATE_DESC) }
     var collapseSingles by rememberSaveable { mutableStateOf(false) }
     var viewLayout by rememberSaveable { mutableStateOf(LibraryViewLayout.SECTIONED) }
@@ -158,7 +161,7 @@ fun VideoListScreen(
     val playCounts by playCountStore.playCounts.collectAsState(initial = emptyMap())
 
     val processedLibrary by produceState(
-        initialValue = libraryEntries,
+        initialValue = emptyList<VideoLibraryEntry>(),
         libraryEntries,
         sortOrder,
         libraryFilter,
@@ -173,10 +176,23 @@ fun VideoListScreen(
             list
         }
     }
-    val displayLibrary = if (processedLibrary.isNotEmpty() || libraryEntries.isEmpty()) {
-        processedLibrary
-    } else {
-        libraryEntries
+    val isUnfilteredAllTab =
+        selectedTypeTab == LibraryTypeTab.ALL && libraryFilter == LibraryFilter()
+    val processedMatchesLibrary = remember(libraryEntries, processedLibrary) {
+        if (processedLibrary.isEmpty() || libraryEntries.isEmpty()) {
+            false
+        } else {
+            val sourceKeys = libraryEntries.mapTo(HashSet(libraryEntries.size)) { entryKey(it) }
+            val resultKeys = processedLibrary.mapTo(HashSet(processedLibrary.size)) { entryKey(it) }
+            resultKeys == sourceKeys
+        }
+    }
+    val displayLibrary = when {
+        libraryEntries.isEmpty() -> emptyList()
+        processedLibrary.isEmpty() && isUnfilteredAllTab -> libraryEntries
+        processedLibrary.isEmpty() -> emptyList()
+        isUnfilteredAllTab && !processedMatchesLibrary -> libraryEntries
+        else -> processedLibrary
     }
     val pinnedSections = remember(displayLibrary, pinnedKeys, viewLayout) {
         if (viewLayout == LibraryViewLayout.SECTIONED) {
@@ -519,7 +535,8 @@ fun VideoListScreen(
 
     if (showThemeSheet) {
         ThemeColorBottomSheet(
-            initialColors = savedThemeColors,
+            themeMode = themeState.mode,
+            initialColors = themeState.colors,
             onSave = { colors ->
                 scope.launch {
                     themeStore.saveThemeColors(colors)
@@ -646,10 +663,36 @@ fun VideoListScreen(
                                 },
                                 contentDescription = stringResource(R.string.tab_marked),
                                 tint = if (isMarkedTabActive) {
-                                    LumenAccentText
+                                    theme.accent
                                 } else {
                                     MaterialTheme.colorScheme.onBackground
                                 },
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                val nextMode = if (themeState.mode == ThemeMode.Dark) {
+                                    ThemeMode.Light
+                                } else {
+                                    ThemeMode.Dark
+                                }
+                                scope.launch {
+                                    themeStore.setThemeMode(nextMode)
+                                }
+                            },
+                        ) {
+                            Icon(
+                                imageVector = if (themeState.mode == ThemeMode.Dark) {
+                                    Icons.Default.LightMode
+                                } else {
+                                    Icons.Default.DarkMode
+                                },
+                                contentDescription = if (themeState.mode == ThemeMode.Dark) {
+                                    stringResource(R.string.theme_mode_light)
+                                } else {
+                                    stringResource(R.string.theme_mode_dark)
+                                },
+                                tint = MaterialTheme.colorScheme.onBackground,
                             )
                         }
                         IconButton(onClick = { showThemeSheet = true }) {
@@ -672,7 +715,7 @@ fun VideoListScreen(
                                             .align(Alignment.TopEnd)
                                             .size(8.dp)
                                             .clip(CircleShape)
-                                            .background(LumenAccentText),
+                                            .background(theme.accent),
                                     )
                                 }
                             }
@@ -752,30 +795,21 @@ fun VideoListScreen(
                                                 .padding(vertical = 48.dp),
                                             contentAlignment = Alignment.Center,
                                         ) {
-                                            CircularProgressIndicator(color = LumenAccentText)
+                                            CircularProgressIndicator(color = theme.accent)
                                         }
                                     }
                                 }
 
                                 if (!isLibraryLoading && !isSortingLibrary && libraryEntries.isEmpty() && recentRecords.isEmpty()) {
                                     item(key = "empty") {
-                                        Column(
+                                        LumenEmptyState(
+                                            title = stringResource(R.string.empty_video_list),
+                                            subtitle = stringResource(R.string.empty_video_hint),
+                                            icon = Icons.Default.VideoLibrary,
                                             modifier = Modifier
                                                 .fillParentMaxSize()
                                                 .padding(24.dp),
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.Center,
-                                        ) {
-                                            Text(
-                                                text = stringResource(R.string.empty_video_list),
-                                                style = MaterialTheme.typography.titleMedium,
-                                            )
-                                            Text(
-                                                text = stringResource(R.string.empty_video_hint),
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = LumenOnSurfaceMuted,
-                                            )
-                                        }
+                                        )
                                     }
                                 }
 
@@ -795,7 +829,7 @@ fun VideoListScreen(
                                             Text(
                                                 text = stringResource(R.string.no_filter_results),
                                                 style = MaterialTheme.typography.bodyLarge,
-                                                color = LumenOnSurfaceMuted,
+                                                color = theme.onSurfaceMuted,
                                             )
                                         }
                                     }
@@ -909,10 +943,11 @@ fun VideoListScreen(
 
 @Composable
 private fun LibrarySectionHeader(title: String) {
+    val theme = LocalLumenTheme.current
     Text(
         text = title,
         style = MaterialTheme.typography.labelLarge,
-        color = LumenOnSurfaceMuted,
+        color = theme.onSurfaceMuted,
         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
     )
 }
@@ -935,7 +970,7 @@ private fun VideoListFab(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = LumenAccentText,
+            tint = theme.accent,
             modifier = Modifier.size(24.dp),
         )
     }

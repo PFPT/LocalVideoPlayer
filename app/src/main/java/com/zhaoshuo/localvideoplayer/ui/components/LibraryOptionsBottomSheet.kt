@@ -21,7 +21,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
@@ -30,8 +29,7 @@ import com.zhaoshuo.localvideoplayer.model.DurationFilter
 import com.zhaoshuo.localvideoplayer.model.LibraryFilter
 import com.zhaoshuo.localvideoplayer.model.LibraryViewLayout
 import com.zhaoshuo.localvideoplayer.model.VideoSortOrder
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenAccentText
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenOnSurfaceMuted
+import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,6 +47,7 @@ fun LibraryOptionsBottomSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+    val theme = LocalLumenTheme.current
     val sortOptions = listOf(
         VideoSortOrder.DATE_DESC to R.string.sort_date_desc,
         VideoSortOrder.DATE_ASC to R.string.sort_date_asc,
@@ -161,8 +160,8 @@ fun LibraryOptionsBottomSheet(
                     checked = collapseSingles,
                     onCheckedChange = onCollapseSinglesChanged,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = LumenAccentText,
-                        checkedTrackColor = LumenAccentText.copy(alpha = 0.35f),
+                        checkedThumbColor = theme.accent,
+                        checkedTrackColor = theme.accent.copy(alpha = 0.35f),
                     ),
                 )
             }
@@ -172,10 +171,11 @@ fun LibraryOptionsBottomSheet(
 
 @Composable
 private fun OptionsSectionTitle(title: String) {
+    val theme = LocalLumenTheme.current
     Text(
         text = title,
         style = MaterialTheme.typography.labelLarge,
-        color = LumenOnSurfaceMuted,
+        color = theme.onSurfaceMuted,
         modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
     )
 }
@@ -186,6 +186,7 @@ private fun SelectableOptionRow(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val theme = LocalLumenTheme.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -196,14 +197,14 @@ private fun SelectableOptionRow(
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
-            color = if (selected) LumenAccentText else Color.White,
+            color = if (selected) theme.accent else theme.onBackground,
             modifier = Modifier.weight(1f),
         )
         if (selected) {
             Icon(
                 imageVector = Icons.Default.Check,
                 contentDescription = null,
-                tint = LumenAccentText,
+                tint = theme.accent,
             )
         }
     }

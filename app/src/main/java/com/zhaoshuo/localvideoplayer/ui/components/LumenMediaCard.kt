@@ -2,6 +2,7 @@ package com.zhaoshuo.localvideoplayer.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,7 +31,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenAccentText
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenThumbCorner
 import com.zhaoshuo.localvideoplayer.util.VideoThumbnailCache
 
@@ -49,16 +49,24 @@ fun LumenMediaCard(
     trailingContent: (@Composable () -> Unit)? = null,
 ) {
     val theme = LocalLumenTheme.current
+    val cardShape = RoundedCornerShape(LumenThumbCorner)
     val backgroundColor = if (opaqueBackground) {
         theme.background.copy(alpha = 1f)
     } else {
-        theme.surface.copy(alpha = 0.35f)
+        theme.glassFill
     }
     val rowModifier = modifier
         .fillMaxWidth()
-        .clip(RoundedCornerShape(LumenThumbCorner))
+        .clip(cardShape)
         .then(if (clickable) Modifier.clickable(onClick = onClick) else Modifier)
         .background(backgroundColor)
+        .then(
+            if (opaqueBackground) {
+                Modifier
+            } else {
+                Modifier.border(1.dp, theme.glassBorder, cardShape)
+            },
+        )
         .padding(12.dp)
 
     Row(
@@ -99,7 +107,7 @@ fun LumenMediaCard(
                         .align(Alignment.BottomStart)
                         .fillMaxWidth(progress.coerceIn(0f, 1f))
                         .height(3.dp)
-                        .background(LumenAccentText),
+                        .background(theme.accent),
                 )
             }
         }

@@ -28,10 +28,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenOnSurfaceMuted
+import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
+import com.zhaoshuo.localvideoplayer.ui.theme.LumenDelete
 import kotlinx.coroutines.launch
-
-private val DeleteActionColor = Color(0xFFE53935)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,6 +44,7 @@ fun DeleteVideoDialog(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+    val theme = LocalLumenTheme.current
 
     fun dismissSheet(action: () -> Unit = {}) {
         scope.launch {
@@ -77,7 +77,7 @@ fun DeleteVideoDialog(
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = LumenOnSurfaceMuted,
+                        color = theme.onSurfaceMuted,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(horizontal = 24.dp),
@@ -86,21 +86,22 @@ fun DeleteVideoDialog(
                 Text(
                     text = stringResource(R.string.delete_video_message),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = LumenOnSurfaceMuted,
+                    color = theme.onSurfaceMuted,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
                 )
                 DeleteActionRow(
                     icon = Icons.Default.RemoveCircleOutline,
                     label = stringResource(R.string.hide_from_list),
-                    labelColor = Color.White,
+                    labelColor = theme.onBackground,
+                    iconTint = theme.onBackground,
                     enabled = !isDeleting,
                     onClick = { dismissSheet(onHideFromList) },
                 )
                 DeleteActionRow(
                     icon = Icons.Default.DeleteForever,
                     label = stringResource(R.string.delete_from_device),
-                    labelColor = DeleteActionColor,
-                    iconTint = DeleteActionColor,
+                    labelColor = LumenDelete,
+                    iconTint = LumenDelete,
                     enabled = !isDeleting,
                     onClick = { onDeleteFromDevice() },
                 )
@@ -119,7 +120,7 @@ fun DeleteVideoDialog(
                     modifier = Modifier
                         .align(Alignment.Center)
                         .size(36.dp),
-                    color = DeleteActionColor,
+                    color = LumenDelete,
                 )
             }
         }
@@ -132,7 +133,7 @@ private fun DeleteActionRow(
     label: String,
     labelColor: Color,
     onClick: () -> Unit,
-    iconTint: Color = Color.White,
+    iconTint: Color,
     enabled: Boolean = true,
 ) {
     Row(

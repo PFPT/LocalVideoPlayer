@@ -15,11 +15,10 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenAccentText
+import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,6 +28,7 @@ fun SpeedSelectorSheet(
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val theme = LocalLumenTheme.current
     val speeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f, 2.5f, 3.0f)
 
     LumenModalBottomSheet(
@@ -55,14 +55,14 @@ fun SpeedSelectorSheet(
                     Text(
                         text = stringResource(R.string.speed_format, formatSpeedLabel(speed)),
                         style = MaterialTheme.typography.bodyLarge,
-                        color = if (speed == currentSpeed) LumenAccentText else Color.White,
+                        color = if (speed == currentSpeed) theme.accent else theme.onBackground,
                         modifier = Modifier.weight(1f),
                     )
                     if (speed == currentSpeed) {
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = null,
-                            tint = LumenAccentText,
+                            tint = theme.accent,
                         )
                     }
                 }

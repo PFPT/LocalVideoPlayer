@@ -22,7 +22,7 @@ import com.zhaoshuo.localvideoplayer.model.SeriesGroupKind
 import com.zhaoshuo.localvideoplayer.model.PlaybackRecord
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 import com.zhaoshuo.localvideoplayer.model.VideoSeries
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenAccentText
+import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
 import com.zhaoshuo.localvideoplayer.util.formatDuration
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -211,7 +211,7 @@ fun SeriesFolderItem(
                         Icon(
                             imageVector = Icons.Default.Folder,
                             contentDescription = null,
-                            tint = LumenAccentText.copy(alpha = 0.85f),
+                            tint = LocalLumenTheme.current.accent.copy(alpha = 0.85f),
                             modifier = Modifier
                                 .align(Alignment.Center)
                                 .width(28.dp)
@@ -300,11 +300,12 @@ private fun MarkToggleButton(
     marked: Boolean,
     onToggleMark: () -> Unit,
 ) {
+    val theme = LocalLumenTheme.current
     IconButton(onClick = onToggleMark) {
         Icon(
             imageVector = if (marked) Icons.Filled.Star else Icons.Outlined.StarOutline,
             contentDescription = stringResource(if (marked) R.string.unmark else R.string.mark),
-            tint = if (marked) LumenAccentText else LumenAccentText.copy(alpha = 0.45f),
+            tint = if (marked) theme.accent else theme.accent.copy(alpha = 0.45f),
             modifier = Modifier.size(22.dp),
         )
     }

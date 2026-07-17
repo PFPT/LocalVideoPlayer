@@ -12,24 +12,23 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenGlassBorder
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenGlassFill
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenSheetBg
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenSheetBorder
+import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
 
 @Composable
 fun GlassSurface(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(20.dp),
-    fillAlpha: Float = 0.10f,
+    fillAlpha: Float? = null,
     borderWidth: Dp = 1.dp,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    val theme = LocalLumenTheme.current
+    val resolvedFill = fillAlpha?.let { theme.glassFill.copy(alpha = it) } ?: theme.glassFill
     Box(
         modifier = modifier
             .clip(shape)
-            .background(LumenGlassFill.copy(alpha = fillAlpha))
-            .border(BorderStroke(borderWidth, LumenGlassBorder), shape),
+            .background(resolvedFill)
+            .border(BorderStroke(borderWidth, theme.glassBorder), shape),
         content = content,
     )
 }
@@ -40,11 +39,12 @@ fun LumenSheetSurface(
     shape: Shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
     content: @Composable BoxScope.() -> Unit,
 ) {
+    val theme = LocalLumenTheme.current
     Box(
         modifier = modifier
             .clip(shape)
-            .background(LumenSheetBg)
-            .border(BorderStroke(1.dp, LumenSheetBorder), shape),
+            .background(theme.sheetBg)
+            .border(BorderStroke(1.dp, theme.sheetBorder), shape),
         content = content,
     )
 }

@@ -18,6 +18,16 @@ val LumenOnBackground = Color.White
 val LumenPrimary = LumenAccentText
 val LumenDelete = Color(0xFFE53935)
 
+val LumenLightBackground = Color(0xFFF7F7FA)
+val LumenLightSurface = Color(0xFFFFFFFF)
+val LumenLightOnBackground = Color(0xFF12121A)
+val LumenLightOnSurfaceMuted = Color(0xFF6B6B7B)
+val LumenLightAccent = Color(0xFF2A2A3A)
+val LumenLightGlassFill = Color.Black.copy(alpha = 0.06f)
+val LumenLightGlassBorder = Color.Black.copy(alpha = 0.12f)
+val LumenLightSheetBg = Color.White.copy(alpha = 0.98f)
+val LumenLightSheetBorder = Color.Black.copy(alpha = 0.10f)
+
 val LumenVideoCorner = 20.dp
 val LumenThumbCorner = 12.dp
 val LumenSheetTopCorner = 32.dp

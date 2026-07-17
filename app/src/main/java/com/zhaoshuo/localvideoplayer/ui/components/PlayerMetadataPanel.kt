@@ -24,7 +24,6 @@ import com.zhaoshuo.localvideoplayer.R
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenMetadataGradientEnd
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenMetadataGradientStart
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenOnSurfaceMuted
 
 @Composable
 fun PlayerMetadataPanel(
@@ -101,7 +100,7 @@ fun PlayerMetadataPanel(
             Text(
                 text = currentEpisode.title,
                 style = MaterialTheme.typography.bodyMedium,
-                color = LumenOnSurfaceMuted,
+                color = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.padding(top = 16.dp),
             )
         }

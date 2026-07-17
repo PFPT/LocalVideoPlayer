@@ -6,12 +6,11 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenBackground
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenOnBackground
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenOnSurfaceMuted
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenSurface
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenThemeColors
+import com.zhaoshuo.localvideoplayer.ui.theme.ThemeMode
+import com.zhaoshuo.localvideoplayer.ui.theme.ThemeState
 import com.zhaoshuo.localvideoplayer.ui.theme.toArgbInt
 import com.zhaoshuo.localvideoplayer.ui.theme.toComposeColor
 import kotlinx.coroutines.flow.Flow
@@ -23,14 +22,29 @@ private val Context.themeDataStore: DataStore<Preferences> by preferencesDataSto
 
 class ThemePreferencesStore(private val context: Context) {
 
-    val themeColors: Flow<LumenThemeColors> = context.themeDataStore.data.map { prefs ->
-        LumenThemeColors(
-            background = (prefs[BACKGROUND_COLOR_KEY] ?: DEFAULT_BACKGROUND_ARGB).toComposeColor(),
-            onBackground = (prefs[TEXT_COLOR_KEY] ?: DEFAULT_TEXT_ARGB).toComposeColor(),
-            surface = (prefs[LIST_OPTION_COLOR_KEY] ?: DEFAULT_LIST_OPTION_ARGB).toComposeColor(),
-            onSurfaceMuted = LumenOnSurfaceMuted,
-            accent = LumenThemeColors.default().accent,
+    val themeState: Flow<ThemeState> = context.themeDataStore.data.map { prefs ->
+        val mode = ThemeMode.fromStorage(prefs[THEME_MODE_KEY])
+        val defaults = LumenThemeColors.defaults(mode)
+        ThemeState(
+            mode = mode,
+            colors = defaults.copy(
+                background = (prefs[BACKGROUND_COLOR_KEY] ?: defaults.background.toArgbInt()).toComposeColor(),
+                onBackground = (prefs[TEXT_COLOR_KEY] ?: defaults.onBackground.toArgbInt()).toComposeColor(),
+                surface = (prefs[LIST_OPTION_COLOR_KEY] ?: defaults.surface.toArgbInt()).toComposeColor(),
+            ),
         )
+    }
+
+    val themeColors: Flow<LumenThemeColors> = themeState.map { it.colors }
+
+    suspend fun setThemeMode(mode: ThemeMode) {
+        val defaults = LumenThemeColors.defaults(mode)
+        context.themeDataStore.edit { prefs ->
+            prefs[THEME_MODE_KEY] = mode.name
+            prefs[BACKGROUND_COLOR_KEY] = defaults.background.toArgbInt()
+            prefs[TEXT_COLOR_KEY] = defaults.onBackground.toArgbInt()
+            prefs[LIST_OPTION_COLOR_KEY] = defaults.surface.toArgbInt()
+        }
     }
 
     suspend fun setBackgroundColor(color: Color) {
@@ -60,16 +74,19 @@ class ThemePreferencesStore(private val context: Context) {
     }
 
     suspend fun resetAll() {
-        saveThemeColors(LumenThemeColors.default())
+        context.themeDataStore.edit { prefs ->
+            val mode = ThemeMode.fromStorage(prefs[THEME_MODE_KEY])
+            val defaults = LumenThemeColors.defaults(mode)
+            prefs[BACKGROUND_COLOR_KEY] = defaults.background.toArgbInt()
+            prefs[TEXT_COLOR_KEY] = defaults.onBackground.toArgbInt()
+            prefs[LIST_OPTION_COLOR_KEY] = defaults.surface.toArgbInt()
+        }
     }
 
     companion object {
+        private val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
         private val BACKGROUND_COLOR_KEY = intPreferencesKey("background_color_argb")
         private val TEXT_COLOR_KEY = intPreferencesKey("text_color_argb")
         private val LIST_OPTION_COLOR_KEY = intPreferencesKey("list_option_color_argb")
-
-        private val DEFAULT_BACKGROUND_ARGB = LumenBackground.toArgbInt()
-        private val DEFAULT_TEXT_ARGB = LumenOnBackground.toArgbInt()
-        private val DEFAULT_LIST_OPTION_ARGB = LumenSurface.toArgbInt()
     }
 }

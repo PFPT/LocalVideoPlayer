@@ -1,6 +1,7 @@
 package com.zhaoshuo.localvideoplayer.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -19,7 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.ui.draw.clip
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -41,9 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
 import com.zhaoshuo.localvideoplayer.model.PlaybackRecord
 import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenAccentText
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenDelete
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenOnSurfaceMuted
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenThumbCorner
 
 @Composable
@@ -92,12 +90,14 @@ private fun RecentPlaybackCard(
     }
 
     val theme = LocalLumenTheme.current
+    val cardShape = RoundedCornerShape(LumenThumbCorner)
     Column(
         modifier = modifier
             .width(120.dp)
-            .clip(RoundedCornerShape(LumenThumbCorner))
+            .clip(cardShape)
             .clickable(onClick = onClick)
-            .background(theme.surface.copy(alpha = 0.35f))
+            .background(theme.glassFill)
+            .border(1.dp, theme.glassBorder, cardShape)
             .padding(8.dp),
     ) {
         Box(
@@ -132,7 +132,7 @@ private fun RecentPlaybackCard(
                         .align(Alignment.BottomStart)
                         .fillMaxWidth(progress)
                         .height(3.dp)
-                        .background(LumenAccentText),
+                        .background(theme.accent),
                 )
             }
         }
@@ -147,7 +147,7 @@ private fun RecentPlaybackCard(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.labelSmall,
-                color = LumenOnSurfaceMuted,
+                color = theme.onSurfaceMuted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 2.dp),

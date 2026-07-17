@@ -71,7 +71,22 @@ class DownloadManager private constructor(private val context: Context) {
     ): Boolean {
         ready.await()
         val fallback = context.getString(R.string.download_default_file_name)
-        val resolvedName = DownloadNameResolver.resolveForEnqueue(url, fileName, fallback)
+        val trustedFileName = fileName.trim().takeIf {
+            it.isNotBlank() && DownloadNameResolver.titleMatchesDownload(it, url)
+        }.orEmpty()
+        val resolvedName = DownloadNameResolver.resolveForEnqueue(url, trustedFileName, fallback, context)
+        DownloadNameResolver.downloadCdnIdentityKey(url)?.let { cdnKey ->
+            val cacheableTitle = DownloadNameResolver.cacheableTitle(resolvedName)
+            DownloadTitleCache.put(context, cdnKey, cacheableTitle)
+            DownloadNameResolver.downloadEpisodeIdentity(url)
+                ?.folderStem
+                ?.let(DownloadNameResolver::seriesStemPrefix)
+                ?.let { stemPrefix ->
+                    DownloadNameResolver.extractShowNameFromTitle(cacheableTitle)?.let { showName ->
+                        DownloadTitleCache.putSeries(context, stemPrefix, showName)
+                    }
+                }
+        }
         val resolvedHeaders = DownloadUrlResolver.inferHeaders(url, headers)
         val directUrl = DownloadUrlResolver.resolveDownloadUrl(url)
         val usedProxy = DownloadUrlClassifier.isLocalProxyUrl(url)

@@ -64,8 +64,19 @@ class MainActivity : ComponentActivity() {
 
     private fun extractSharedDownloadText(intent: Intent?): String? {
         if (intent?.action != Intent.ACTION_SEND || intent.type != "text/plain") return null
-        return intent.getStringExtra(Intent.EXTRA_TEXT)?.trim()?.takeIf { it.isNotBlank() }
+        val text = intent.getStringExtra(Intent.EXTRA_TEXT)?.trim().orEmpty()
+        if (text.isBlank()) return null
+        val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)?.trim().orEmpty()
+            .ifBlank { intent.getStringExtra(Intent.EXTRA_TITLE)?.trim().orEmpty() }
+        return if (text.isHttpUrl() && subject.isNotBlank()) {
+            "$subject|$text"
+        } else {
+            text
+        }
     }
+
+    private fun String.isHttpUrl(): Boolean =
+        startsWith("http://") || startsWith("https://")
 
     fun enterPipMode(
         hasNext: Boolean,

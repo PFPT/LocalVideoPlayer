@@ -49,15 +49,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
+import com.zhaoshuo.localvideoplayer.model.LibraryTypeTab
 import com.zhaoshuo.localvideoplayer.ui.theme.HsvColor
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenAccentText
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenOnSurfaceMuted
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenSheetBorder
+import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenThemeColors
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenThumbCorner
-import com.zhaoshuo.localvideoplayer.ui.theme.LocalVideoPlayerTheme
-import com.zhaoshuo.localvideoplayer.model.LibraryTypeTab
-import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
+import com.zhaoshuo.localvideoplayer.ui.theme.ThemeMode
 import com.zhaoshuo.localvideoplayer.ui.theme.formatAlphaPercent
 import com.zhaoshuo.localvideoplayer.ui.theme.toColor
 import com.zhaoshuo.localvideoplayer.ui.theme.toHexArgb
@@ -73,12 +70,15 @@ private enum class ThemeColorTarget {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ThemeColorBottomSheet(
+    themeMode: ThemeMode,
     initialColors: LumenThemeColors,
     onSave: (LumenThemeColors) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+    val theme = LocalLumenTheme.current
+    val modeDefaults = remember(themeMode) { LumenThemeColors.defaults(themeMode) }
 
     var draftColors by remember(initialColors) { mutableStateOf(initialColors) }
     var selectedTarget by remember { mutableStateOf(ThemeColorTarget.Background) }
@@ -132,10 +132,9 @@ fun ThemeColorBottomSheet(
 
     fun resetAllAndSave() {
         scope.launch {
-            val default = LumenThemeColors.default()
-            draftColors = default
+            draftColors = modeDefaults
             sheetState.hide()
-            onSave(default)
+            onSave(modeDefaults)
             onDismiss()
         }
     }
@@ -156,132 +155,130 @@ fun ThemeColorBottomSheet(
         ) {
             ThemePreviewBar(colors = draftColors)
 
-            LocalVideoPlayerTheme(LumenThemeColors.default()) {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.theme_color),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    TextButton(
+                        onClick = { resetAllAndSave() },
                     ) {
                         Text(
-                            text = stringResource(R.string.theme_color),
-                            style = MaterialTheme.typography.titleMedium,
+                            text = stringResource(R.string.theme_reset_all),
+                            color = theme.accent,
                         )
-                        TextButton(
-                            onClick = { resetAllAndSave() },
-                        ) {
-                            Text(
-                                text = stringResource(R.string.theme_reset_all),
-                                color = LumenAccentText,
-                            )
-                        }
                     }
+                }
 
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        SegmentedButton(
-                            selected = selectedTarget == ThemeColorTarget.Background,
-                            onClick = {
-                                selectedTarget = ThemeColorTarget.Background
-                                syncPickerFromDraft(ThemeColorTarget.Background)
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
-                        ) {
-                            Text(stringResource(R.string.theme_background))
-                        }
-                        SegmentedButton(
-                            selected = selectedTarget == ThemeColorTarget.Text,
-                            onClick = {
-                                selectedTarget = ThemeColorTarget.Text
-                                syncPickerFromDraft(ThemeColorTarget.Text)
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
-                        ) {
-                            Text(stringResource(R.string.theme_text))
-                        }
-                        SegmentedButton(
-                            selected = selectedTarget == ThemeColorTarget.ListOption,
-                            onClick = {
-                                selectedTarget = ThemeColorTarget.ListOption
-                                syncPickerFromDraft(ThemeColorTarget.ListOption)
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
-                        ) {
-                            Text(stringResource(R.string.theme_list_option))
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = selectedTarget == ThemeColorTarget.Background,
+                        onClick = {
+                            selectedTarget = ThemeColorTarget.Background
+                            syncPickerFromDraft(ThemeColorTarget.Background)
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
                     ) {
-                        TextButton(
-                            onClick = {
-                                val defaultColor = when (selectedTarget) {
-                                    ThemeColorTarget.Background -> LumenThemeColors.default().background
-                                    ThemeColorTarget.Text -> LumenThemeColors.default().onBackground
-                                    ThemeColorTarget.ListOption -> LumenThemeColors.default().surface
-                                }
-                                val hsv = defaultColor.toHsv()
-                                hue = hsv.hue
-                                saturation = hsv.saturation
-                                value = hsv.value
-                                alpha = defaultColor.alpha
-                                applyPickerColorToDraft()
-                            },
-                        ) {
-                            Text(
-                                text = stringResource(R.string.theme_reset_default),
-                                color = LumenAccentText,
-                            )
-                        }
+                        Text(stringResource(R.string.theme_background))
                     }
-
-                    CurrentColorRow(color = color)
-
-                    SaturationValuePicker(
-                        hue = hue,
-                        saturation = saturation,
-                        value = value,
-                        onChange = { s, v ->
-                            saturation = s
-                            value = v
-                            applyPickerColorToDraft()
+                    SegmentedButton(
+                        selected = selectedTarget == ThemeColorTarget.Text,
+                        onClick = {
+                            selectedTarget = ThemeColorTarget.Text
+                            syncPickerFromDraft(ThemeColorTarget.Text)
                         },
-                    )
-
-                    HueSlider(
-                        hue = hue,
-                        onHueChange = {
-                            hue = it
-                            applyPickerColorToDraft()
-                        },
-                    )
-
-                    AlphaSliderSection(
-                        color = opaqueColor,
-                        alpha = alpha,
-                        onAlphaChange = {
-                            alpha = it
-                            applyPickerColorToDraft()
-                        },
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
                     ) {
-                        TextButton(
-                            onClick = { dismissSheet(save = false) },
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(stringResource(R.string.theme_cancel))
-                        }
-                        Button(
-                            onClick = { dismissSheet(save = true) },
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(stringResource(R.string.theme_save))
-                        }
+                        Text(stringResource(R.string.theme_text))
+                    }
+                    SegmentedButton(
+                        selected = selectedTarget == ThemeColorTarget.ListOption,
+                        onClick = {
+                            selectedTarget = ThemeColorTarget.ListOption
+                            syncPickerFromDraft(ThemeColorTarget.ListOption)
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                    ) {
+                        Text(stringResource(R.string.theme_list_option))
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(
+                        onClick = {
+                            val defaultColor = when (selectedTarget) {
+                                ThemeColorTarget.Background -> modeDefaults.background
+                                ThemeColorTarget.Text -> modeDefaults.onBackground
+                                ThemeColorTarget.ListOption -> modeDefaults.surface
+                            }
+                            val hsv = defaultColor.toHsv()
+                            hue = hsv.hue
+                            saturation = hsv.saturation
+                            value = hsv.value
+                            alpha = defaultColor.alpha
+                            applyPickerColorToDraft()
+                        },
+                    ) {
+                        Text(
+                            text = stringResource(R.string.theme_reset_default),
+                            color = theme.accent,
+                        )
+                    }
+                }
+
+                CurrentColorRow(color = color)
+
+                SaturationValuePicker(
+                    hue = hue,
+                    saturation = saturation,
+                    value = value,
+                    onChange = { s, v ->
+                        saturation = s
+                        value = v
+                        applyPickerColorToDraft()
+                    },
+                )
+
+                HueSlider(
+                    hue = hue,
+                    onHueChange = {
+                        hue = it
+                        applyPickerColorToDraft()
+                    },
+                )
+
+                AlphaSliderSection(
+                    color = opaqueColor,
+                    alpha = alpha,
+                    onAlphaChange = {
+                        alpha = it
+                        applyPickerColorToDraft()
+                    },
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    TextButton(
+                        onClick = { dismissSheet(save = false) },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                    Button(
+                        onClick = { dismissSheet(save = true) },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.theme_save))
                     }
                 }
             }
@@ -291,12 +288,13 @@ fun ThemeColorBottomSheet(
 
 @Composable
 private fun CurrentColorRow(color: Color) {
+    val theme = LocalLumenTheme.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, LumenSheetBorder, RoundedCornerShape(12.dp))
+            .border(1.dp, theme.sheetBorder, RoundedCornerShape(12.dp))
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -305,7 +303,7 @@ private fun CurrentColorRow(color: Color) {
             modifier = Modifier
                 .size(36.dp)
                 .clip(CircleShape)
-                .border(1.dp, LumenSheetBorder, CircleShape),
+                .border(1.dp, theme.sheetBorder, CircleShape),
         ) {
             CheckerboardBackground(modifier = Modifier.fillMaxSize())
             Box(modifier = Modifier.fillMaxSize().background(color))
@@ -314,7 +312,7 @@ private fun CurrentColorRow(color: Color) {
             Text(
                 text = stringResource(R.string.theme_current_color),
                 style = MaterialTheme.typography.bodySmall,
-                color = LumenOnSurfaceMuted,
+                color = theme.onSurfaceMuted,
             )
             Text(
                 text = color.toHexArgb(),
@@ -327,6 +325,7 @@ private fun CurrentColorRow(color: Color) {
 
 @Composable
 private fun ThemePreviewBar(colors: LumenThemeColors) {
+    val theme = LocalLumenTheme.current
     val previewTabs = remember {
         listOf(LibraryTypeTab.ALL, LibraryTypeTab.EPISODES, LibraryTypeTab.MARKED)
     }
@@ -335,7 +334,7 @@ private fun ThemePreviewBar(colors: LumenThemeColors) {
             .fillMaxWidth()
             .height(120.dp)
             .clip(RoundedCornerShape(12.dp))
-            .border(1.dp, LumenSheetBorder, RoundedCornerShape(12.dp)),
+            .border(1.dp, theme.sheetBorder, RoundedCornerShape(12.dp)),
     ) {
         CheckerboardBackground(modifier = Modifier.fillMaxSize())
         Column(
@@ -390,12 +389,13 @@ private fun SaturationValuePicker(
     value: Float,
     onChange: (Float, Float) -> Unit,
 ) {
+    val theme = LocalLumenTheme.current
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .height(180.dp)
             .clip(RoundedCornerShape(12.dp))
-            .border(1.dp, LumenSheetBorder, RoundedCornerShape(12.dp))
+            .border(1.dp, theme.sheetBorder, RoundedCornerShape(12.dp))
             .background(
                 Brush.horizontalGradient(
                     colors = listOf(Color.White, HsvColor(hue, 1f, 1f).toColor()),
@@ -441,6 +441,7 @@ private fun HueSlider(
     hue: Float,
     onHueChange: (Float) -> Unit,
 ) {
+    val theme = LocalLumenTheme.current
     val hueColors = remember {
         List(7) { index ->
             HsvColor(index * 60f, 1f, 1f).toColor()
@@ -451,7 +452,7 @@ private fun HueSlider(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .border(1.dp, LumenSheetBorder, RoundedCornerShape(12.dp)),
+            .border(1.dp, theme.sheetBorder, RoundedCornerShape(12.dp)),
     ) {
         Slider(
             value = hue,
@@ -476,12 +477,13 @@ private fun AlphaSliderSection(
     alpha: Float,
     onAlphaChange: (Float) -> Unit,
 ) {
+    val theme = LocalLumenTheme.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, LumenSheetBorder, RoundedCornerShape(12.dp))
+            .border(1.dp, theme.sheetBorder, RoundedCornerShape(12.dp))
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -497,7 +499,7 @@ private fun AlphaSliderSection(
             Text(
                 text = formatAlphaPercent(alpha),
                 style = MaterialTheme.typography.bodySmall,
-                color = LumenOnSurfaceMuted,
+                color = theme.onSurfaceMuted,
             )
         }
         Box(
@@ -521,7 +523,7 @@ private fun AlphaSliderSection(
                 onValueChange = onAlphaChange,
                 valueRange = 0f..1f,
                 colors = SliderDefaults.colors(
-                    thumbColor = LumenAccentText,
+                    thumbColor = theme.accent,
                     activeTrackColor = Color.Transparent,
                     inactiveTrackColor = Color.Transparent,
                 ),

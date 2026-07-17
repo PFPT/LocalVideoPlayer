@@ -3,6 +3,7 @@ package com.zhaoshuo.localvideoplayer.ui.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
@@ -48,7 +49,7 @@ private fun lumenTypography(colors: LumenThemeColors) = Typography(
         fontFamily = GeistFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 13.sp,
-        color = colors.accent,
+        color = colors.onBackground,
     ),
     bodySmall = TextStyle(
         fontFamily = GeistMonoFontFamily,
@@ -64,43 +65,65 @@ private fun lumenTypography(colors: LumenThemeColors) = Typography(
     ),
 )
 
-private fun lumenColorScheme(colors: LumenThemeColors) = darkColorScheme(
-    primary = colors.accent,
-    onPrimary = colors.background,
-    background = colors.background,
-    onBackground = colors.onBackground,
-    surface = colors.surface,
-    onSurface = colors.onBackground,
-    surfaceContainerHigh = colors.surface,
-    onSurfaceVariant = colors.onSurfaceMuted,
-    outline = LumenSheetBorder,
-)
+private fun lumenColorScheme(mode: ThemeMode, colors: LumenThemeColors) = when (mode) {
+    ThemeMode.Dark -> darkColorScheme(
+        primary = colors.accent,
+        onPrimary = colors.background,
+        primaryContainer = colors.accent.copy(alpha = 0.18f),
+        onPrimaryContainer = colors.accent,
+        secondaryContainer = colors.surface,
+        onSecondaryContainer = colors.onBackground,
+        tertiaryContainer = colors.accent.copy(alpha = 0.12f),
+        onTertiaryContainer = colors.accent,
+        background = colors.background,
+        onBackground = colors.onBackground,
+        surface = colors.surface,
+        onSurface = colors.onBackground,
+        surfaceVariant = colors.surface,
+        onSurfaceVariant = colors.onSurfaceMuted,
+        surfaceContainerHigh = colors.surface,
+        outline = colors.sheetBorder,
+        error = LumenDelete,
+        errorContainer = LumenDelete.copy(alpha = 0.18f),
+        onErrorContainer = LumenDelete,
+    )
+    ThemeMode.Light -> lightColorScheme(
+        primary = colors.accent,
+        onPrimary = Color.White,
+        primaryContainer = colors.accent.copy(alpha = 0.12f),
+        onPrimaryContainer = colors.accent,
+        secondaryContainer = colors.glassFill,
+        onSecondaryContainer = colors.onBackground,
+        tertiaryContainer = colors.accent.copy(alpha = 0.08f),
+        onTertiaryContainer = colors.accent,
+        background = colors.background,
+        onBackground = colors.onBackground,
+        surface = colors.surface,
+        onSurface = colors.onBackground,
+        surfaceVariant = colors.glassFill,
+        onSurfaceVariant = colors.onSurfaceMuted,
+        surfaceContainerHigh = colors.surface,
+        outline = colors.sheetBorder,
+        error = LumenDelete,
+        errorContainer = LumenDelete.copy(alpha = 0.12f),
+        onErrorContainer = LumenDelete,
+    )
+}
 
 @Composable
 fun LocalVideoPlayerTheme(
-    colors: LumenThemeColors = LumenThemeColors.default(),
+    mode: ThemeMode = ThemeMode.Dark,
+    colors: LumenThemeColors = LumenThemeColors.defaults(mode),
     content: @Composable () -> Unit,
 ) {
-    CompositionLocalProvider(LocalLumenTheme provides colors) {
+    CompositionLocalProvider(
+        LocalLumenTheme provides colors,
+        LocalThemeMode provides mode,
+    ) {
         MaterialTheme(
-            colorScheme = lumenColorScheme(colors),
+            colorScheme = lumenColorScheme(mode, colors),
             typography = lumenTypography(colors),
             content = content,
         )
     }
 }
-
-@Deprecated("Use LumenBackground", ReplaceWith("LumenBackground"))
-val IosBackground = LumenBackground
-
-@Deprecated("Use LumenSurface", ReplaceWith("LumenSurface"))
-val IosSurface = LumenSurface
-
-@Deprecated("Use LumenSheetBorder", ReplaceWith("LumenSheetBorder"))
-val IosDivider = LumenSheetBorder
-
-@Deprecated("Use LumenPrimary", ReplaceWith("LumenPrimary"))
-val IosBlue = LumenPrimary
-
-@Deprecated("Use LumenOnSurfaceMuted", ReplaceWith("LumenOnSurfaceMuted"))
-val IosSecondaryText = LumenOnSurfaceMuted

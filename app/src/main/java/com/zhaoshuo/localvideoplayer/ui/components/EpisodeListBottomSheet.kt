@@ -15,12 +15,11 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
 import com.zhaoshuo.localvideoplayer.model.VideoItem
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenAccentText
+import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
 import com.zhaoshuo.localvideoplayer.util.formatDuration
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,6 +31,7 @@ fun EpisodeListBottomSheet(
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val theme = LocalLumenTheme.current
 
     LumenModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -60,19 +60,20 @@ fun EpisodeListBottomSheet(
                     Text(
                         text = episodeLabel,
                         style = MaterialTheme.typography.bodyLarge,
-                        color = if (index == currentIndex) LumenAccentText else Color.White,
+                        color = if (index == currentIndex) theme.accent else theme.onBackground,
                         modifier = Modifier.weight(1f),
                     )
                     Text(
                         text = formatDuration(episode.durationMs),
                         style = MaterialTheme.typography.bodySmall,
+                        color = theme.onSurfaceMuted,
                         modifier = Modifier.padding(end = 8.dp),
                     )
                     if (index == currentIndex) {
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = null,
-                            tint = LumenAccentText,
+                            tint = theme.accent,
                         )
                     }
                 }

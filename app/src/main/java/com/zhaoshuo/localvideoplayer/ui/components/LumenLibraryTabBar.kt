@@ -1,6 +1,7 @@
 package com.zhaoshuo.localvideoplayer.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -36,6 +37,7 @@ fun LumenLibraryTabBar(
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp),
 ) {
     val theme = LocalLumenTheme.current
+    val chipShape = RoundedCornerShape(20.dp)
     LazyRow(
         modifier = modifier,
         contentPadding = contentPadding,
@@ -46,10 +48,12 @@ fun LumenLibraryTabBar(
             val label = tabLabel(tab)
             val textColor = if (selected) theme.onBackground else theme.onSurfaceMuted
             val chipModifier = Modifier
-                .clip(RoundedCornerShape(20.dp))
+                .clip(chipShape)
                 .then(
                     if (selected) {
-                        Modifier.background(theme.surface.copy(alpha = 1f))
+                        Modifier
+                            .background(theme.glassFill)
+                            .border(1.dp, theme.glassBorder, chipShape)
                     } else {
                         Modifier
                     },
