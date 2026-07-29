@@ -26,49 +26,48 @@ val GeistMonoFontFamily = FontFamily(
     Font(R.font.geist_mono_variable, FontWeight.Medium),
 )
 
-private fun lumenTypography(colors: LumenThemeColors) = Typography(
+private val lumenTypography = Typography(
     titleLarge = TextStyle(
         fontFamily = GeistFontFamily,
         fontWeight = FontWeight.SemiBold,
         fontSize = 17.sp,
-        color = colors.onBackground,
     ),
     titleMedium = TextStyle(
         fontFamily = GeistFontFamily,
         fontWeight = FontWeight.SemiBold,
         fontSize = 15.sp,
-        color = colors.onBackground,
     ),
     bodyLarge = TextStyle(
         fontFamily = GeistFontFamily,
         fontWeight = FontWeight.Medium,
         fontSize = 13.sp,
-        color = colors.onBackground,
     ),
     bodyMedium = TextStyle(
         fontFamily = GeistFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 13.sp,
-        color = colors.onBackground,
     ),
     bodySmall = TextStyle(
         fontFamily = GeistMonoFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
-        color = colors.onSurfaceMuted,
     ),
     labelSmall = TextStyle(
         fontFamily = GeistMonoFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 10.sp,
-        color = colors.onBackground,
     ),
 )
+
+private fun contrastingOnColor(background: Color): Color {
+    val luminance = 0.2126f * background.red + 0.7152f * background.green + 0.0722f * background.blue
+    return if (luminance > 0.5f) Color.Black else Color.White
+}
 
 private fun lumenColorScheme(mode: ThemeMode, colors: LumenThemeColors) = when (mode) {
     ThemeMode.Dark -> darkColorScheme(
         primary = colors.accent,
-        onPrimary = colors.background,
+        onPrimary = contrastingOnColor(colors.accent),
         primaryContainer = colors.accent.copy(alpha = 0.18f),
         onPrimaryContainer = colors.accent,
         secondaryContainer = colors.surface,
@@ -89,7 +88,7 @@ private fun lumenColorScheme(mode: ThemeMode, colors: LumenThemeColors) = when (
     )
     ThemeMode.Light -> lightColorScheme(
         primary = colors.accent,
-        onPrimary = Color.White,
+        onPrimary = contrastingOnColor(colors.accent),
         primaryContainer = colors.accent.copy(alpha = 0.12f),
         onPrimaryContainer = colors.accent,
         secondaryContainer = colors.glassFill,
@@ -122,7 +121,7 @@ fun LocalVideoPlayerTheme(
     ) {
         MaterialTheme(
             colorScheme = lumenColorScheme(mode, colors),
-            typography = lumenTypography(colors),
+            typography = lumenTypography,
             content = content,
         )
     }

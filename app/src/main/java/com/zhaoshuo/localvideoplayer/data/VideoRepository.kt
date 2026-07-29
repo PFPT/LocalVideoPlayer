@@ -78,12 +78,25 @@ class VideoRepository(private val context: Context) {
             }
         }
 
+        return videos
+    }
+
+    fun loadM3u8Playlists(existing: List<VideoItem> = emptyList()): List<VideoItem> {
+        val videos = mutableListOf<VideoItem>()
+        val seenUris = existing.mapTo(mutableSetOf()) { it.uri.toString() }
+        loadM3u8Files(videos, seenUris)
+        return videos
+    }
+
+    fun loadAllVideos(): List<VideoItem> {
+        val videos = loadVideos().toMutableList()
+        val seenUris = videos.mapTo(mutableSetOf()) { it.uri.toString() }
         loadM3u8Files(videos, seenUris)
         return videos
     }
 
     fun loadVideosExcluding(hiddenUris: Set<String>): List<VideoItem> {
-        return loadVideos().filter { it.uri.toString() !in hiddenUris }
+        return loadAllVideos().filter { it.uri.toString() !in hiddenUris }
     }
 
     fun loadLibrary(hiddenUris: Set<String> = emptySet()): List<VideoLibraryEntry> {

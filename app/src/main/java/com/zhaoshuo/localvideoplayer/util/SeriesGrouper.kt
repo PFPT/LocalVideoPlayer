@@ -15,6 +15,7 @@ object SeriesGrouper {
     private const val SHORT_CLIP_MAX_MS = 60_000L
     private const val MIN_GROUP_SIZE = 2
     private const val MIN_SHORT_MONTH_GROUP = 3
+    private const val MAX_SIMILAR_NAME_CLUSTER_SIZE = 150
 
     private val GENERIC_FOLDER_NAMES = setOf(
         "camera",
@@ -238,6 +239,7 @@ object SeriesGrouper {
     ) {
         val indices = parsed.indices.filter { !assigned[it] }
         if (indices.size < 2) return
+        if (indices.size > MAX_SIMILAR_NAME_CLUSTER_SIZE) return
 
         val clusters = clusterIndices(indices) { left, right ->
             shouldGroup(parsed[left].second, parsed[right].second)

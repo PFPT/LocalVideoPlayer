@@ -13,8 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.compose.ui.unit.dp
+import androidx.media3.exoplayer.ExoPlayer
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 
 @Composable
@@ -54,17 +54,27 @@ fun PortraitPlayerLayout(
     isAdjustingVolume: Boolean,
     brightnessFraction: Float,
     volumeFraction: Float,
+    isSpeedBoosted: Boolean,
     onVideoTap: () -> Unit,
     onVideoDoubleTap: () -> Unit,
     onPlayPauseClick: () -> Unit,
     onPreviousClick: () -> Unit,
     onNextClick: () -> Unit,
     onSeek: (Long) -> Unit,
+    playbackSpeed: Float,
+    repeatOne: Boolean,
     onEpisodeSelected: (Int) -> Unit,
-    onViewAllClick: () -> Unit,
+    onSpeedClick: () -> Unit,
+    onLoopClick: () -> Unit,
+    onMoreClick: () -> Unit,
+    showSkipIntro: Boolean,
+    showSkipOutro: Boolean,
+    onSkipIntro: () -> Unit,
+    onSkipOutro: () -> Unit,
     onFullscreenClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val showChrome = controlsVisible || isSeeking
     Column(modifier = modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
@@ -78,115 +88,122 @@ fun PortraitPlayerLayout(
                     .statusBarsPadding(),
             ) {
                 VideoPlayerGesture(
-                scale = 1f,
-                offsetX = 0f,
-                offsetY = 0f,
-                onScaleChange = {},
-                onOffsetChange = { _, _ -> },
-                getCurrentPositionMs = { seekPositionMs },
-                durationMs = durationMs,
-                onSeekPreview = onSeekPreview,
-                onSeekPreviewFrame = onSeekPreviewFrame,
-                onSeekCommitted = onSeekCommitted,
-                onTap = { _, _, _ -> onVideoTap() },
-                onDoubleTap = onVideoDoubleTap,
-                onSeekingChange = onSeekingChange,
-                onSpeedBoostStart = onSpeedBoostStart,
-                onSpeedBoostEnd = onSpeedBoostEnd,
-                onBrightnessGestureStart = onBrightnessGestureStart,
-                onBrightnessChange = onBrightnessChange,
-                onBrightnessGestureEnd = onBrightnessGestureEnd,
-                onVolumeGestureStart = onVolumeGestureStart,
-                onVolumeChange = onVolumeChange,
-                onVolumeGestureEnd = onVolumeGestureEnd,
-                getCurrentBrightness = getCurrentBrightness,
-                getCurrentVolume = getCurrentVolume,
-                enabled = durationMs > 0,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black),
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
+                    scale = 1f,
+                    offsetX = 0f,
+                    offsetY = 0f,
+                    onScaleChange = {},
+                    onOffsetChange = { _, _ -> },
+                    getCurrentPositionMs = { seekPositionMs },
+                    durationMs = durationMs,
+                    onSeekPreview = onSeekPreview,
+                    onSeekPreviewFrame = onSeekPreviewFrame,
+                    onSeekCommitted = onSeekCommitted,
+                    onTap = { _, _, _ -> onVideoTap() },
+                    onDoubleTap = onVideoDoubleTap,
+                    onSeekingChange = onSeekingChange,
+                    onSpeedBoostStart = onSpeedBoostStart,
+                    onSpeedBoostEnd = onSpeedBoostEnd,
+                    onBrightnessGestureStart = onBrightnessGestureStart,
+                    onBrightnessChange = onBrightnessChange,
+                    onBrightnessGestureEnd = onBrightnessGestureEnd,
+                    onVolumeGestureStart = onVolumeGestureStart,
+                    onVolumeChange = onVolumeChange,
+                    onVolumeGestureEnd = onVolumeGestureEnd,
+                    getCurrentBrightness = getCurrentBrightness,
+                    getCurrentVolume = getCurrentVolume,
+                    enabled = durationMs > 0,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black),
                 ) {
-                    FittedPlayerSurface(
-                        player = exoPlayer,
+                    Box(
                         modifier = Modifier.fillMaxSize(),
-                    )
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        FittedPlayerSurface(
+                            player = exoPlayer,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
-            }
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .then(
-                        if (controlsVisible || isSeeking) {
-                            Modifier.background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Black.copy(alpha = 0.5f),
-                                        Color.Transparent,
-                                        Color.Transparent,
-                                        Color.Black.copy(alpha = 0.6f),
-                                    ),
-                                ),
-                            )
-                        } else {
-                            Modifier
-                        },
-                    ),
-            )
-            SeekPreviewOverlay(
-                visible = isSeeking,
-                previewPositionMs = previewPositionMs,
-                durationMs = durationMs,
-                seekStartPositionMs = seekStartPositionMs,
-            )
-            BrightnessFeedbackOverlay(
-                visible = isAdjustingBrightness,
-                brightnessFraction = brightnessFraction,
-            )
-            VolumeFeedbackOverlay(
-                visible = isAdjustingVolume,
-                volumeFraction = volumeFraction,
-            )
-            PlayerTopBar(
-                title = title,
-                resolution = resolution,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            )
-            if (controlsVisible || isSeeking) {
                 Box(
-                    modifier = Modifier.align(Alignment.Center),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    PlayerCenterControls(
-                        isPlaying = isPlaying,
-                        hasPrevious = hasPrevious,
-                        hasNext = hasNext,
-                        onPlayPauseClick = onPlayPauseClick,
-                        onPreviousClick = onPreviousClick,
-                        onNextClick = onNextClick,
+                    modifier = Modifier
+                        .matchParentSize()
+                        .then(
+                            if (showChrome) {
+                                Modifier.background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Black.copy(alpha = 0.5f),
+                                            Color.Transparent,
+                                            Color.Transparent,
+                                            Color.Black.copy(alpha = 0.6f),
+                                        ),
+                                    ),
+                                )
+                            } else {
+                                Modifier
+                            },
+                        ),
+                )
+                SeekPreviewOverlay(
+                    visible = isSeeking,
+                    previewPositionMs = previewPositionMs,
+                    durationMs = durationMs,
+                    seekStartPositionMs = seekStartPositionMs,
+                )
+                BrightnessFeedbackOverlay(
+                    visible = isAdjustingBrightness,
+                    brightnessFraction = brightnessFraction,
+                )
+                VolumeFeedbackOverlay(
+                    visible = isAdjustingVolume,
+                    volumeFraction = volumeFraction,
+                )
+                SpeedBoostOverlay(visible = isSpeedBoosted)
+                SkipIntroOutroOverlay(
+                    showSkipIntro = showSkipIntro,
+                    showSkipOutro = showSkipOutro,
+                    onSkipIntro = onSkipIntro,
+                    onSkipOutro = onSkipOutro,
+                )
+                if (showChrome) {
+                    PlayerTopBar(
+                        title = title,
+                        resolution = resolution,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .statusBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                    )
+                    Box(
+                        modifier = Modifier.align(Alignment.Center),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        PlayerCenterControls(
+                            isPlaying = isPlaying,
+                            hasPrevious = hasPrevious,
+                            hasNext = hasNext,
+                            onPlayPauseClick = onPlayPauseClick,
+                            onPreviousClick = onPreviousClick,
+                            onNextClick = onNextClick,
+                        )
+                    }
+                    PlayerProgressBar(
+                        currentPositionMs = currentPositionMs,
+                        bufferedPositionMs = bufferedPositionMs,
+                        durationMs = durationMs,
+                        onSeek = onSeek,
+                        showFullscreen = true,
+                        isFullscreen = false,
+                        onFullscreenClick = onFullscreenClick,
+                        compact = true,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
                     )
                 }
-            }
-            PlayerProgressBar(
-                currentPositionMs = currentPositionMs,
-                bufferedPositionMs = bufferedPositionMs,
-                durationMs = durationMs,
-                onSeek = onSeek,
-                showFullscreen = true,
-                isFullscreen = false,
-                onFullscreenClick = onFullscreenClick,
-                compact = true,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-            )
             }
         }
         PlayerMetadataPanel(
@@ -195,8 +212,13 @@ fun PortraitPlayerLayout(
             totalEpisodes = episodes.size,
             currentEpisode = episodes[currentIndex],
             episodes = episodes,
+            playbackSpeed = playbackSpeed,
+            repeatOne = repeatOne,
+            resolution = resolution,
             onEpisodeSelected = onEpisodeSelected,
-            onViewAllClick = onViewAllClick,
+            onSpeedClick = onSpeedClick,
+            onLoopClick = onLoopClick,
+            onMoreClick = onMoreClick,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(0.62f)

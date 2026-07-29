@@ -8,12 +8,14 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.zhaoshuo.localvideoplayer.ui.theme.LauncherIcon
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenThemeColors
 import com.zhaoshuo.localvideoplayer.ui.theme.ThemeMode
 import com.zhaoshuo.localvideoplayer.ui.theme.ThemeState
 import com.zhaoshuo.localvideoplayer.ui.theme.toArgbInt
 import com.zhaoshuo.localvideoplayer.ui.theme.toComposeColor
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.themeDataStore: DataStore<Preferences> by preferencesDataStore(
@@ -36,6 +38,18 @@ class ThemePreferencesStore(private val context: Context) {
     }
 
     val themeColors: Flow<LumenThemeColors> = themeState.map { it.colors }
+
+    val launcherIcon: Flow<LauncherIcon> = context.themeDataStore.data.map { prefs ->
+        LauncherIcon.fromId(prefs[LAUNCHER_ICON_KEY])
+    }
+
+    suspend fun getLauncherIcon(): LauncherIcon = launcherIcon.first()
+
+    suspend fun setLauncherIcon(icon: LauncherIcon) {
+        context.themeDataStore.edit { prefs ->
+            prefs[LAUNCHER_ICON_KEY] = icon.id
+        }
+    }
 
     suspend fun setThemeMode(mode: ThemeMode) {
         val defaults = LumenThemeColors.defaults(mode)
@@ -85,6 +99,7 @@ class ThemePreferencesStore(private val context: Context) {
 
     companion object {
         private val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
+        private val LAUNCHER_ICON_KEY = stringPreferencesKey("launcher_icon_id")
         private val BACKGROUND_COLOR_KEY = intPreferencesKey("background_color_argb")
         private val TEXT_COLOR_KEY = intPreferencesKey("text_color_argb")
         private val LIST_OPTION_COLOR_KEY = intPreferencesKey("list_option_color_argb")

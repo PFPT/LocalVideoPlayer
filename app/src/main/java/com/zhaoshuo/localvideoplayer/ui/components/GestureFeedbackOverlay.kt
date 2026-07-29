@@ -85,6 +85,34 @@ fun VolumeFeedbackOverlay(
 }
 
 @Composable
+fun SpeedBoostOverlay(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = modifier.fillMaxSize(),
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            Text(
+                text = stringResource(R.string.speed_boost_active),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                modifier = Modifier
+                    .padding(top = 72.dp)
+                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
+    }
+}
+
+@Composable
 private fun EdgeLevelFeedbackOverlay(
     visible: Boolean,
     fraction: Float,

@@ -53,6 +53,7 @@ fun LandscapePlayerLayout(
     onSpeedClick: () -> Unit,
     onLoopClick: () -> Unit,
     onEpisodePickerClick: () -> Unit,
+    onMoreClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (isFullscreen) {
@@ -81,6 +82,7 @@ fun LandscapePlayerLayout(
             onSpeedClick = onSpeedClick,
             onLoopClick = onLoopClick,
             onEpisodePickerClick = onEpisodePickerClick,
+            onMoreClick = onMoreClick,
             modifier = modifier,
         )
         return
@@ -118,6 +120,7 @@ fun LandscapePlayerLayout(
                 onSpeedClick = onSpeedClick,
                 onLoopClick = onLoopClick,
                 onEpisodePickerClick = onEpisodePickerClick,
+                onMoreClick = onMoreClick,
             )
     }
 }
@@ -149,6 +152,7 @@ private fun LandscapePlayerLayoutContent(
     onSpeedClick: () -> Unit,
     onLoopClick: () -> Unit,
     onEpisodePickerClick: () -> Unit,
+    onMoreClick: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
@@ -207,6 +211,7 @@ private fun LandscapePlayerLayoutContent(
                 onSpeedClick = onSpeedClick,
                 onLoopClick = onLoopClick,
                 onEpisodePickerClick = onEpisodePickerClick,
+                onMoreClick = onMoreClick,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 6.dp),

@@ -1,13 +1,16 @@
 package com.zhaoshuo.localvideoplayer.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,12 +18,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -46,11 +51,14 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
 import com.zhaoshuo.localvideoplayer.model.LibraryTypeTab
 import com.zhaoshuo.localvideoplayer.ui.theme.HsvColor
+import com.zhaoshuo.localvideoplayer.ui.theme.LauncherIcon
 import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenThemeColors
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenThumbCorner
@@ -72,7 +80,8 @@ private enum class ThemeColorTarget {
 fun ThemeColorBottomSheet(
     themeMode: ThemeMode,
     initialColors: LumenThemeColors,
-    onSave: (LumenThemeColors) -> Unit,
+    selectedLauncherIcon: LauncherIcon,
+    onSave: (LumenThemeColors, LauncherIcon) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -81,7 +90,9 @@ fun ThemeColorBottomSheet(
     val modeDefaults = remember(themeMode) { LumenThemeColors.defaults(themeMode) }
 
     var draftColors by remember(initialColors) { mutableStateOf(initialColors) }
+    var draftLauncherIcon by remember(selectedLauncherIcon) { mutableStateOf(selectedLauncherIcon) }
     var selectedTarget by remember { mutableStateOf(ThemeColorTarget.Background) }
+    var dismissing by remember { mutableStateOf(false) }
 
     val editingColor = when (selectedTarget) {
         ThemeColorTarget.Background -> draftColors.background
@@ -121,20 +132,24 @@ fun ThemeColorBottomSheet(
     }
 
     fun dismissSheet(save: Boolean) {
+        if (dismissing) return
+        dismissing = true
+        if (save) {
+            onSave(draftColors, draftLauncherIcon)
+        }
         scope.launch {
             sheetState.hide()
-            if (save) {
-                onSave(draftColors)
-            }
             onDismiss()
         }
     }
 
     fun resetAllAndSave() {
+        if (dismissing) return
+        dismissing = true
+        draftColors = modeDefaults
+        onSave(modeDefaults, draftLauncherIcon)
         scope.launch {
-            draftColors = modeDefaults
             sheetState.hide()
-            onSave(modeDefaults)
             onDismiss()
         }
     }
@@ -151,11 +166,21 @@ fun ThemeColorBottomSheet(
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            ThemePreviewBar(colors = draftColors)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                ThemePreviewBar(colors = draftColors)
 
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                LauncherIconPicker(
+                    selected = draftLauncherIcon,
+                    onSelected = { draftLauncherIcon = it },
+                )
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -263,23 +288,25 @@ fun ThemeColorBottomSheet(
                         applyPickerColorToDraft()
                     },
                 )
+            }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedButton(
+                    onClick = { dismissSheet(save = false) },
+                    modifier = Modifier.weight(1f),
                 ) {
-                    TextButton(
-                        onClick = { dismissSheet(save = false) },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.cancel))
-                    }
-                    Button(
-                        onClick = { dismissSheet(save = true) },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.theme_save))
-                    }
+                    Text(stringResource(R.string.cancel))
+                }
+                Button(
+                    onClick = { dismissSheet(save = true) },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(stringResource(R.string.theme_save))
                 }
             }
         }
@@ -319,6 +346,57 @@ private fun CurrentColorRow(color: Color) {
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onBackground,
             )
+        }
+    }
+}
+
+@Composable
+private fun LauncherIconPicker(
+    selected: LauncherIcon,
+    onSelected: (LauncherIcon) -> Unit,
+) {
+    val theme = LocalLumenTheme.current
+    val rows = remember { LauncherIcon.entries.chunked(3) }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = stringResource(R.string.theme_launcher_icon),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        rows.forEach { rowIcons ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                rowIcons.forEach { icon ->
+                    val isSelected = icon == selected
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(theme.surface)
+                            .border(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) theme.accent else theme.sheetBorder,
+                                shape = RoundedCornerShape(14.dp),
+                            )
+                            .clickable { onSelected(icon) }
+                            .padding(10.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Image(
+                            painter = painterResource(icon.previewRes),
+                            contentDescription = stringResource(icon.labelRes),
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Crop,
+                        )
+                    }
+                }
+                repeat(3 - rowIcons.size) {
+                    Box(modifier = Modifier.weight(1f))
+                }
+            }
         }
     }
 }
@@ -371,7 +449,7 @@ private fun ThemePreviewBar(colors: LumenThemeColors) {
                         maxLines = 1,
                     )
                     Text(
-                        text = "00:00 · 2026/01/01",
+                        text = stringResource(R.string.theme_preview_meta),
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.onSurfaceMuted,
                         maxLines = 1,

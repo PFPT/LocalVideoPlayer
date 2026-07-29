@@ -32,6 +32,13 @@ class DownloadNameResolverTest {
     }
 
     @Test
+    fun parsesUrlEmbeddedInClipboardText() {
+        val parsed = DownloadNameResolver.parseSharedText("请复制：https://cdn.example.com/a.mp4")
+        assertNull(parsed.title)
+        assertEquals("https://cdn.example.com/a.mp4", parsed.url)
+    }
+
+    @Test
     fun addsMp4ExtensionForHlsTitle() {
         assertEquals(
             "说唱巅峰对决.mp4",

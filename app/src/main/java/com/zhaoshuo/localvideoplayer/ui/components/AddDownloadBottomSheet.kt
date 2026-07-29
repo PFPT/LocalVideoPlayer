@@ -1,6 +1,7 @@
 package com.zhaoshuo.localvideoplayer.ui.components
 
 import android.content.ClipboardManager
+import android.view.ViewTreeObserver
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,8 +18,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
@@ -54,6 +58,7 @@ fun AddDownloadBottomSheet(
     var fileNameEdited by remember { mutableStateOf(false) }
     var autoFilledFileName by remember { mutableStateOf(false) }
     var pendingShareTitle by remember { mutableStateOf<String?>(null) }
+    var clipboardAutoFilled by remember { mutableStateOf(false) }
     val invalidUrl = stringResource(R.string.download_invalid_url)
     val invalidHeaders = stringResource(R.string.download_invalid_headers)
     val defaultFileName = stringResource(R.string.download_default_file_name)
@@ -64,32 +69,50 @@ fun AddDownloadBottomSheet(
         return raw.takeIf { DownloadNameResolver.titleMatchesDownload(raw, sharedUrl) }.orEmpty()
     }
 
-    fun applySharedText(text: String, showClipboardToast: Boolean) {
+    fun applySharedText(text: String, showClipboardToast: Boolean): Boolean {
         val parsed = DownloadNameResolver.parseSharedText(text)
-        parsed.url?.let { sharedUrl ->
-            pendingShareTitle = trustedShareTitle(parsed.title, sharedUrl).ifBlank { null }
-            url = sharedUrl
-            if (showClipboardToast) {
-                Toast.makeText(context, context.getString(R.string.download_clipboard_filled), Toast.LENGTH_SHORT).show()
-            }
+        val sharedUrl = parsed.url ?: return false
+        pendingShareTitle = trustedShareTitle(parsed.title, sharedUrl).ifBlank { null }
+        url = sharedUrl
+        if (showClipboardToast) {
+            Toast.makeText(context, context.getString(R.string.download_clipboard_filled), Toast.LENGTH_SHORT).show()
         }
+        return true
     }
 
-    LaunchedEffect(initialShareText) {
-        initialShareText?.let { applySharedText(it, showClipboardToast = false) }
-    }
-
-    LaunchedEffect(Unit) {
-        if (initialShareText != null) return@LaunchedEffect
-        val clip = context.getSystemService(ClipboardManager::class.java)
+    fun readClipboardText(): String =
+        context.getSystemService(ClipboardManager::class.java)
             ?.primaryClip
+            ?.takeIf { it.itemCount > 0 }
             ?.getItemAt(0)
             ?.coerceToText(context)
             ?.toString()
             .orEmpty()
-        if (clip.contains("http://") || clip.contains("https://")) {
-            applySharedText(clip, showClipboardToast = true)
+
+    fun clipboardLooksLikeHttp(text: String): Boolean {
+        val lower = text.lowercase()
+        return lower.contains("http://") || lower.contains("https://")
+    }
+
+    fun tryFillFromClipboard(showToast: Boolean, showFailureToast: Boolean = false): Boolean {
+        val clip = readClipboardText()
+        if (clip.isBlank()) {
+            if (showFailureToast) {
+                Toast.makeText(context, context.getString(R.string.download_clipboard_empty), Toast.LENGTH_SHORT).show()
+            }
+            return false
         }
+        if (!clipboardLooksLikeHttp(clip) || !applySharedText(clip, showClipboardToast = showToast)) {
+            if (showFailureToast) {
+                Toast.makeText(context, context.getString(R.string.download_clipboard_no_url), Toast.LENGTH_SHORT).show()
+            }
+            return false
+        }
+        return true
+    }
+
+    LaunchedEffect(initialShareText) {
+        initialShareText?.let { applySharedText(it, showClipboardToast = false) }
     }
 
     LaunchedEffect(url) {
@@ -115,6 +138,28 @@ fun AddDownloadBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {
+        val sheetView = LocalView.current
+        DisposableEffect(sheetView, initialShareText) {
+            if (initialShareText != null) {
+                return@DisposableEffect onDispose { }
+            }
+            fun attemptFill() {
+                if (clipboardAutoFilled || url.isNotBlank()) return
+                if (tryFillFromClipboard(showToast = true)) {
+                    clipboardAutoFilled = true
+                }
+            }
+            val listener = ViewTreeObserver.OnWindowFocusChangeListener { hasFocus ->
+                if (hasFocus) attemptFill()
+            }
+            sheetView.viewTreeObserver.addOnWindowFocusChangeListener(listener)
+            sheetView.post {
+                if (sheetView.hasWindowFocus()) attemptFill()
+            }
+            onDispose {
+                sheetView.viewTreeObserver.removeOnWindowFocusChangeListener(listener)
+            }
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -143,6 +188,15 @@ fun AddDownloadBottomSheet(
                 singleLine = true,
                 isError = inputError != null,
                 supportingText = inputError?.let { { Text(it) } },
+                trailingIcon = {
+                    TextButton(
+                        onClick = {
+                            tryFillFromClipboard(showToast = true, showFailureToast = true)
+                        },
+                    ) {
+                        Text(stringResource(R.string.download_paste_clipboard))
+                    }
+                },
             )
             OutlinedTextField(
                 value = fileName,

@@ -60,6 +60,7 @@ internal fun FullscreenPlayerLayout(
     onSpeedClick: () -> Unit,
     onLoopClick: () -> Unit,
     onEpisodePickerClick: () -> Unit,
+    onMoreClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -167,6 +168,7 @@ internal fun FullscreenPlayerLayout(
                         onSpeedClick = onSpeedClick,
                         onLoopClick = onLoopClick,
                         onEpisodePickerClick = onEpisodePickerClick,
+                        onMoreClick = onMoreClick,
                     )
                 }
             }

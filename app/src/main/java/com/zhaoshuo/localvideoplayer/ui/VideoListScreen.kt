@@ -101,9 +101,11 @@ import com.zhaoshuo.localvideoplayer.ui.components.VideoListItem
 import com.zhaoshuo.localvideoplayer.ui.components.rememberEpisodeProgressList
 import com.zhaoshuo.localvideoplayer.ui.components.rememberPlaybackProgress
 import com.zhaoshuo.localvideoplayer.ui.components.rememberSeriesPlaybackStats
+import com.zhaoshuo.localvideoplayer.ui.theme.LauncherIcon
 import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
 import com.zhaoshuo.localvideoplayer.ui.theme.ThemeMode
 import com.zhaoshuo.localvideoplayer.ui.theme.ThemeState
+import com.zhaoshuo.localvideoplayer.util.LauncherIconSwitcher
 import com.zhaoshuo.localvideoplayer.util.M3uPlaylistParser
 import com.zhaoshuo.localvideoplayer.util.isM3u8Title
 import kotlinx.coroutines.Dispatchers
@@ -255,7 +257,8 @@ fun VideoListScreen(
                 )
             } catch (_: SecurityException) {
             }
-            val title = uri.lastPathSegment?.substringAfterLast(':') ?: "Selected Video"
+            val title = uri.lastPathSegment?.substringAfterLast(':')
+                ?: context.getString(R.string.selected_video_fallback)
             val pickedItem = VideoItem(
                 id = uri.hashCode().toLong(),
                 uri = uri,
@@ -533,13 +536,24 @@ fun VideoListScreen(
         )
     }
 
+    val selectedLauncherIcon by themeStore.launcherIcon.collectAsState(initial = LauncherIcon.Default)
     if (showThemeSheet) {
         ThemeColorBottomSheet(
             themeMode = themeState.mode,
             initialColors = themeState.colors,
-            onSave = { colors ->
+            selectedLauncherIcon = selectedLauncherIcon,
+            onSave = { colors, icon ->
                 scope.launch {
                     themeStore.saveThemeColors(colors)
+                    if (icon != selectedLauncherIcon) {
+                        themeStore.setLauncherIcon(icon)
+                        LauncherIconSwitcher.apply(context, icon)
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.theme_launcher_icon_updated),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
                 }
             },
             onDismiss = { showThemeSheet = false },
@@ -642,7 +656,7 @@ fun VideoListScreen(
                         IconButton(onClick = onOpenDownloads) {
                             Icon(
                                 imageVector = Icons.Filled.Download,
-                                contentDescription = "Downloads",
+                                contentDescription = stringResource(R.string.downloads_title),
                                 tint = MaterialTheme.colorScheme.onBackground,
                             )
                         }
@@ -908,21 +922,37 @@ fun VideoListScreen(
                                             }
                                         }
 
-                                        if (sections.singles.isNotEmpty() && !collapseSingles) {
-                                            item(key = "header-singles") {
-                                                LibrarySectionHeader(
-                                                    stringResource(
-                                                        R.string.section_other_videos,
-                                                        sections.singles.size,
-                                                    ),
-                                                )
-                                            }
-                                            items(
-                                                items = sections.singles,
-                                                key = { entry -> entryKey(entry) },
-                                                contentType = { 1 },
-                                            ) { entry ->
-                                                SingleLibraryRow(entry)
+                                        if (sections.singles.isNotEmpty()) {
+                                            if (collapseSingles) {
+                                                item(key = "expand-singles") {
+                                                    Text(
+                                                        text = stringResource(
+                                                            R.string.expand_singles,
+                                                            sections.singles.size,
+                                                        ),
+                                                        style = MaterialTheme.typography.labelLarge,
+                                                        color = LocalLumenTheme.current.accent,
+                                                        modifier = Modifier
+                                                            .padding(top = 8.dp, bottom = 4.dp)
+                                                            .clickable { collapseSingles = false },
+                                                    )
+                                                }
+                                            } else {
+                                                item(key = "header-singles") {
+                                                    LibrarySectionHeader(
+                                                        stringResource(
+                                                            R.string.section_other_videos,
+                                                            sections.singles.size,
+                                                        ),
+                                                    )
+                                                }
+                                                items(
+                                                    items = sections.singles,
+                                                    key = { entry -> entryKey(entry) },
+                                                    contentType = { 1 },
+                                                ) { entry ->
+                                                    SingleLibraryRow(entry)
+                                                }
                                             }
                                         }
                                     }

@@ -36,6 +36,7 @@ import com.zhaoshuo.localvideoplayer.data.PinnedItemsStore
 import com.zhaoshuo.localvideoplayer.data.PlayCountStore
 import com.zhaoshuo.localvideoplayer.data.LibraryCacheStore
 import com.zhaoshuo.localvideoplayer.data.PlaybackStore
+import com.zhaoshuo.localvideoplayer.data.PlayerPreferencesStore
 import com.zhaoshuo.localvideoplayer.data.ThemePreferencesStore
 import com.zhaoshuo.localvideoplayer.data.VideoRepository
 import com.zhaoshuo.localvideoplayer.download.DownloadManager
@@ -52,6 +53,7 @@ import com.zhaoshuo.localvideoplayer.ui.VideoListScreen
 import com.zhaoshuo.localvideoplayer.ui.theme.LocalVideoPlayerTheme
 import com.zhaoshuo.localvideoplayer.ui.theme.ThemeMode
 import com.zhaoshuo.localvideoplayer.ui.theme.ThemeState
+import com.zhaoshuo.localvideoplayer.util.LauncherIconSwitcher
 import com.zhaoshuo.localvideoplayer.util.Permissions
 import com.zhaoshuo.localvideoplayer.util.SeriesGrouper
 import kotlinx.coroutines.async
@@ -80,6 +82,7 @@ fun LocalVideoPlayerApp(
     val repository = remember { VideoRepository(context) }
     val downloadManager = remember { DownloadManager.get(context) }
     val playbackStore = remember { PlaybackStore(context) }
+    val playerPreferencesStore = remember { PlayerPreferencesStore(context) }
     val hiddenVideosStore = remember { HiddenVideosStore(context) }
     val pinnedItemsStore = remember { PinnedItemsStore(context) }
     val playCountStore = remember { PlayCountStore(context) }
@@ -171,6 +174,7 @@ fun LocalVideoPlayerApp(
                 video.uri.toString() !in hiddenUris
             }
             if (videos.isEmpty()) return@coroutineScope
+            libraryEntries = videos.map { VideoLibraryEntry.Single(it) }
             applyVideos(videos, hiddenUris = emptySet())
         }
     }
@@ -199,6 +203,15 @@ fun LocalVideoPlayerApp(
         }
     }
 
+    suspend fun saveLibraryCache(videos: List<VideoItem>, fromPull: Boolean) {
+        if (videos.isEmpty() && !fromPull) return
+        withContext(Dispatchers.IO) {
+            runCatching {
+                libraryCacheStore.saveVideos(videos)
+            }
+        }
+    }
+
     suspend fun performLibraryRefresh(showLoading: Boolean = false, fromPull: Boolean = false) {
         val previousSignature = if (fromPull) librarySignature(libraryEntries) else emptyList()
         if (fromPull) isRefreshing = true
@@ -209,14 +222,24 @@ fun LocalVideoPlayerApp(
             if (scanned.isEmpty() && libraryEntries.isNotEmpty() && !fromPull) {
                 return
             }
-            applyVideos(scanned, hiddenUris)
-            if (scanned.isNotEmpty() || fromPull) {
-                withContext(Dispatchers.IO) {
-                    runCatching {
-                        libraryCacheStore.saveVideos(scanned)
-                    }
-                }
+            if (libraryEntries.isEmpty()) {
+                libraryEntries = scanned
+                    .filter { it.uri.toString() !in hiddenUris }
+                    .map { VideoLibraryEntry.Single(it) }
+                isLibraryLoading = false
             }
+            applyVideos(scanned, hiddenUris)
+            saveLibraryCache(scanned, fromPull)
+
+            val m3u8Items = withContext(Dispatchers.IO) {
+                repository.loadM3u8Playlists(scanned)
+            }
+            if (m3u8Items.isNotEmpty()) {
+                val merged = scanned + m3u8Items
+                applyVideos(merged, hiddenUris)
+                saveLibraryCache(merged, fromPull)
+            }
+
             if (fromPull && librarySignature(libraryEntries) == previousSignature) {
                 Toast.makeText(
                     context,
@@ -259,6 +282,14 @@ fun LocalVideoPlayerApp(
     LaunchedEffect(Unit) {
         if (!hasPermission) {
             permissionLauncher.launch(Permissions.readVideoPermission)
+        }
+    }
+
+    LaunchedEffect(themeStore) {
+        val savedIcon = themeStore.getLauncherIcon()
+        val activeIcon = LauncherIconSwitcher.current(context)
+        if (savedIcon != activeIcon) {
+            LauncherIconSwitcher.apply(context, savedIcon)
         }
     }
 
@@ -364,6 +395,8 @@ fun LocalVideoPlayerApp(
                         PlayerScreen(
                             playlistState = state,
                             playbackStore = playbackStore,
+                            playerPreferencesStore = playerPreferencesStore,
+                            pinnedItemsStore = pinnedItemsStore,
                             onBack = { navController.popBackStack() },
                         )
                     }

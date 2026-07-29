@@ -59,7 +59,13 @@ object DownloadNameResolver {
                 return when {
                     left.isHttpUrl() -> ParsedShare(title = sanitizeTitle(right), url = left)
                     right.isHttpUrl() -> ParsedShare(title = sanitizeTitle(left), url = right)
-                    else -> ParsedShare(title = sanitizeTitle(left), url = null)
+                    else -> {
+                        val embedded = extractInlineHttpUrl(trimmed)
+                        ParsedShare(
+                            title = sanitizeTitle(left).takeIf { embedded != null },
+                            url = embedded,
+                        )
+                    }
                 }
             }
         }
@@ -77,7 +83,8 @@ object DownloadNameResolver {
             }
         }
         if (trimmed.isHttpUrl()) return ParsedShare(null, trimmed)
-        return ParsedShare(null, urlLine)
+        if (urlLine != null) return ParsedShare(null, urlLine)
+        return ParsedShare(null, extractInlineHttpUrl(trimmed))
     }
 
     suspend fun resolve(url: String, fallback: String, context: Context? = null): String =
@@ -872,6 +879,12 @@ object DownloadNameResolver {
 
     private fun String.isHttpUrl(): Boolean =
         startsWith("http://") || startsWith("https://")
+
+    private fun extractInlineHttpUrl(text: String): String? =
+        INLINE_HTTP_URL_PATTERN.find(text)?.value
+            ?.trimEnd(',', '.', ';', ')', ']', '}', '"', '\'')
+
+    private val INLINE_HTTP_URL_PATTERN = Regex("""https?://\S+""")
 
     private val TITLE_QUERY_KEYS = setOf("name", "title", "filename", "n", "vod_name")
 

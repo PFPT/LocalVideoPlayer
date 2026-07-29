@@ -26,7 +26,7 @@ private const val DOUBLE_TAP_TIMEOUT_MS = 300L
 private const val MIN_SCALE = 1f
 private const val MAX_SCALE = 3f
 private const val PREVIEW_FRAME_THROTTLE_MS = 100L
-private const val SEEK_SENSITIVITY = 1f
+private const val SEEK_FULL_SWIPE_MS = 10 * 60_000L
 private const val VERTICAL_SENSITIVITY = 1f
 
 private enum class DragMode {
@@ -299,7 +299,8 @@ private fun applyDragDelta(
 ): DragApplyResult {
     return when (dragMode) {
         DragMode.Seek -> {
-            val deltaMs = (delta.x / width) * durationMs * SEEK_SENSITIVITY
+            val seekRangeMs = minOf(durationMs, SEEK_FULL_SWIPE_MS)
+            val deltaMs = (delta.x / width) * seekRangeMs
             val previewMs = (startPositionMs + deltaMs.toLong()).coerceIn(0L, durationMs)
             onSeekPreview(previewMs)
             var frameAt = lastPreviewFrameAt

@@ -24,6 +24,7 @@ fun PlayerBottomToolbar(
     onSpeedClick: () -> Unit,
     onLoopClick: () -> Unit,
     onEpisodePickerClick: () -> Unit,
+    onMoreClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -45,6 +46,12 @@ fun PlayerBottomToolbar(
             ToolbarItem(
                 text = stringResource(R.string.episode_picker),
                 onClick = onEpisodePickerClick,
+            )
+        }
+        if (onMoreClick != null) {
+            ToolbarItem(
+                text = stringResource(R.string.more_options),
+                onClick = onMoreClick,
             )
         }
     }
