@@ -7,7 +7,11 @@ import android.content.res.Configuration
 class OrientationController(private val activity: Activity) {
 
     fun unlockForPlayer() {
-        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
+        activity.requestedOrientation = if (isLandscape()) {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
     }
 
     fun lockPortrait() {

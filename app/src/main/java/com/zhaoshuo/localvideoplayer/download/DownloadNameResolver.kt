@@ -57,10 +57,10 @@ object DownloadNameResolver {
                 val left = parts[0].trim()
                 val right = parts[1].trim()
                 return when {
-                    left.isHttpUrl() -> ParsedShare(title = sanitizeTitle(right), url = left)
-                    right.isHttpUrl() -> ParsedShare(title = sanitizeTitle(left), url = right)
+                    left.isDownloadUrl() -> ParsedShare(title = sanitizeTitle(right), url = left.normalizeDownloadUrl())
+                    right.isDownloadUrl() -> ParsedShare(title = sanitizeTitle(left), url = right.normalizeDownloadUrl())
                     else -> {
-                        val embedded = extractInlineHttpUrl(trimmed)
+                        val embedded = extractInlineDownloadUrl(trimmed)
                         ParsedShare(
                             title = sanitizeTitle(left).takeIf { embedded != null },
                             url = embedded,
@@ -70,10 +70,10 @@ object DownloadNameResolver {
             }
         }
         val lines = trimmed.lines().map { it.trim() }.filter { it.isNotBlank() }
-        val urlLine = lines.firstOrNull { it.isHttpUrl() }
+        val urlLine = lines.firstOrNull { it.isDownloadUrl() }?.normalizeDownloadUrl()
         if (lines.size >= 2 && urlLine != null) {
             val titleCandidates = lines
-                .filter { it != urlLine && !it.isHttpUrl() }
+                .filter { it != urlLine && !it.isDownloadUrl() }
                 .map(::sanitizeTitle)
                 .filter { it.isNotBlank() && !isPlaybackStatusLabel(it) }
             val titleLine = titleCandidates.firstOrNull { titleMatchesDownload(it, urlLine) }
@@ -82,9 +82,9 @@ object DownloadNameResolver {
                 return ParsedShare(title = titleLine, url = urlLine)
             }
         }
-        if (trimmed.isHttpUrl()) return ParsedShare(null, trimmed)
+        if (trimmed.isDownloadUrl()) return ParsedShare(null, trimmed.normalizeDownloadUrl())
         if (urlLine != null) return ParsedShare(null, urlLine)
-        return ParsedShare(null, extractInlineHttpUrl(trimmed))
+        return ParsedShare(null, extractInlineDownloadUrl(trimmed))
     }
 
     suspend fun resolve(url: String, fallback: String, context: Context? = null): String =
@@ -98,6 +98,14 @@ object DownloadNameResolver {
     ): String {
         val trimmed = url.trim()
         if (trimmed.isEmpty()) return fallback
+        if (DownloadUrlClassifier.isMagnetUrl(trimmed)) {
+            val sanitizedUser = sanitizeTitle(userFileName)
+            if (sanitizedUser.isNotBlank()) {
+                return toOutputFileName(sanitizedUser, isHls = false, fallback)
+            }
+            val magnetName = DownloadUrlClassifier.magnetDisplayName(trimmed)?.let(::sanitizeTitle).orEmpty()
+            return toOutputFileName(magnetName.ifBlank { fallback }, isHls = false, fallback)
+        }
         val isHls = DownloadUrlClassifier.isHlsDownloadUrl(trimmed)
         val sanitizedUser = sanitizeTitle(userFileName)
         if (sanitizedUser.isNotBlank() && titleMatchesDownload(sanitizedUser, trimmed)) {
@@ -880,9 +888,20 @@ object DownloadNameResolver {
     private fun String.isHttpUrl(): Boolean =
         startsWith("http://") || startsWith("https://")
 
-    private fun extractInlineHttpUrl(text: String): String? =
-        INLINE_HTTP_URL_PATTERN.find(text)?.value
-            ?.trimEnd(',', '.', ';', ')', ']', '}', '"', '\'')
+    private fun String.isDownloadUrl(): Boolean =
+        isHttpUrl() || DownloadUrlClassifier.isMagnetUrl(this) || contains("magnet:?", ignoreCase = true)
+
+    private fun String.normalizeDownloadUrl(): String =
+        if (DownloadUrlClassifier.isMagnetUrl(this) || contains("magnet:?", ignoreCase = true)) {
+            DownloadUrlClassifier.extractFirstMagnet(this) ?: this
+        } else {
+            this
+        }
+
+    private fun extractInlineDownloadUrl(text: String): String? =
+        DownloadUrlClassifier.extractFirstMagnet(text)
+            ?: INLINE_HTTP_URL_PATTERN.find(text)?.value
+                ?.trimEnd(',', '.', ';', ')', ']', '}', '"', '\'')
 
     private val INLINE_HTTP_URL_PATTERN = Regex("""https?://\S+""")
 

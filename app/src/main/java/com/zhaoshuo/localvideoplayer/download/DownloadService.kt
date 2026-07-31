@@ -12,6 +12,7 @@ import android.provider.MediaStore
 import androidx.core.app.NotificationCompat
 import com.zhaoshuo.localvideoplayer.MainActivity
 import com.zhaoshuo.localvideoplayer.R
+import com.zhaoshuo.localvideoplayer.download.torrent.TorrentSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -134,10 +135,12 @@ class DownloadService : Service() {
             if (control.stopped) throw IOException(getString(R.string.download_paused))
             val current = manager.get(taskId) ?: return
             val isHls = DownloadUrlClassifier.isHlsDownloadUrl(current.url)
+            val isMagnet = DownloadUrlClassifier.isMagnetUrl(current.url)
             val mergedPart = partFile(taskId)
             val partial = when {
                 mergedPart.exists() && mergedPart.length() > 0L -> mergedPart.absolutePath
                 isHls -> hlsDir(taskId).also { it.mkdirs() }.absolutePath
+                isMagnet -> torrentDir(taskId).also { it.mkdirs() }.absolutePath
                 else -> current.partialPath ?: mergedPart.absolutePath
             }
             manager.update(taskId) { task ->
@@ -145,6 +148,7 @@ class DownloadService : Service() {
                     partialPath = partial,
                     downloadedBytes = when {
                         mergedPart.exists() && mergedPart.length() > 0L -> mergedPart.length()
+                        isMagnet -> task.downloadedBytes
                         isHls -> directorySize(File(partial))
                         else -> File(partial).takeIf(File::exists)?.length() ?: 0
                     },
@@ -231,6 +235,10 @@ class DownloadService : Service() {
             publishPart(taskId, mergedPart, manager, control)
             return
         }
+        if (DownloadUrlClassifier.isMagnetUrl(task.url)) {
+            downloadTorrent(task, manager, control)
+            return
+        }
         val isHls = DownloadUrlClassifier.isHlsDownloadUrl(task.url)
         if (isHls) {
             val hlsPackage = hlsDir(task.id)
@@ -250,6 +258,86 @@ class DownloadService : Service() {
         downloadProgressive(task, part, manager, control)
         if (control.stopped) throw IOException(getString(R.string.download_paused))
         publishPart(task.id, part, manager, control)
+    }
+
+    private suspend fun downloadTorrent(task: DownloadTask, manager: DownloadManager, control: TaskControl) {
+        val saveDir = torrentDir(task.id)
+        saveDir.mkdirs()
+        manager.update(task.id) { it.copy(partialPath = saveDir.absolutePath) }
+        val videoFile = try {
+            TorrentSession.downloadMagnet(
+                taskId = task.id,
+                magnetUri = task.url,
+                saveDir = saveDir,
+                shouldStop = { control.stopped },
+                isCanceled = { control.canceled },
+                onName = { name ->
+                    val sanitized = DownloadNameResolver.sanitizeTitle(name)
+                    if (sanitized.isBlank()) return@downloadMagnet
+                    val currentName = manager.get(task.id)?.fileName.orEmpty()
+                    val looksLikeHash = currentName.length in 32..64 && currentName.all { it.isLetterOrDigit() }
+                    if (looksLikeHash || currentName.isBlank() || currentName == getString(R.string.download_default_file_name)) {
+                        val withExt = if ('.' in sanitized.substringAfterLast('/')) sanitized else "$sanitized.mp4"
+                        manager.update(task.id) { it.copy(fileName = withExt) }
+                    }
+                },
+                onProgress = { downloaded, total, speedBps ->
+                    reportTorrentProgress(task.id, manager, downloaded, total, speedBps)
+                },
+            )
+        } catch (error: IOException) {
+            if (control.stopped && !control.canceled) {
+                throw IOException(getString(R.string.download_paused))
+            }
+            throw error
+        }
+        if (control.stopped) throw IOException(getString(R.string.download_paused))
+        val publishedName = ensureExtension(manager.get(task.id)?.fileName ?: videoFile.name, videoFile.name)
+        manager.update(task.id) { it.copy(fileName = publishedName) }
+        publishPart(task.id, videoFile, manager, control)
+        if (saveDir.exists()) {
+            saveDir.deleteRecursively()
+        }
+    }
+
+    private suspend fun reportTorrentProgress(
+        taskId: String,
+        manager: DownloadManager,
+        downloaded: Long,
+        total: Long,
+        speedBps: Long,
+        force: Boolean = false,
+    ) {
+        val current = manager.get(taskId) ?: return
+        val nextTotal = if (total > 0) total else current.totalBytes
+        val nextDownloaded = maxOf(current.downloadedBytes, downloaded.coerceAtLeast(0L))
+        if (!force &&
+            nextDownloaded - current.downloadedBytes < PROGRESS_STEP &&
+            nextTotal == current.totalBytes &&
+            speedBps == current.downloadSpeedBps
+        ) {
+            return
+        }
+        manager.update(taskId) {
+            it.copy(
+                downloadedBytes = nextDownloaded,
+                totalBytes = nextTotal,
+                downloadSpeedBps = speedBps.coerceAtLeast(0L),
+            )
+        }
+        val latest = manager.get(taskId) ?: current.copy(
+            downloadedBytes = nextDownloaded,
+            totalBytes = nextTotal,
+            downloadSpeedBps = speedBps.coerceAtLeast(0L),
+        )
+        updateNotification(task = latest, taskId = taskId)
+    }
+
+    private fun ensureExtension(preferred: String, fallbackFileName: String): String {
+        val preferredBase = preferred.substringAfterLast('/')
+        if ('.' in preferredBase) return preferred
+        val ext = fallbackFileName.substringAfterLast('.', "")
+        return if (ext.isNotBlank()) "$preferred.$ext" else preferred
     }
 
     private suspend fun downloadProgressive(task: DownloadTask, part: File, manager: DownloadManager, control: TaskControl) {
@@ -971,8 +1059,11 @@ class DownloadService : Service() {
     private fun createOutput(task: DownloadTask, displayName: String): Uri {
         val collection = if (task.saveToMovies) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Downloads.EXTERNAL_CONTENT_URI
         val mimeType = when {
-            displayName.endsWith(".ts", true) -> "video/mp2t"
+            displayName.endsWith(".ts", true) || displayName.endsWith(".m2ts", true) -> "video/mp2t"
             displayName.endsWith(".mkv", true) -> "video/x-matroska"
+            displayName.endsWith(".webm", true) -> "video/webm"
+            displayName.endsWith(".avi", true) -> "video/x-msvideo"
+            displayName.endsWith(".mov", true) -> "video/quicktime"
             else -> "video/mp4"
         }
         return contentResolver.insert(
@@ -1181,6 +1272,7 @@ class DownloadService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        TorrentSession.stop()
         scope.cancel()
         super.onDestroy()
     }
@@ -1188,6 +1280,8 @@ class DownloadService : Service() {
     private fun partFile(id: String) = File(filesDir, "download_parts/$id.part")
 
     private fun hlsDir(id: String) = File(filesDir, "hls_downloads/$id")
+
+    private fun torrentDir(id: String) = File(filesDir, "torrent_downloads/$id")
 
     private fun hlsSegmentFile(hlsPackage: File, format: HlsSegmentFormat, index: Int) =
         File(hlsPackage, "seg%05d.${format.segmentExtension()}".format(index))
@@ -1247,6 +1341,9 @@ class DownloadService : Service() {
 
         fun hlsPackageDir(context: android.content.Context, taskId: String) =
             File(context.filesDir, "hls_downloads/$taskId")
+
+        fun torrentPackageDir(context: android.content.Context, taskId: String) =
+            File(context.filesDir, "torrent_downloads/$taskId")
 
         fun cleanupRangeParts(context: android.content.Context, taskId: String) {
             context.cacheDir.listFiles()

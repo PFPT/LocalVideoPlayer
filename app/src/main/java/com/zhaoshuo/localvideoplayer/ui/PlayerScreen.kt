@@ -398,7 +398,6 @@ fun PlayerScreen(
 
     LaunchedEffect(configuration.orientation) {
         isLandscape = orientationController?.isLandscape() == true
-        resetSpeedBoost()
     }
 
     LaunchedEffect(playlist) {

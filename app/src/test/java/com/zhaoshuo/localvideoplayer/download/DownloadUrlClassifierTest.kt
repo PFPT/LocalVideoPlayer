@@ -36,4 +36,23 @@ class DownloadUrlClassifierTest {
         val url = "https://cdn.example.com/video/movie.mp4"
         assertFalse(DownloadUrlClassifier.isHlsDownloadUrl(url))
     }
+
+    @Test
+    fun recognizesMagnetUrl() {
+        val url = "magnet:?xt=urn:btih:aaabb331189c1bb1f198797dc208d14afa824429&dn=Sample"
+        assertTrue(DownloadUrlClassifier.isMagnetUrl(url))
+        assertFalse(DownloadUrlClassifier.isHlsDownloadUrl(url))
+        assertEquals("Sample", DownloadUrlClassifier.magnetDisplayName(url))
+    }
+
+    @Test
+    fun extractsFirstMagnetFromGluedClipboard() {
+        val glued =
+            "magnet:?xt=urn:btih:aaabb331189c1bb1f198797dc208d14afa824429" +
+                "magnet:?xt=urn:btih:bbbbb331189c1bb1f198797dc208d14afa824429"
+        assertEquals(
+            "magnet:?xt=urn:btih:aaabb331189c1bb1f198797dc208d14afa824429",
+            DownloadUrlClassifier.extractFirstMagnet(glued),
+        )
+    }
 }

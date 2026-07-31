@@ -280,6 +280,7 @@ class DownloadManager private constructor(private val context: Context) {
 
     internal fun cleanupTaskFiles(task: DownloadTask) {
         DownloadService.hlsPackageDir(context, task.id).takeIf { it.exists() }?.deleteRecursively()
+        DownloadService.torrentPackageDir(context, task.id).takeIf { it.exists() }?.deleteRecursively()
         DownloadService.cleanupRangeParts(context, task.id)
         task.partialPath?.let { path ->
             val file = File(path)

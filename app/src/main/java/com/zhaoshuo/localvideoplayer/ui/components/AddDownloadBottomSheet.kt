@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
 import com.zhaoshuo.localvideoplayer.download.DownloadManager
 import com.zhaoshuo.localvideoplayer.download.DownloadNameResolver
+import com.zhaoshuo.localvideoplayer.download.DownloadUrlClassifier
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -89,9 +90,11 @@ fun AddDownloadBottomSheet(
             ?.toString()
             .orEmpty()
 
-    fun clipboardLooksLikeHttp(text: String): Boolean {
+    fun clipboardLooksLikeDownload(text: String): Boolean {
         val lower = text.lowercase()
-        return lower.contains("http://") || lower.contains("https://")
+        return lower.contains("http://") ||
+            lower.contains("https://") ||
+            lower.contains("magnet:?")
     }
 
     fun tryFillFromClipboard(showToast: Boolean, showFailureToast: Boolean = false): Boolean {
@@ -102,7 +105,7 @@ fun AddDownloadBottomSheet(
             }
             return false
         }
-        if (!clipboardLooksLikeHttp(clip) || !applySharedText(clip, showClipboardToast = showToast)) {
+        if (!clipboardLooksLikeDownload(clip) || !applySharedText(clip, showClipboardToast = showToast)) {
             if (showFailureToast) {
                 Toast.makeText(context, context.getString(R.string.download_clipboard_no_url), Toast.LENGTH_SHORT).show()
             }
@@ -253,11 +256,16 @@ fun AddDownloadBottomSheet(
                 Button(
                     onClick = {
                         scope.launch {
-                            val parsedUrl = url.trim()
-                            if (!parsedUrl.startsWith("http://") && !parsedUrl.startsWith("https://")) {
+                            val parsedUrl = url.trim().let { raw ->
+                                DownloadUrlClassifier.extractFirstMagnet(raw) ?: raw
+                            }
+                            val isHttp = parsedUrl.startsWith("http://") || parsedUrl.startsWith("https://")
+                            val isMagnet = DownloadUrlClassifier.isMagnetUrl(parsedUrl)
+                            if (!isHttp && !isMagnet) {
                                 inputError = invalidUrl
                                 return@launch
                             }
+                            url = parsedUrl
                             val headers = parseHeaders(headersText)
                             if (headers == null) {
                                 inputError = invalidHeaders

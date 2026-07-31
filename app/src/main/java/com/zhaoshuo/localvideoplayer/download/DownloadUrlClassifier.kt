@@ -3,9 +3,41 @@ package com.zhaoshuo.localvideoplayer.download
 import java.net.URLDecoder
 
 object DownloadUrlClassifier {
+    fun isMagnetUrl(url: String): Boolean =
+        url.trim().startsWith("magnet:?", ignoreCase = true)
+
+    fun extractFirstMagnet(text: String): String? {
+        val start = text.indexOf("magnet:?", ignoreCase = true)
+        if (start < 0) return null
+        val next = text.indexOf("magnet:?", start + 8, ignoreCase = true)
+        val end = if (next >= 0) next else text.length
+        return text.substring(start, end)
+            .trim()
+            .trimEnd(',', '.', ';', ')', ']', '}', '"', '\'')
+            .takeIf { isMagnetUrl(it) }
+    }
+
+    fun magnetDisplayName(url: String): String? {
+        val query = url.trim().substringAfter('?', "")
+        if (query.isEmpty()) return null
+        val dn = query.split('&')
+            .firstOrNull { it.startsWith("dn=", ignoreCase = true) }
+            ?.substringAfter('=')
+            ?.let { decodeOnce(it).trim() }
+            ?.takeIf { it.isNotBlank() }
+        if (dn != null) return dn
+        val xt = query.split('&')
+            .firstOrNull { it.startsWith("xt=", ignoreCase = true) }
+            ?.substringAfter('=')
+            .orEmpty()
+        val hash = xt.substringAfter("urn:btih:", "").substringBefore('&').trim()
+        return hash.takeIf { it.isNotBlank() }
+    }
+
     fun isHlsDownloadUrl(url: String): Boolean {
         val trimmed = url.trim()
         if (trimmed.isEmpty()) return false
+        if (isMagnetUrl(trimmed)) return false
         val path = trimmed.substringBefore('?').substringBefore('#')
         if (path.endsWith(".m3u8", ignoreCase = true)) return true
         if (path.endsWith("/m3u8", ignoreCase = true)) return true

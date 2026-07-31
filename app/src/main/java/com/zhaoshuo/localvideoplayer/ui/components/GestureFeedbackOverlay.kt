@@ -6,10 +6,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -96,17 +97,19 @@ fun SpeedBoostOverlay(
         modifier = modifier.fillMaxSize(),
     ) {
         Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.TopCenter,
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding(),
+            contentAlignment = Alignment.TopEnd,
         ) {
             Text(
                 text = stringResource(R.string.speed_boost_active),
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.bodyMedium,
                 color = Color.White,
                 modifier = Modifier
-                    .padding(top = 72.dp)
-                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(top = 8.dp, end = 56.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+                    .padding(horizontal = 12.dp, vertical = 5.dp),
             )
         }
     }

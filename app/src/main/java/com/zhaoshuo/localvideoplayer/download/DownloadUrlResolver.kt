@@ -18,6 +18,7 @@ object DownloadUrlResolver {
     fun resolveDownloadUrl(url: String): String {
         val trimmed = url.trim()
         if (trimmed.isEmpty()) return trimmed
+        if (DownloadUrlClassifier.isMagnetUrl(trimmed)) return trimmed
         if (DownloadUrlClassifier.isHlsDownloadUrl(trimmed)) {
             return DownloadUrlClassifier.extractNestedM3u8Url(trimmed)
                 ?.let(::unwrapProxyUrl)
@@ -27,6 +28,7 @@ object DownloadUrlResolver {
     }
 
     fun inferHeaders(url: String, userHeaders: Map<String, String>): Map<String, String> {
+        if (DownloadUrlClassifier.isMagnetUrl(url)) return userHeaders
         val merged = LinkedHashMap<String, String>()
         extractHeadersFromUrl(url).forEach { (key, value) -> merged.putIfAbsent(key, value) }
         userHeaders.forEach { (key, value) -> merged[key] = value }

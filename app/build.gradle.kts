@@ -15,6 +15,9 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+        }
     }
 
     buildTypes {
@@ -69,6 +72,10 @@ dependencies {
     implementation(libs.ffmpeg.kit.min)
     implementation(libs.smart.exception.java)
     implementation(libs.okhttp)
+    implementation(libs.libtorrent4j)
+    implementation(libs.libtorrent4j.android.arm)
+    implementation(libs.libtorrent4j.android.arm64)
+    implementation(libs.libtorrent4j.android.x64)
 
     testImplementation("junit:junit:4.13.2")
 }

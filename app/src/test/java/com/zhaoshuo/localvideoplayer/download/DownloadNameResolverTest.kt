@@ -39,6 +39,22 @@ class DownloadNameResolverTest {
     }
 
     @Test
+    fun parsesMagnetFromClipboard() {
+        val magnet = "magnet:?xt=urn:btih:aaabb331189c1bb1f198797dc208d14afa824429&dn=Show"
+        val parsed = DownloadNameResolver.parseSharedText(magnet)
+        assertNull(parsed.title)
+        assertEquals(magnet, parsed.url)
+    }
+
+    @Test
+    fun parsesFirstMagnetFromGluedClipboard() {
+        val first = "magnet:?xt=urn:btih:aaabb331189c1bb1f198797dc208d14afa824429"
+        val glued = first + "magnet:?xt=urn:btih:bbbbb331189c1bb1f198797dc208d14afa824429"
+        val parsed = DownloadNameResolver.parseSharedText(glued)
+        assertEquals(first, parsed.url)
+    }
+
+    @Test
     fun addsMp4ExtensionForHlsTitle() {
         assertEquals(
             "说唱巅峰对决.mp4",

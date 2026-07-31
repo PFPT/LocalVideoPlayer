@@ -14,6 +14,7 @@ ksp = "2.0.21-1.0.28"
 okhttp = "4.12.0"
 ffmpegKit = "8.1.7"
 smartException = "0.2.1"
+libtorrent4j = "2.1.0-39"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -40,6 +41,10 @@ androidx-room-compiler = { group = "androidx.room", name = "room-compiler", vers
 ffmpeg-kit-min = { group = "dev.ffmpegkit-maintained", name = "ffmpeg-kit-min", version.ref = "ffmpegKit" }
 smart-exception-java = { group = "com.arthenica", name = "smart-exception-java", version.ref = "smartException" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+libtorrent4j = { group = "org.libtorrent4j", name = "libtorrent4j", version.ref = "libtorrent4j" }
+libtorrent4j-android-arm = { group = "org.libtorrent4j", name = "libtorrent4j-android-arm", version.ref = "libtorrent4j" }
+libtorrent4j-android-arm64 = { group = "org.libtorrent4j", name = "libtorrent4j-android-arm64", version.ref = "libtorrent4j" }
+libtorrent4j-android-x64 = { group = "org.libtorrent4j", name = "libtorrent4j-android-x86_64", version.ref = "libtorrent4j" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

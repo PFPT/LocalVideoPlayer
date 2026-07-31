@@ -4,6 +4,7 @@ import com.zhaoshuo.localvideoplayer.model.SeriesGroupKind
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
 import com.zhaoshuo.localvideoplayer.model.VideoSeries
+import com.zhaoshuo.localvideoplayer.player.PlaylistState
 import java.util.Calendar
 import java.util.Locale
 
@@ -533,6 +534,57 @@ object SeriesGrouper {
             compareBy<VideoItem> { it.season ?: Int.MAX_VALUE }
                 .thenBy { it.episode ?: Int.MAX_VALUE }
                 .thenBy { it.title.lowercase() },
+        )
+    }
+
+    fun quickPlaylistFor(target: VideoItem, candidates: List<VideoItem>): PlaylistState {
+        val targetParsed = TitleParser.parse(target.title)
+        val targetWithMeta = target.copy(
+            season = targetParsed.season,
+            episode = targetParsed.episode,
+        )
+        val targetFolder = parentFolderKey(targetWithMeta)
+        val targetSeriesKey = TitleParser.normalizeForGrouping(targetParsed.seriesName)
+            .takeIf { it.length >= MIN_GROUP_KEY_LENGTH }
+
+        val folderSiblings = if (targetFolder != null && !isGenericFolderName(folderLeafName(targetFolder))) {
+            candidates.mapNotNull { video ->
+                val parsed = TitleParser.parse(video.title)
+                val withMeta = video.copy(season = parsed.season, episode = parsed.episode)
+                if (parentFolderKey(withMeta) == targetFolder) withMeta else null
+            }
+        } else {
+            emptyList()
+        }
+
+        val nameSiblings = if (targetSeriesKey != null) {
+            candidates.mapNotNull { video ->
+                val parsed = TitleParser.parse(video.title)
+                val withMeta = video.copy(season = parsed.season, episode = parsed.episode)
+                val seriesKey = TitleParser.normalizeForGrouping(parsed.seriesName)
+                if (seriesKey == targetSeriesKey) withMeta else null
+            }
+        } else {
+            emptyList()
+        }
+
+        val siblings = when {
+            folderSiblings.size >= MIN_GROUP_SIZE -> folderSiblings
+            nameSiblings.size >= MIN_GROUP_SIZE &&
+                nameSiblings.any { it.episode != null || it.season != null } -> nameSiblings
+            else -> listOf(targetWithMeta)
+        }
+
+        val sorted = if (siblings.size >= MIN_GROUP_SIZE) {
+            sortEpisodes(siblings.distinctBy { it.uri.toString() })
+        } else {
+            listOf(targetWithMeta)
+        }
+        val index = sorted.indexOfFirst { it.uri.toString() == target.uri.toString() }
+            .coerceAtLeast(0)
+        return PlaylistState(
+            items = sorted,
+            currentIndex = index,
         )
     }
 }

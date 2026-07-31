@@ -107,6 +107,7 @@ import com.zhaoshuo.localvideoplayer.ui.theme.ThemeMode
 import com.zhaoshuo.localvideoplayer.ui.theme.ThemeState
 import com.zhaoshuo.localvideoplayer.util.LauncherIconSwitcher
 import com.zhaoshuo.localvideoplayer.util.M3uPlaylistParser
+import com.zhaoshuo.localvideoplayer.util.SeriesGrouper
 import com.zhaoshuo.localvideoplayer.util.isM3u8Title
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -379,26 +380,39 @@ fun VideoListScreen(
         }
     }
 
-    fun playVideoItem(video: VideoItem) {
-        incrementPlayCount(playCountKeyForVideo(video))
-        scope.launch {
-            val state = withContext(Dispatchers.IO) {
-                repository.playlistStateFor(video, libraryEntries)
+    val libraryEntriesState by rememberUpdatedState(libraryEntries)
+    val onPlayVideoState by rememberUpdatedState(onPlayVideo)
+
+    suspend fun resolvePlaylist(video: VideoItem): PlaylistState {
+        val entries = libraryEntriesState
+        if (entries.any { it is VideoLibraryEntry.Series }) {
+            return withContext(Dispatchers.IO) {
+                repository.playlistStateFor(video, entries)
             }
-            onPlayVideo(state)
+        }
+        val videos = entries.flatMap { entry ->
+            when (entry) {
+                is VideoLibraryEntry.Single -> listOf(entry.video)
+                is VideoLibraryEntry.Series -> entry.series.episodes
+            }
+        }
+        return withContext(Dispatchers.Default) {
+            SeriesGrouper.quickPlaylistFor(video, videos.ifEmpty { listOf(video) })
         }
     }
 
-    val libraryEntriesState by rememberUpdatedState(libraryEntries)
-    val onPlayVideoState by rememberUpdatedState(onPlayVideo)
+    fun playVideoItem(video: VideoItem) {
+        incrementPlayCount(playCountKeyForVideo(video))
+        scope.launch {
+            onPlayVideoState(resolvePlaylist(video))
+        }
+    }
+
     val playVideoHandler = remember(scope, repository) {
         { video: VideoItem ->
             incrementPlayCount(playCountKeyForVideo(video))
             scope.launch {
-                val state = withContext(Dispatchers.IO) {
-                    repository.playlistStateFor(video, libraryEntriesState)
-                }
-                onPlayVideoState(state)
+                onPlayVideoState(resolvePlaylist(video))
             }
         }
     }
@@ -487,26 +501,22 @@ fun VideoListScreen(
 
     fun playRecentRecord(record: PlaybackRecord) {
         val targetUri = record.uri.toString()
-        val matched = libraryEntries.flatMap { entry ->
+        val matched = libraryEntriesState.flatMap { entry ->
             when (entry) {
                 is VideoLibraryEntry.Single -> listOf(entry.video)
                 is VideoLibraryEntry.Series -> entry.series.episodes
             }
         }.find { it.uri.toString() == targetUri }
 
-        if (matched != null) {
-            playVideoItem(matched)
-        } else {
-            val fallback = VideoItem(
-                id = record.uri.hashCode().toLong(),
-                uri = record.uri,
-                title = record.title,
-                durationMs = record.durationMs,
-                dateAdded = record.lastPlayedAt / 1000,
-                thumbnailUri = null,
-            )
-            playVideoItem(fallback)
-        }
+        val video = matched ?: VideoItem(
+            id = record.uri.hashCode().toLong(),
+            uri = record.uri,
+            title = record.title,
+            durationMs = record.durationMs,
+            dateAdded = record.lastPlayedAt / 1000,
+            thumbnailUri = null,
+        )
+        playVideoItem(video)
     }
 
     fun hideVideos(uris: List<Uri>) {
