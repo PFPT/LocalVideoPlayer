@@ -2,6 +2,9 @@ package com.zhaoshuo.localvideoplayer.model
 
 import android.net.Uri
 
+const val APP_DOWNLOAD_BUCKET = "LocalVideoPlayer"
+const val APP_DOWNLOAD_FOLDER_KEY = "bucket:$APP_DOWNLOAD_BUCKET"
+
 sealed class VideoLibraryEntry {
     data class Series(val series: VideoSeries) : VideoLibraryEntry()
     data class Single(val video: VideoItem) : VideoLibraryEntry()
@@ -12,6 +15,20 @@ fun entryKey(entry: VideoLibraryEntry): String {
         is VideoLibraryEntry.Series -> "series:${entry.series.id}"
         is VideoLibraryEntry.Single -> "single:${entry.video.uri}"
     }
+}
+
+fun isAppDownloadFolder(entry: VideoLibraryEntry): Boolean {
+    if (entry !is VideoLibraryEntry.Series) return false
+    if (entry.series.groupKind != SeriesGroupKind.BUCKET) return false
+    if (entry.series.title.equals(APP_DOWNLOAD_BUCKET, ignoreCase = true)) return true
+    return entry.series.episodes.any { it.seriesKey == APP_DOWNLOAD_FOLDER_KEY }
+}
+
+fun isAppDownloadLocation(video: VideoItem): Boolean {
+    val bucket = video.bucketName?.trim().orEmpty()
+    if (bucket.equals(APP_DOWNLOAD_BUCKET, ignoreCase = true)) return true
+    val path = video.relativePath.orEmpty()
+    return path.contains(APP_DOWNLOAD_BUCKET, ignoreCase = true)
 }
 
 data class LibrarySections(

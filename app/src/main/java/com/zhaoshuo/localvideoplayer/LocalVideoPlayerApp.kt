@@ -37,6 +37,7 @@ import com.zhaoshuo.localvideoplayer.data.PlayCountStore
 import com.zhaoshuo.localvideoplayer.data.LibraryCacheStore
 import com.zhaoshuo.localvideoplayer.data.PlaybackStore
 import com.zhaoshuo.localvideoplayer.data.PlayerPreferencesStore
+import com.zhaoshuo.localvideoplayer.data.SeriesSkipStore
 import com.zhaoshuo.localvideoplayer.data.ThemePreferencesStore
 import com.zhaoshuo.localvideoplayer.data.VideoRepository
 import com.zhaoshuo.localvideoplayer.download.DownloadManager
@@ -83,6 +84,7 @@ fun LocalVideoPlayerApp(
     val downloadManager = remember { DownloadManager.get(context) }
     val playbackStore = remember { PlaybackStore(context) }
     val playerPreferencesStore = remember { PlayerPreferencesStore(context) }
+    val seriesSkipStore = remember { SeriesSkipStore(context) }
     val hiddenVideosStore = remember { HiddenVideosStore(context) }
     val pinnedItemsStore = remember { PinnedItemsStore(context) }
     val playCountStore = remember { PlayCountStore(context) }
@@ -380,7 +382,13 @@ fun LocalVideoPlayerApp(
                             playCountStore = playCountStore,
                             onBack = { navController.popBackStack() },
                             onPlayEpisode = { state ->
-                                playlistState = state
+                                val current = state.items.getOrNull(state.currentIndex)
+                                playlistState = if (current != null) {
+                                    val resolved = repository.playlistStateFor(current, libraryEntries)
+                                    if (resolved.items.size > 1) resolved else state
+                                } else {
+                                    state
+                                }
                                 navController.navigate(ROUTE_PLAYER)
                             },
                             onVideosRemoved = { uris -> removeVideosFromLibrary(uris) },
@@ -397,6 +405,7 @@ fun LocalVideoPlayerApp(
                             playbackStore = playbackStore,
                             playerPreferencesStore = playerPreferencesStore,
                             pinnedItemsStore = pinnedItemsStore,
+                            seriesSkipStore = seriesSkipStore,
                             onBack = { navController.popBackStack() },
                         )
                     }

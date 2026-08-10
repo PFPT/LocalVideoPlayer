@@ -49,6 +49,8 @@ import com.zhaoshuo.localvideoplayer.data.PlaybackStore
 import com.zhaoshuo.localvideoplayer.data.PinnedItemsStore
 import com.zhaoshuo.localvideoplayer.data.PlayerPreferences
 import com.zhaoshuo.localvideoplayer.data.PlayerPreferencesStore
+import com.zhaoshuo.localvideoplayer.data.SeriesSkipSettings
+import com.zhaoshuo.localvideoplayer.data.SeriesSkipStore
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 import com.zhaoshuo.localvideoplayer.player.applyTrackSelection
 import com.zhaoshuo.localvideoplayer.player.buildExoPlayer
@@ -76,6 +78,7 @@ import com.zhaoshuo.localvideoplayer.ui.components.VideoPlayerGesture
 import com.zhaoshuo.localvideoplayer.util.OrientationController
 import com.zhaoshuo.localvideoplayer.util.PlaybackSystemControls
 import com.zhaoshuo.localvideoplayer.util.CastHelper
+import com.zhaoshuo.localvideoplayer.util.TitleParser
 import com.zhaoshuo.localvideoplayer.util.toMediaItem
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -89,6 +92,7 @@ fun PlayerScreen(
     playbackStore: PlaybackStore,
     playerPreferencesStore: PlayerPreferencesStore,
     pinnedItemsStore: PinnedItemsStore,
+    seriesSkipStore: SeriesSkipStore,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -301,7 +305,6 @@ fun PlayerScreen(
     }
 
     fun toggleControlsVisibility() {
-        if (controlsLocked) return
         controlsVisible = !controlsVisible
         if (controlsVisible) {
             resetControlsTimer()
@@ -309,6 +312,7 @@ fun PlayerScreen(
     }
 
     fun setFullscreen(enabled: Boolean) {
+        if (!enabled && controlsLocked) return
         isFullscreen = enabled
         if (enabled) {
             controlsVisible = false
@@ -326,6 +330,7 @@ fun PlayerScreen(
     }
 
     fun enterLandscapeFullscreen() {
+        if (controlsLocked) return
         if (orientationController?.isLandscape() != true) {
             orientationController?.togglePortraitLandscape()
             forcedLandscapeForFullscreen = true
@@ -344,6 +349,7 @@ fun PlayerScreen(
             showMoreSheet -> showMoreSheet = false
             showTrackSheet != null -> showTrackSheet = null
             showInfoDialog -> showInfoDialog = false
+            controlsLocked -> return
             isFullscreen -> setFullscreen(false)
             else -> {
                 resetSpeedBoost()
@@ -352,6 +358,59 @@ fun PlayerScreen(
                     onBack()
                 }
             }
+        }
+    }
+
+    fun handlePipClick() {
+        if (controlsLocked) return
+        resetControlsTimer()
+        if (pipSupported) {
+            activity?.enterPipMode(
+                hasNext = currentIndex < playlist.lastIndex,
+                isPlaying = exoPlayer.isPlaying,
+            )
+        } else {
+            Toast.makeText(
+                context,
+                context.getString(R.string.pip_not_supported),
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+
+    fun handleFullscreenToggleClick() {
+        if (controlsLocked) return
+        resetControlsTimer()
+        setFullscreen(!isFullscreen)
+    }
+
+    fun handleRotateClick() {
+        if (controlsLocked) return
+        resetControlsTimer()
+        orientationController?.togglePortraitLandscape()
+    }
+
+    fun handleDoubleTap() {
+        if (controlsLocked) return
+        if (isFullscreen) {
+            if (videoScale > 1f) {
+                resetZoom()
+            } else {
+                setFullscreen(false)
+            }
+        } else {
+            resetZoom()
+        }
+    }
+
+    fun handleLockToggle() {
+        controlsLocked = !controlsLocked
+        if (controlsLocked) {
+            controlsVisible = false
+            orientationController?.lockCurrentOrientation()
+        } else {
+            orientationController?.unlockForPlayer()
+            resetControlsTimer()
         }
     }
 
@@ -496,6 +555,67 @@ fun PlayerScreen(
     val hasPrevious = currentIndex > 0
     val hasNext = currentIndex < playlist.lastIndex
     val currentVideo = playlist.getOrNull(currentIndex)
+    val seriesKey = currentVideo?.seriesKey
+    val seriesSkip by seriesSkipStore.observe(seriesKey).collectAsState(initial = SeriesSkipSettings())
+    val effectiveIntroSeconds = seriesSkip.introSeconds ?: preferences.skipIntroSeconds
+    val effectiveOutroSeconds = seriesSkip.outroSeconds ?: preferences.skipOutroSeconds
+    val canEditSeriesSkip = !seriesKey.isNullOrBlank()
+    val introEndMs = if (effectiveIntroSeconds > 0) effectiveIntroSeconds * 1_000L else 0L
+    val outroStartMs = if (effectiveOutroSeconds > 0 && progress.durationMs > 0) {
+        (progress.durationMs - effectiveOutroSeconds * 1_000L).coerceAtLeast(0L)
+    } else {
+        -1L
+    }
+    fun markSeriesIntro() {
+        val key = seriesKey ?: return
+        val seconds = (displayPositionMs / 1_000L).toInt().coerceIn(0, 600)
+        if (seconds <= 0) {
+            Toast.makeText(context, context.getString(R.string.series_skip_invalid), Toast.LENGTH_SHORT).show()
+            return
+        }
+        scope.launch {
+            seriesSkipStore.setIntroSeconds(key, seconds)
+            Toast.makeText(
+                context,
+                context.getString(R.string.series_intro_saved, seconds),
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+    fun markSeriesOutro() {
+        val key = seriesKey ?: return
+        if (progress.durationMs <= 0 || displayPositionMs >= progress.durationMs) {
+            Toast.makeText(context, context.getString(R.string.series_skip_invalid), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val seconds = ((progress.durationMs - displayPositionMs) / 1_000L).toInt().coerceIn(0, 600)
+        if (seconds <= 0) {
+            Toast.makeText(context, context.getString(R.string.series_skip_invalid), Toast.LENGTH_SHORT).show()
+            return
+        }
+        scope.launch {
+            seriesSkipStore.setOutroSeconds(key, seconds)
+            Toast.makeText(
+                context,
+                context.getString(R.string.series_outro_saved, seconds),
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+    fun clearSeriesIntro() {
+        val key = seriesKey ?: return
+        scope.launch {
+            seriesSkipStore.clearIntro(key)
+            Toast.makeText(context, context.getString(R.string.series_intro_cleared), Toast.LENGTH_SHORT).show()
+        }
+    }
+    fun clearSeriesOutro() {
+        val key = seriesKey ?: return
+        scope.launch {
+            seriesSkipStore.clearOutro(key)
+            Toast.makeText(context, context.getString(R.string.series_outro_cleared), Toast.LENGTH_SHORT).show()
+        }
+    }
     val favoriteKey = currentVideo?.let { "single:${it.uri}" }
     val isFavorite = favoriteKey in pinnedKeys
     val currentTitle = currentVideo?.title ?: ""
@@ -506,14 +626,14 @@ fun PlayerScreen(
         null
     }
     val useLandscapeLayout = isLandscape || isFullscreen
-    val showSkipIntro = preferences.skipIntroSeconds > 0 &&
-        displayPositionMs in 0..preferences.skipIntroSeconds * 1_000L
-    val showSkipOutro = preferences.skipOutroSeconds > 0 &&
+    val showSkipIntro = effectiveIntroSeconds > 0 &&
+        displayPositionMs in 0..effectiveIntroSeconds * 1_000L
+    val showSkipOutro = effectiveOutroSeconds > 0 &&
         progress.durationMs > 0 &&
-        displayPositionMs >= progress.durationMs - preferences.skipOutroSeconds * 1_000L
+        displayPositionMs >= progress.durationMs - effectiveOutroSeconds * 1_000L
 
     LaunchedEffect(controlsVisible, isPlaying, isSeeking, useLandscapeLayout, controlsLocked, isAdjustingBrightness, isAdjustingVolume, isFullscreen) {
-        if (controlsVisible && isPlaying && !isSeeking && !controlsLocked && !isAdjustingBrightness && !isAdjustingVolume) {
+        if (controlsVisible && !isSeeking && !isAdjustingBrightness && !isAdjustingVolume && (controlsLocked || isPlaying)) {
             delay(3000)
             controlsVisible = false
         }
@@ -651,6 +771,15 @@ fun PlayerScreen(
                     hasNext = hasNext,
                     showSkipIntro = showSkipIntro,
                     showSkipOutro = showSkipOutro,
+                    canEditSeriesSkip = canEditSeriesSkip,
+                    introEndMs = introEndMs,
+                    outroStartMs = outroStartMs,
+                    introMarked = seriesSkip.introSeconds != null,
+                    outroMarked = seriesSkip.outroSeconds != null,
+                    onMarkIntro = ::markSeriesIntro,
+                    onMarkOutro = ::markSeriesOutro,
+                    onClearIntro = ::clearSeriesIntro,
+                    onClearOutro = ::clearSeriesOutro,
                     onScaleChange = { videoScale = it },
                     onOffsetChange = { x, y ->
                         offsetX = x
@@ -663,17 +792,7 @@ fun PlayerScreen(
                         resetControlsTimer()
                     },
                     onTap = ::handleFullscreenTap,
-                    onDoubleTap = {
-                        if (isFullscreen) {
-                            if (videoScale > 1f) {
-                                resetZoom()
-                            } else {
-                                setFullscreen(false)
-                            }
-                        } else {
-                            resetZoom()
-                        }
-                    },
+                    onDoubleTap = ::handleDoubleTap,
                     onSeekingChange = ::handleSeekingChange,
                     onSpeedBoostStart = {
                         if (!isSpeedBoosted) {
@@ -724,22 +843,8 @@ fun PlayerScreen(
                         exoPlayer.seekTo(position)
                         progress.currentPositionMs = position
                     },
-                    onLockToggle = {
-                        controlsLocked = !controlsLocked
-                        if (controlsLocked) {
-                            controlsVisible = true
-                            orientationController?.lockCurrentOrientation()
-                        } else {
-                            orientationController?.unlockForPlayer()
-                        }
-                        resetControlsTimer()
-                    },
-                    onRotateClick = {
-                        resetControlsTimer()
-                        if (!controlsLocked) {
-                            orientationController?.togglePortraitLandscape()
-                        }
-                    },
+                    onLockToggle = ::handleLockToggle,
+                    onRotateClick = ::handleRotateClick,
                     onSpeedClick = {
                         resetControlsTimer()
                         showSpeedSheet = true
@@ -757,7 +862,7 @@ fun PlayerScreen(
                         showMoreSheet = true
                     },
                     onSkipIntro = {
-                        val position = preferences.skipIntroSeconds * 1_000L
+                        val position = effectiveIntroSeconds * 1_000L
                         exoPlayer.seekTo(position)
                         progress.currentPositionMs = position
                     },
@@ -769,22 +874,8 @@ fun PlayerScreen(
                         }
                     },
                     pipSupported = pipSupported,
-                    onPipClick = {
-                        resetControlsTimer()
-                        if (pipSupported) {
-                            activity?.enterPipMode(hasNext, isPlaying)
-                        } else {
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.pip_not_supported),
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                        }
-                    },
-                    onFullscreenClick = {
-                        resetControlsTimer()
-                        setFullscreen(!isFullscreen)
-                    },
+                    onPipClick = ::handlePipClick,
+                    onFullscreenClick = ::handleFullscreenToggleClick,
                 )
             }
             else -> {
@@ -807,6 +898,15 @@ fun PlayerScreen(
                         hasNext = hasNext,
                         showSkipIntro = showSkipIntro,
                         showSkipOutro = showSkipOutro,
+                        canEditSeriesSkip = canEditSeriesSkip,
+                        introEndMs = introEndMs,
+                        outroStartMs = outroStartMs,
+                        introMarked = seriesSkip.introSeconds != null,
+                        outroMarked = seriesSkip.outroSeconds != null,
+                        onMarkIntro = ::markSeriesIntro,
+                        onMarkOutro = ::markSeriesOutro,
+                        onClearIntro = ::clearSeriesIntro,
+                        onClearOutro = ::clearSeriesOutro,
                         onSeekPreview = ::handleSeekPreview,
                         onSeekPreviewFrame = ::handleSeekPreviewFrame,
                         onSeekCommitted = ::handleSeekCommitted,
@@ -867,7 +967,7 @@ fun PlayerScreen(
                         onLoopClick = { repeatOne = !repeatOne },
                         onMoreClick = { showMoreSheet = true },
                         onSkipIntro = {
-                            val position = preferences.skipIntroSeconds * 1_000L
+                            val position = effectiveIntroSeconds * 1_000L
                             exoPlayer.seekTo(position)
                             progress.currentPositionMs = position
                         },
@@ -911,6 +1011,15 @@ private fun LandscapePlayerContent(
     hasNext: Boolean,
     showSkipIntro: Boolean,
     showSkipOutro: Boolean,
+    canEditSeriesSkip: Boolean,
+    introEndMs: Long,
+    outroStartMs: Long,
+    introMarked: Boolean,
+    outroMarked: Boolean,
+    onMarkIntro: () -> Unit,
+    onMarkOutro: () -> Unit,
+    onClearIntro: () -> Unit,
+    onClearOutro: () -> Unit,
     onScaleChange: (Float) -> Unit,
     onOffsetChange: (Float, Float) -> Unit,
     onSeekPreview: (Long) -> Unit,
@@ -991,6 +1100,7 @@ private fun LandscapePlayerContent(
         getCurrentBrightness = getCurrentBrightness,
         getCurrentVolume = getCurrentVolume,
         enabled = true,
+        speedBoostOnly = controlsLocked,
         modifier = Modifier.fillMaxSize(),
     ) {
         Box(
@@ -1033,7 +1143,7 @@ private fun LandscapePlayerContent(
         }
 
         LandscapePlayerLayout(
-        visible = controlsVisible || controlsLocked || isSeeking,
+        visible = controlsVisible || isSeeking,
         title = title,
         resolution = resolution,
         isPlaying = isPlaying,
@@ -1048,6 +1158,15 @@ private fun LandscapePlayerContent(
         repeatOne = repeatOne,
         hasPrevious = hasPrevious,
         hasNext = hasNext,
+        canEditSeriesSkip = canEditSeriesSkip,
+        introEndMs = introEndMs,
+        outroStartMs = outroStartMs,
+        introMarked = introMarked,
+        outroMarked = outroMarked,
+        onMarkIntro = onMarkIntro,
+        onMarkOutro = onMarkOutro,
+        onClearIntro = onClearIntro,
+        onClearOutro = onClearOutro,
         onBack = onBack,
         onPlayPauseClick = onPlayPauseClick,
         onPreviousClick = onPreviousClick,
@@ -1085,6 +1204,15 @@ private fun PortraitPlayerContent(
     hasNext: Boolean,
     showSkipIntro: Boolean,
     showSkipOutro: Boolean,
+    canEditSeriesSkip: Boolean,
+    introEndMs: Long,
+    outroStartMs: Long,
+    introMarked: Boolean,
+    outroMarked: Boolean,
+    onMarkIntro: () -> Unit,
+    onMarkOutro: () -> Unit,
+    onClearIntro: () -> Unit,
+    onClearOutro: () -> Unit,
     onSeekPreview: (Long) -> Unit,
     onSeekPreviewFrame: (Long) -> Unit,
     onSeekCommitted: (Long) -> Unit,
@@ -1173,6 +1301,15 @@ private fun PortraitPlayerContent(
         showSkipOutro = showSkipOutro,
         onSkipIntro = onSkipIntro,
         onSkipOutro = onSkipOutro,
+        canEditSeriesSkip = canEditSeriesSkip,
+        introEndMs = introEndMs,
+        outroStartMs = outroStartMs,
+        introMarked = introMarked,
+        outroMarked = outroMarked,
+        onMarkIntro = onMarkIntro,
+        onMarkOutro = onMarkOutro,
+        onClearIntro = onClearIntro,
+        onClearOutro = onClearOutro,
         onFullscreenClick = onFullscreenClick,
         modifier = Modifier.fillMaxSize(),
     )
@@ -1180,16 +1317,21 @@ private fun PortraitPlayerContent(
 
 private fun deriveSeriesTitle(playlist: List<VideoItem>, currentIndex: Int): String {
     if (playlist.isEmpty()) return ""
-    val current = playlist[currentIndex]
-    current.bucketName?.let { return it }
-    val baseTitle = current.title
-        .substringBeforeLast("：")
-        .substringBeforeLast(":")
-        .trim()
-    if (baseTitle.isNotEmpty() && baseTitle != current.title) {
-        return baseTitle
-    }
+    val current = playlist[currentIndex.coerceIn(0, playlist.lastIndex)]
+
     if (playlist.size > 1) {
+        val names = playlist
+            .map { TitleParser.parse(it.title).seriesName.trim() }
+            .filter { it.isNotBlank() }
+        val topNorm = names
+            .groupingBy { TitleParser.normalizeForGrouping(it) }
+            .eachCount()
+            .filterKeys { it.length >= 2 }
+            .maxByOrNull { it.value }
+            ?.key
+        if (topNorm != null) {
+            names.firstOrNull { TitleParser.normalizeForGrouping(it) == topNorm }?.let { return it }
+        }
         val commonPrefix = playlist
             .map { it.title }
             .reduce { acc, title -> acc.commonPrefixWith(title) }
@@ -1199,5 +1341,17 @@ private fun deriveSeriesTitle(playlist: List<VideoItem>, currentIndex: Int): Str
             return commonPrefix
         }
     }
+
+    val parsedName = TitleParser.parse(current.title).seriesName.trim()
+    if (parsedName.length >= 2) return parsedName
+
+    val baseTitle = current.title
+        .substringBeforeLast("：")
+        .substringBeforeLast(":")
+        .trim()
+    if (baseTitle.isNotEmpty() && baseTitle != current.title) {
+        return baseTitle
+    }
+    current.bucketName?.takeIf { it.isNotBlank() }?.let { return it }
     return baseTitle.ifEmpty { current.title }
 }

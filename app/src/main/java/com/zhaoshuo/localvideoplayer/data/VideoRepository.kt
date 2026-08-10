@@ -125,6 +125,15 @@ class VideoRepository(private val context: Context) {
         video: VideoItem,
         libraryEntries: List<VideoLibraryEntry>,
     ): PlaylistState {
+        val allVideos = libraryEntries.flatMap { entry ->
+            when (entry) {
+                is VideoLibraryEntry.Single -> listOf(entry.video)
+                is VideoLibraryEntry.Series -> entry.series.episodes
+            }
+        }.distinctBy { it.uri.toString() }
+
+        SeriesGrouper.playlistBySeriesName(video, allVideos)?.let { return it }
+
         val targetUri = video.uri.toString()
         for (entry in libraryEntries) {
             when (entry) {

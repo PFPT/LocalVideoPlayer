@@ -2,8 +2,14 @@ package com.zhaoshuo.localvideoplayer.ui
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -25,7 +31,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
@@ -59,7 +64,6 @@ fun SeriesDetailScreen(
     onVideosRemoved: (List<Uri>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var selectionMode by rememberSaveable { mutableStateOf(false) }
     var selectedUris by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -162,27 +166,36 @@ fun SeriesDetailScreen(
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(bottom = 8.dp),
     ) {
-        if (selectionMode) {
-            SelectionTopBar(
-                selectedCount = selectedUris.size,
-                totalCount = visibleEpisodes.size,
-                onSelectAll = {
-                    selectedUris = visibleEpisodes.map { it.uri.toString() }.toSet()
-                },
-                onDelete = {
-                    val uris = visibleEpisodes
-                        .filter { it.uri.toString() in selectedUris }
-                        .map { it.uri }
-                    openDeleteDialog(uris)
-                },
-                onCancel = ::exitSelectionMode,
-            )
-        } else {
-            LumenListHeader(
-                title = series.title,
-                onBack = onBack,
-                applyStatusBarPadding = false,
-            )
+        AnimatedContent(
+            targetState = selectionMode,
+            transitionSpec = {
+                fadeIn(animationSpec = tween(180)) togetherWith
+                    fadeOut(animationSpec = tween(180))
+            },
+            label = "series-detail-top-bar",
+        ) { selecting ->
+            if (selecting) {
+                SelectionTopBar(
+                    selectedCount = selectedUris.size,
+                    totalCount = visibleEpisodes.size,
+                    onSelectAll = {
+                        selectedUris = visibleEpisodes.map { it.uri.toString() }.toSet()
+                    },
+                    onDelete = {
+                        val uris = visibleEpisodes
+                            .filter { it.uri.toString() in selectedUris }
+                            .map { it.uri }
+                        openDeleteDialog(uris)
+                    },
+                    onCancel = ::exitSelectionMode,
+                )
+            } else {
+                LumenListHeader(
+                    title = series.title,
+                    onBack = onBack,
+                    applyStatusBarPadding = false,
+                )
+            }
         }
 
         val listState = rememberLazyListState()
@@ -190,54 +203,72 @@ fun SeriesDetailScreen(
             derivedStateOf { listState.isScrollInProgress }
         }
 
-        LazyColumn(
+        AnimatedContent(
+            targetState = series.id,
+            transitionSpec = {
+                fadeIn(animationSpec = tween(200)) togetherWith
+                    fadeOut(animationSpec = tween(120))
+            },
+            label = "series-detail-list",
             modifier = Modifier.fillMaxSize(),
-            state = listState,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            itemsIndexed(
-                items = visibleEpisodes,
-                key = { _, episode -> episode.uri.toString() },
-            ) { index, episode ->
-                val uriKey = episode.uri.toString()
-                val isSelected = uriKey in selectedUris
-                val progress = rememberPlaybackProgress(uriKey, playbackRecords)
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 12.dp,
+                    bottom = 24.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                itemsIndexed(
+                    items = visibleEpisodes,
+                    key = { _, episode -> episode.uri.toString() },
+                    contentType = { _, _ -> 1 },
+                ) { index, episode ->
+                    val uriKey = episode.uri.toString()
+                    val isSelected = uriKey in selectedUris
+                    val progress = rememberPlaybackProgress(uriKey, playbackRecords)
 
-                EpisodeListItem(
-                    episode = episode,
-                    episodeNumber = episode.episode,
-                    progress = progress,
-                    selectionMode = selectionMode,
-                    selected = isSelected,
-                    deferThumbnailLoad = isListScrolling,
-                    onClick = {
-                        if (selectionMode) {
-                            selectedUris = if (isSelected) {
-                                selectedUris - uriKey
-                            } else {
-                                selectedUris + uriKey
-                            }
-                        } else {
-                            scope.launch(Dispatchers.IO) {
-                                playCountStore.increment("series:${series.id}")
-                            }
-                            onPlayEpisode(
-                                PlaylistState(
-                                    items = visibleEpisodes,
-                                    currentIndex = index,
-                                ),
-                            )
-                        }
-                    },
-                    onLongClick = {
-                        selectionMode = true
-                        selectedUris = setOf(uriKey)
-                    },
-                    onSwipeDelete = {
-                        openDeleteDialog(listOf(episode.uri))
-                    },
-                )
+                    Box(modifier = Modifier.animateItem()) {
+                        EpisodeListItem(
+                            episode = episode,
+                            episodeNumber = episode.episode,
+                            progress = progress,
+                            selectionMode = selectionMode,
+                            selected = isSelected,
+                            deferThumbnailLoad = isListScrolling,
+                            onClick = {
+                                if (selectionMode) {
+                                    selectedUris = if (isSelected) {
+                                        selectedUris - uriKey
+                                    } else {
+                                        selectedUris + uriKey
+                                    }
+                                } else {
+                                    scope.launch(Dispatchers.IO) {
+                                        playCountStore.increment("series:${series.id}")
+                                    }
+                                    onPlayEpisode(
+                                        PlaylistState(
+                                            items = visibleEpisodes,
+                                            currentIndex = index,
+                                        ),
+                                    )
+                                }
+                            },
+                            onLongClick = {
+                                selectionMode = true
+                                selectedUris = setOf(uriKey)
+                            },
+                            onSwipeDelete = {
+                                openDeleteDialog(listOf(episode.uri))
+                            },
+                        )
+                    }
+                }
             }
         }
     }

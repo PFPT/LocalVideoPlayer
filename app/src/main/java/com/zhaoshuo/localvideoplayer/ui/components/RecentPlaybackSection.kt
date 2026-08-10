@@ -1,5 +1,12 @@
 package com.zhaoshuo.localvideoplayer.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -30,10 +37,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -243,29 +252,55 @@ fun SelectableListItem(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
+    val contentStartPadding by animateDpAsState(
+        targetValue = if (selectionMode) 48.dp else 0.dp,
+        label = "selection-content-padding",
+    )
+    val selectedScale by animateFloatAsState(
+        targetValue = if (selected && selectionMode) 0.97f else 1f,
+        label = "selection-scale",
+    )
+
     Box(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = selectedScale
+                scaleY = selectedScale
+            }
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
             ),
     ) {
-        if (selectionMode) {
+        AnimatedVisibility(
+            visible = selectionMode,
+            enter = slideInHorizontally { -it / 2 } + fadeIn(),
+            exit = slideOutHorizontally { -it / 2 } + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 4.dp),
+        ) {
             Checkbox(
                 checked = selected,
                 onCheckedChange = { onClick() },
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 4.dp),
             )
         }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = if (selectionMode) 48.dp else 0.dp),
+                .padding(start = contentStartPadding),
         ) {
             content()
+            if (selected && selectionMode) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        ),
+                )
+            }
         }
     }
 }

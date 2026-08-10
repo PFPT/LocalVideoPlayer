@@ -90,11 +90,29 @@ object TorrentSession {
     fun stop() {
         synchronized(lock) {
             val manager = session
-            activeInfoHashes.keys.toList().forEach { taskId ->
-                removeTaskLocked(manager, taskId, deleteFiles = false)
+            synchronized(nativeLock) {
+                activeInfoHashes.keys.toList().forEach { taskId ->
+                    removeTaskLocked(manager, taskId, deleteFiles = false)
+                }
+                activeInfoHashes.clear()
             }
-            activeInfoHashes.clear()
             manager?.stop()
+            session = null
+        }
+    }
+
+    fun releaseForServiceDestroy() {
+        synchronized(lock) {
+            val manager = session ?: return
+            if (activeInfoHashes.isNotEmpty()) {
+                synchronized(nativeLock) {
+                    activeInfoHashes.keys.toList().forEach { taskId ->
+                        pauseTaskLocked(manager, taskId)
+                    }
+                }
+                return
+            }
+            manager.stop()
             session = null
         }
     }
@@ -192,42 +210,39 @@ object TorrentSession {
 
         manager.addListener(listener)
         try {
-            val resumedExisting = synchronized(nativeLock) {
-                val hash = infoHashRef.get() ?: return@synchronized false
-                val existing = manager.find(hash) ?: return@synchronized false
-                if (!safeIsValid(existing)) return@synchronized false
-                activeInfoHashes[taskId] = hash
-                boostPeerDiscoveryLocked(existing, discoveryBoosted)
-                val info = safeTorrentFile(existing)
-                if (info != null && info.isValid) {
-                    torrentInfoRef.compareAndSet(null, info)
-                    if (prioritized.compareAndSet(false, true)) {
-                        applyVideoPrioritiesLocked(existing, info)
-                    }
-                    metadataLatch.countDown()
-                }
-                if (safeIsFinished(existing)) {
-                    finishedLatch.countDown()
-                }
-                true
-            }
+            val resumedExisting = attachExistingLocked(
+                manager = manager,
+                taskId = taskId,
+                infoHashRef = infoHashRef,
+                torrentInfoRef = torrentInfoRef,
+                prioritized = prioritized,
+                discoveryBoosted = discoveryBoosted,
+                metadataLatch = metadataLatch,
+                finishedLatch = finishedLatch,
+            )
             if (!resumedExisting) {
-                manager.download(magnetUri, saveDir, torrent_flags_t())
-                // download() may no-op if same hash still present; attach if so
-                synchronized(nativeLock) {
-                    val hash = infoHashRef.get() ?: return@synchronized
-                    val existing = manager.find(hash) ?: return@synchronized
-                    if (!safeIsValid(existing)) return@synchronized
-                    activeInfoHashes[taskId] = hash
-                    boostPeerDiscoveryLocked(existing, discoveryBoosted)
-                    val info = safeTorrentFile(existing)
-                    if (info != null && info.isValid) {
-                        torrentInfoRef.compareAndSet(null, info)
-                        if (prioritized.compareAndSet(false, true)) {
-                            applyVideoPrioritiesLocked(existing, info)
-                        }
-                        metadataLatch.countDown()
-                    }
+                val attachedBeforeAdd = attachExistingLocked(
+                    manager = manager,
+                    taskId = taskId,
+                    infoHashRef = infoHashRef,
+                    torrentInfoRef = torrentInfoRef,
+                    prioritized = prioritized,
+                    discoveryBoosted = discoveryBoosted,
+                    metadataLatch = metadataLatch,
+                    finishedLatch = finishedLatch,
+                )
+                if (!attachedBeforeAdd) {
+                    manager.download(magnetUri, saveDir, torrent_flags_t())
+                    attachExistingLocked(
+                        manager = manager,
+                        taskId = taskId,
+                        infoHashRef = infoHashRef,
+                        torrentInfoRef = torrentInfoRef,
+                        prioritized = prioritized,
+                        discoveryBoosted = discoveryBoosted,
+                        metadataLatch = metadataLatch,
+                        finishedLatch = finishedLatch,
+                    )
                 }
             }
 
@@ -247,6 +262,7 @@ object TorrentSession {
             }
 
             var lastReannounceAt = 0L
+            var handleMissCount = 0
             while (!finishedLatch.await(0, TimeUnit.MILLISECONDS)) {
                 checkControl(shouldStop, isCanceled, errorRef)
                 val progress = withHandle(manager, taskId, infoHashRef.get()) { handle ->
@@ -270,7 +286,14 @@ object TorrentSession {
                         lastReannounceAt = now
                     }
                     snapshot
-                } ?: throw IOException("torrent handle invalid")
+                }
+                if (progress == null) {
+                    handleMissCount++
+                    if (handleMissCount >= 10) throw IOException("torrent handle invalid")
+                    delay(500)
+                    continue
+                }
+                handleMissCount = 0
                 onProgress(progress.downloaded, if (progress.total > 0) progress.total else -1L, progress.speedBps)
                 if (progress.finished || (progress.total > 0 && progress.downloaded >= progress.total)) break
                 delay(500)
@@ -310,6 +333,35 @@ object TorrentSession {
                 }
             }
         }
+    }
+
+    private fun attachExistingLocked(
+        manager: SessionManager,
+        taskId: String,
+        infoHashRef: AtomicReference<Sha1Hash?>,
+        torrentInfoRef: AtomicReference<TorrentInfo?>,
+        prioritized: AtomicBoolean,
+        discoveryBoosted: AtomicBoolean,
+        metadataLatch: CountDownLatch,
+        finishedLatch: CountDownLatch,
+    ): Boolean = synchronized(nativeLock) {
+        val hash = infoHashRef.get() ?: return false
+        val existing = manager.find(hash) ?: return false
+        if (!safeIsValid(existing)) return false
+        activeInfoHashes[taskId] = hash
+        boostPeerDiscoveryLocked(existing, discoveryBoosted)
+        val info = safeTorrentFile(existing)
+        if (info != null && info.isValid) {
+            torrentInfoRef.compareAndSet(null, info)
+            if (prioritized.compareAndSet(false, true)) {
+                applyVideoPrioritiesLocked(existing, info)
+            }
+            metadataLatch.countDown()
+        }
+        if (safeIsFinished(existing)) {
+            finishedLatch.countDown()
+        }
+        true
     }
 
     private enum class Outcome {

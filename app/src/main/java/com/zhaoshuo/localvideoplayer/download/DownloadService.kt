@@ -100,6 +100,15 @@ class DownloadService : Service() {
                     val limit = manager.effectiveConcurrentLimit(activeJobs.size + manager.countQueued())
                     if (activeJobs.size >= limit) break
                     val task = manager.claimNextQueued() ?: break
+                    val existing = activeJobs[task.id]
+                    if (existing != null && existing.isActive) {
+                        manager.update(task.id) { it.copy(status = DownloadStatus.QUEUED) }
+                        break
+                    }
+                    if (existing != null) {
+                        activeJobs.remove(task.id, existing)
+                        activeControls.remove(task.id)
+                    }
                     launchTask(task, manager)
                 }
                 refreshAllNotifications(manager)
@@ -109,6 +118,8 @@ class DownloadService : Service() {
     }
 
     private fun launchTask(task: DownloadTask, manager: DownloadManager) {
+        val existing = activeJobs[task.id]
+        if (existing != null && existing.isActive) return
         val control = TaskControl()
         val job = scope.launch(start = CoroutineStart.LAZY) {
             processTask(task.id, manager, control)
@@ -1272,7 +1283,7 @@ class DownloadService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        TorrentSession.stop()
+        TorrentSession.releaseForServiceDestroy()
         scope.cancel()
         super.onDestroy()
     }

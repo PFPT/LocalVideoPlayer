@@ -72,6 +72,15 @@ fun PortraitPlayerLayout(
     onSkipIntro: () -> Unit,
     onSkipOutro: () -> Unit,
     onFullscreenClick: () -> Unit,
+    canEditSeriesSkip: Boolean = false,
+    introEndMs: Long = 0L,
+    outroStartMs: Long = -1L,
+    introMarked: Boolean = false,
+    outroMarked: Boolean = false,
+    onMarkIntro: () -> Unit = {},
+    onMarkOutro: () -> Unit = {},
+    onClearIntro: () -> Unit = {},
+    onClearOutro: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val showChrome = controlsVisible || isSeeking
@@ -198,6 +207,15 @@ fun PortraitPlayerLayout(
                         isFullscreen = false,
                         onFullscreenClick = onFullscreenClick,
                         compact = true,
+                        canEditSeriesSkip = canEditSeriesSkip,
+                        introEndMs = introEndMs,
+                        outroStartMs = outroStartMs,
+                        introMarked = introMarked,
+                        outroMarked = outroMarked,
+                        onMarkIntro = onMarkIntro,
+                        onMarkOutro = onMarkOutro,
+                        onClearIntro = onClearIntro,
+                        onClearOutro = onClearOutro,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()

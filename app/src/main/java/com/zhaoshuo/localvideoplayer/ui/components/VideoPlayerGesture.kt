@@ -60,6 +60,7 @@ fun VideoPlayerGesture(
     onSpeedBoostStart: (() -> Unit)? = null,
     onSpeedBoostEnd: (() -> Unit)? = null,
     enabled: Boolean,
+    speedBoostOnly: Boolean = false,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -77,165 +78,53 @@ fun VideoPlayerGesture(
                 translationY = offsetY
             }
             .then(
-                if (enabled) {
-                    Modifier
-                        .pointerInput(scale) {
-                            detectTransformGestures { _, pan, zoom, _ ->
-                                if (zoom != 1f) {
-                                    val newScale = (scale * zoom).coerceIn(MIN_SCALE, MAX_SCALE)
-                                    onScaleChange(newScale)
-                                    if (newScale <= MIN_SCALE) {
-                                        onOffsetChange(0f, 0f)
-                                    }
-                                } else if (scale > MIN_SCALE) {
-                                    val maxOffsetX = (size.width * (scale - 1f)) / 2f
-                                    val maxOffsetY = (size.height * (scale - 1f)) / 2f
-                                    onOffsetChange(
-                                        (offsetX + pan.x).coerceIn(-maxOffsetX, maxOffsetX),
-                                        (offsetY + pan.y).coerceIn(-maxOffsetY, maxOffsetY),
-                                    )
-                                }
-                            }
-                        }
-                        .pointerInput(scale) {
-                            coroutineScope {
-                            if (scale > MIN_SCALE) {
-                                detectTapGestures(
-                                    onTap = { offset ->
-                                        onTap(offset, size.width.toFloat(), size.height.toFloat())
-                                    },
-                                    onDoubleTap = { onDoubleTap() },
-                                )
-                                return@coroutineScope
-                            }
-
-                            var lastTapUptimeMs = 0L
-                            var lastTapPosition = Offset.Zero
-                            var pendingSingleTapJob: Job? = null
-
+                when {
+                    enabled && speedBoostOnly -> {
+                        Modifier.pointerInput(
+                            longPressTimeout,
+                            touchSlop,
+                            onSpeedBoostStart,
+                            onSpeedBoostEnd,
+                        ) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
                                 val pointerId = down.id
-                                var dragMode: DragMode? = null
-                                var fingerUpBeforeSlop = false
-                                val startPositionMs = getCurrentPositionMs()
-                                var startBrightness = 0f
-                                var startVolume = 0f
-                                var previewPositionMs = startPositionMs
-                                var lastPreviewFrameAt = 0L
+                                var fingerUpBeforeTimeout = false
+                                var movedBeyondSlop = false
 
-                                val timedOutWithoutDrag = withTimeoutOrNull(longPressTimeout) {
-                                    while (dragMode == null) {
+                                val timedOutWithoutMove = withTimeoutOrNull(longPressTimeout) {
+                                    while (true) {
                                         val event = awaitPointerEvent(PointerEventPass.Main)
                                         val change = event.changes.firstOrNull { it.id == pointerId }
                                             ?: return@withTimeoutOrNull false
                                         if (!change.pressed) {
-                                            fingerUpBeforeSlop = true
+                                            fingerUpBeforeTimeout = true
                                             return@withTimeoutOrNull false
                                         }
-
-                                        val deltaFromStart = change.position - down.position
-                                        if (abs(deltaFromStart.x) > touchSlop || abs(deltaFromStart.y) > touchSlop) {
-                                            dragMode = resolveDragMode(
-                                                deltaFromStart = deltaFromStart,
-                                                downX = down.position.x,
-                                                width = size.width.toFloat(),
-                                                durationMs = durationMs,
-                                                onBrightnessAvailable = onBrightnessGestureStart != null &&
-                                                    onBrightnessChange != null,
-                                                onVolumeAvailable = onVolumeGestureStart != null &&
-                                                    onVolumeChange != null,
-                                            )
-                                            if (dragMode == null) {
-                                                return@withTimeoutOrNull false
-                                            }
-                                            when (val mode = dragMode!!) {
-                                                DragMode.Seek -> onSeekingChange(true)
-                                                DragMode.Brightness -> {
-                                                    startBrightness = getCurrentBrightness()
-                                                    onBrightnessGestureStart?.invoke()
-                                                }
-                                                DragMode.Volume -> {
-                                                    startVolume = getCurrentVolume()
-                                                    onVolumeGestureStart?.invoke()
-                                                }
-                                            }
+                                        val delta = change.position - down.position
+                                        if (abs(delta.x) > touchSlop || abs(delta.y) > touchSlop) {
+                                            movedBeyondSlop = true
+                                            return@withTimeoutOrNull false
                                         }
                                     }
+                                    @Suppress("UNREACHABLE_CODE")
                                     false
-                                } ?: true
+                                } != false
 
                                 when {
-                                    fingerUpBeforeSlop -> {
-                                        val now = System.currentTimeMillis()
-                                        val position = down.position
-                                        val isDoubleTap = lastTapUptimeMs > 0L &&
-                                            now - lastTapUptimeMs < DOUBLE_TAP_TIMEOUT_MS &&
-                                            hypot(
-                                                position.x - lastTapPosition.x,
-                                                position.y - lastTapPosition.y,
-                                            ) < touchSlop
-                                        if (isDoubleTap) {
-                                            pendingSingleTapJob?.cancel()
-                                            pendingSingleTapJob = null
-                                            lastTapUptimeMs = 0L
-                                            onDoubleTap()
-                                        } else {
-                                            lastTapUptimeMs = now
-                                            lastTapPosition = position
-                                            pendingSingleTapJob?.cancel()
-                                            pendingSingleTapJob = this@coroutineScope.launch {
-                                                delay(DOUBLE_TAP_TIMEOUT_MS)
-                                                onTap(
-                                                    position,
-                                                    size.width.toFloat(),
-                                                    size.height.toFloat(),
-                                                )
-                                                lastTapUptimeMs = 0L
-                                            }
-                                        }
-                                    }
-                                    dragMode != null -> {
-                                        while (true) {
-                                            val event = awaitPointerEvent(PointerEventPass.Main)
-                                            val change = event.changes.firstOrNull { it.id == pointerId }
-                                                ?: break
-                                            if (!change.pressed) break
-
-                                            val delta = change.position - down.position
-                                            val result = applyDragDelta(
-                                                dragMode = dragMode!!,
-                                                delta = delta,
-                                                width = size.width.toFloat(),
-                                                height = size.height.toFloat(),
-                                                startPositionMs = startPositionMs,
-                                                startBrightness = startBrightness,
-                                                startVolume = startVolume,
-                                                durationMs = durationMs,
-                                                onSeekPreview = onSeekPreview,
-                                                onSeekPreviewFrame = onSeekPreviewFrame,
-                                                onBrightnessChange = onBrightnessChange,
-                                                onVolumeChange = onVolumeChange,
-                                                lastPreviewFrameAt = lastPreviewFrameAt,
-                                            )
-                                            previewPositionMs = result.previewPositionMs
-                                            lastPreviewFrameAt = result.lastPreviewFrameAt
-                                            change.consume()
-                                        }
-                                        finishDragMode(
-                                            dragMode = dragMode!!,
-                                            previewPositionMs = previewPositionMs,
-                                            onSeekCommitted = onSeekCommitted,
-                                            onSeekingChange = onSeekingChange,
-                                            onBrightnessGestureEnd = onBrightnessGestureEnd,
-                                            onVolumeGestureEnd = onVolumeGestureEnd,
+                                    fingerUpBeforeTimeout -> {
+                                        onTap(
+                                            down.position,
+                                            size.width.toFloat(),
+                                            size.height.toFloat(),
                                         )
                                     }
-                                    timedOutWithoutDrag &&
+                                    timedOutWithoutMove &&
+                                        !movedBeyondSlop &&
                                         onSpeedBoostStart != null &&
                                         onSpeedBoostEnd != null -> {
                                         try {
-                                            onSpeedBoostStart()
+                                            onSpeedBoostStart.invoke()
                                             while (true) {
                                                 val event = awaitPointerEvent(PointerEventPass.Main)
                                                 val change = event.changes.firstOrNull { it.id == pointerId }
@@ -244,20 +133,196 @@ fun VideoPlayerGesture(
                                                 change.consume()
                                             }
                                         } finally {
-                                            onSpeedBoostEnd()
+                                            onSpeedBoostEnd.invoke()
                                         }
                                     }
                                 }
                             }
-                            }
                         }
-                } else {
-                    Modifier.pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = { offset ->
-                                onTap(offset, size.width.toFloat(), size.height.toFloat())
-                            },
-                        )
+                    }
+                    enabled -> {
+                        Modifier
+                            .pointerInput(scale) {
+                                detectTransformGestures { _, pan, zoom, _ ->
+                                    if (zoom != 1f) {
+                                        val newScale = (scale * zoom).coerceIn(MIN_SCALE, MAX_SCALE)
+                                        onScaleChange(newScale)
+                                        if (newScale <= MIN_SCALE) {
+                                            onOffsetChange(0f, 0f)
+                                        }
+                                    } else if (scale > MIN_SCALE) {
+                                        val maxOffsetX = (size.width * (scale - 1f)) / 2f
+                                        val maxOffsetY = (size.height * (scale - 1f)) / 2f
+                                        onOffsetChange(
+                                            (offsetX + pan.x).coerceIn(-maxOffsetX, maxOffsetX),
+                                            (offsetY + pan.y).coerceIn(-maxOffsetY, maxOffsetY),
+                                        )
+                                    }
+                                }
+                            }
+                            .pointerInput(scale) {
+                                coroutineScope {
+                                if (scale > MIN_SCALE) {
+                                    detectTapGestures(
+                                        onTap = { offset ->
+                                            onTap(offset, size.width.toFloat(), size.height.toFloat())
+                                        },
+                                        onDoubleTap = { onDoubleTap() },
+                                    )
+                                    return@coroutineScope
+                                }
+
+                                var lastTapUptimeMs = 0L
+                                var lastTapPosition = Offset.Zero
+                                var pendingSingleTapJob: Job? = null
+
+                                awaitEachGesture {
+                                    val down = awaitFirstDown(requireUnconsumed = false)
+                                    val pointerId = down.id
+                                    var dragMode: DragMode? = null
+                                    var fingerUpBeforeSlop = false
+                                    val startPositionMs = getCurrentPositionMs()
+                                    var startBrightness = 0f
+                                    var startVolume = 0f
+                                    var previewPositionMs = startPositionMs
+                                    var lastPreviewFrameAt = 0L
+
+                                    val timedOutWithoutDrag = withTimeoutOrNull(longPressTimeout) {
+                                        while (dragMode == null) {
+                                            val event = awaitPointerEvent(PointerEventPass.Main)
+                                            val change = event.changes.firstOrNull { it.id == pointerId }
+                                                ?: return@withTimeoutOrNull false
+                                            if (!change.pressed) {
+                                                fingerUpBeforeSlop = true
+                                                return@withTimeoutOrNull false
+                                            }
+
+                                            val deltaFromStart = change.position - down.position
+                                            if (abs(deltaFromStart.x) > touchSlop || abs(deltaFromStart.y) > touchSlop) {
+                                                dragMode = resolveDragMode(
+                                                    deltaFromStart = deltaFromStart,
+                                                    downX = down.position.x,
+                                                    width = size.width.toFloat(),
+                                                    durationMs = durationMs,
+                                                    onBrightnessAvailable = onBrightnessGestureStart != null &&
+                                                        onBrightnessChange != null,
+                                                    onVolumeAvailable = onVolumeGestureStart != null &&
+                                                        onVolumeChange != null,
+                                                )
+                                                if (dragMode == null) {
+                                                    return@withTimeoutOrNull false
+                                                }
+                                                when (val mode = dragMode!!) {
+                                                    DragMode.Seek -> onSeekingChange(true)
+                                                    DragMode.Brightness -> {
+                                                        startBrightness = getCurrentBrightness()
+                                                        onBrightnessGestureStart?.invoke()
+                                                    }
+                                                    DragMode.Volume -> {
+                                                        startVolume = getCurrentVolume()
+                                                        onVolumeGestureStart?.invoke()
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        false
+                                    } ?: true
+
+                                    when {
+                                        fingerUpBeforeSlop -> {
+                                            val now = System.currentTimeMillis()
+                                            val position = down.position
+                                            val isDoubleTap = lastTapUptimeMs > 0L &&
+                                                now - lastTapUptimeMs < DOUBLE_TAP_TIMEOUT_MS &&
+                                                hypot(
+                                                    position.x - lastTapPosition.x,
+                                                    position.y - lastTapPosition.y,
+                                                ) < touchSlop
+                                            if (isDoubleTap) {
+                                                pendingSingleTapJob?.cancel()
+                                                pendingSingleTapJob = null
+                                                lastTapUptimeMs = 0L
+                                                onDoubleTap()
+                                            } else {
+                                                lastTapUptimeMs = now
+                                                lastTapPosition = position
+                                                pendingSingleTapJob?.cancel()
+                                                pendingSingleTapJob = this@coroutineScope.launch {
+                                                    delay(DOUBLE_TAP_TIMEOUT_MS)
+                                                    onTap(
+                                                        position,
+                                                        size.width.toFloat(),
+                                                        size.height.toFloat(),
+                                                    )
+                                                    lastTapUptimeMs = 0L
+                                                }
+                                            }
+                                        }
+                                        dragMode != null -> {
+                                            while (true) {
+                                                val event = awaitPointerEvent(PointerEventPass.Main)
+                                                val change = event.changes.firstOrNull { it.id == pointerId }
+                                                    ?: break
+                                                if (!change.pressed) break
+
+                                                val delta = change.position - down.position
+                                                val result = applyDragDelta(
+                                                    dragMode = dragMode!!,
+                                                    delta = delta,
+                                                    width = size.width.toFloat(),
+                                                    height = size.height.toFloat(),
+                                                    startPositionMs = startPositionMs,
+                                                    startBrightness = startBrightness,
+                                                    startVolume = startVolume,
+                                                    durationMs = durationMs,
+                                                    onSeekPreview = onSeekPreview,
+                                                    onSeekPreviewFrame = onSeekPreviewFrame,
+                                                    onBrightnessChange = onBrightnessChange,
+                                                    onVolumeChange = onVolumeChange,
+                                                    lastPreviewFrameAt = lastPreviewFrameAt,
+                                                )
+                                                previewPositionMs = result.previewPositionMs
+                                                lastPreviewFrameAt = result.lastPreviewFrameAt
+                                                change.consume()
+                                            }
+                                            finishDragMode(
+                                                dragMode = dragMode!!,
+                                                previewPositionMs = previewPositionMs,
+                                                onSeekCommitted = onSeekCommitted,
+                                                onSeekingChange = onSeekingChange,
+                                                onBrightnessGestureEnd = onBrightnessGestureEnd,
+                                                onVolumeGestureEnd = onVolumeGestureEnd,
+                                            )
+                                        }
+                                        timedOutWithoutDrag &&
+                                            onSpeedBoostStart != null &&
+                                            onSpeedBoostEnd != null -> {
+                                            try {
+                                                onSpeedBoostStart()
+                                                while (true) {
+                                                    val event = awaitPointerEvent(PointerEventPass.Main)
+                                                    val change = event.changes.firstOrNull { it.id == pointerId }
+                                                        ?: break
+                                                    if (!change.pressed) break
+                                                    change.consume()
+                                                }
+                                            } finally {
+                                                onSpeedBoostEnd()
+                                            }
+                                        }
+                                    }
+                                }
+                                }
+                            }
+                    }
+                    else -> {
+                        Modifier.pointerInput(Unit) {
+                            detectTapGestures(
+                                onTap = { offset ->
+                                    onTap(offset, size.width.toFloat(), size.height.toFloat())
+                                },
+                            )
+                        }
                     }
                 },
             ),

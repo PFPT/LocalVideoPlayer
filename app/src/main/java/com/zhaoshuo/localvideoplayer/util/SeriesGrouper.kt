@@ -4,6 +4,9 @@ import com.zhaoshuo.localvideoplayer.model.SeriesGroupKind
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
 import com.zhaoshuo.localvideoplayer.model.VideoSeries
+import com.zhaoshuo.localvideoplayer.model.APP_DOWNLOAD_BUCKET
+import com.zhaoshuo.localvideoplayer.model.APP_DOWNLOAD_FOLDER_KEY
+import com.zhaoshuo.localvideoplayer.model.isAppDownloadLocation
 import com.zhaoshuo.localvideoplayer.player.PlaylistState
 import java.util.Calendar
 import java.util.Locale
@@ -54,7 +57,134 @@ object SeriesGrouper {
             }
         }
 
+        ensureCompleteDownloadFolder(parsed.map { it.first }, entries)
+        mergeEpisodeSeriesByName(entries)
         return entries
+    }
+
+    fun playlistBySeriesName(target: VideoItem, candidates: List<VideoItem>): PlaylistState? {
+        val targetParsed = TitleParser.parse(target.title)
+        val targetKey = TitleParser.normalizeForGrouping(targetParsed.seriesName)
+            .takeIf { it.length >= MIN_GROUP_KEY_LENGTH }
+            ?: return null
+
+        val siblings = candidates.mapNotNull { video ->
+            val parsed = TitleParser.parse(video.title)
+            val key = TitleParser.normalizeForGrouping(parsed.seriesName)
+            if (key != targetKey) return@mapNotNull null
+            video.copy(
+                season = parsed.season ?: video.season,
+                episode = parsed.episode ?: video.episode,
+            )
+        }.distinctBy { it.uri.toString() }
+
+        if (siblings.size < MIN_GROUP_SIZE) return null
+
+        val sorted = sortEpisodes(siblings)
+        val index = sorted.indexOfFirst { it.uri.toString() == target.uri.toString() }
+            .coerceAtLeast(0)
+        return PlaylistState(items = sorted, currentIndex = index)
+    }
+
+    private fun mergeEpisodeSeriesByName(entries: MutableList<VideoLibraryEntry>) {
+        val episodeEntries = entries.mapIndexedNotNull { index, entry ->
+            if (entry is VideoLibraryEntry.Series &&
+                entry.series.groupKind == SeriesGroupKind.EPISODE
+            ) {
+                index to entry
+            } else {
+                null
+            }
+        }
+        if (episodeEntries.size < 2) return
+
+        val groups = linkedMapOf<String, MutableList<IndexedValue<VideoLibraryEntry.Series>>>()
+        episodeEntries.forEach { (index, entry) ->
+            val key = episodeMergeKey(entry) ?: return@forEach
+            groups.getOrPut(key) { mutableListOf() }.add(IndexedValue(index, entry))
+        }
+
+        val indicesToRemove = mutableSetOf<Int>()
+        val mergedEntries = mutableListOf<VideoLibraryEntry.Series>()
+
+        groups.values.forEach { group ->
+            if (group.size < 2) return@forEach
+            val allEpisodes = group
+                .flatMap { it.value.series.episodes }
+                .distinctBy { it.uri.toString() }
+            if (allEpisodes.size <= group.maxOf { it.value.series.episodes.size }) {
+                return@forEach
+            }
+            val title = group
+                .map { it.value.series.title }
+                .groupingBy { it }
+                .eachCount()
+                .maxByOrNull { it.value }
+                ?.key
+                ?: group.first().value.series.title
+            val seriesKey = "name:${TitleParser.normalizeForGrouping(title)}"
+            val sortedEpisodes = sortEpisodes(
+                allEpisodes.map { it.copy(seriesKey = seriesKey) },
+            )
+            group.forEach { indicesToRemove.add(it.index) }
+            mergedEntries.add(
+                VideoLibraryEntry.Series(
+                    VideoSeries(
+                        id = seriesKey.hashCode().toUInt().toString(16),
+                        title = title,
+                        episodes = sortedEpisodes,
+                        groupKind = SeriesGroupKind.EPISODE,
+                    ),
+                ),
+            )
+        }
+
+        if (indicesToRemove.isEmpty()) return
+        val remaining = entries.filterIndexed { index, _ -> index !in indicesToRemove }.toMutableList()
+        remaining.addAll(0, mergedEntries)
+        entries.clear()
+        entries.addAll(remaining)
+    }
+
+    private fun episodeMergeKey(entry: VideoLibraryEntry.Series): String? {
+        val fromEpisodes = entry.series.episodes
+            .map { TitleParser.normalizeForGrouping(TitleParser.parse(it.title).seriesName) }
+            .filter { it.length >= MIN_GROUP_KEY_LENGTH }
+            .groupingBy { it }
+            .eachCount()
+            .maxByOrNull { it.value }
+            ?.key
+        if (fromEpisodes != null) return fromEpisodes
+        val fromTitle = TitleParser.normalizeForGrouping(entry.series.title)
+        return fromTitle.takeIf { it.length >= MIN_GROUP_KEY_LENGTH }
+    }
+
+    private fun ensureCompleteDownloadFolder(
+        videos: List<VideoItem>,
+        entries: MutableList<VideoLibraryEntry>,
+    ) {
+        val downloadVideos = videos.filter(::isAppDownloadLocation)
+        if (downloadVideos.isEmpty()) return
+
+        entries.removeAll { entry ->
+            entry is VideoLibraryEntry.Series &&
+                entry.series.groupKind == SeriesGroupKind.BUCKET &&
+                entry.series.title.equals(APP_DOWNLOAD_BUCKET, ignoreCase = true)
+        }
+
+        val sortedEpisodes = sortEpisodes(
+            downloadVideos.map { it.copy(seriesKey = APP_DOWNLOAD_FOLDER_KEY) },
+        )
+        entries.add(
+            VideoLibraryEntry.Series(
+                VideoSeries(
+                    id = APP_DOWNLOAD_FOLDER_KEY.hashCode().toUInt().toString(16),
+                    title = APP_DOWNLOAD_BUCKET,
+                    episodes = sortedEpisodes,
+                    groupKind = SeriesGroupKind.BUCKET,
+                ),
+            ),
+        )
     }
 
     private fun groupByFolder(

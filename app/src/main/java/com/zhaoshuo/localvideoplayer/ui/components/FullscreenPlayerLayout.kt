@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -61,115 +62,154 @@ internal fun FullscreenPlayerLayout(
     onLoopClick: () -> Unit,
     onEpisodePickerClick: () -> Unit,
     onMoreClick: () -> Unit = {},
+    canEditSeriesSkip: Boolean = false,
+    introEndMs: Long = 0L,
+    outroStartMs: Long = -1L,
+    introMarked: Boolean = false,
+    outroMarked: Boolean = false,
+    onMarkIntro: () -> Unit = {},
+    onMarkOutro: () -> Unit = {},
+    onClearIntro: () -> Unit = {},
+    onClearOutro: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier.fillMaxSize(),
     ) {
-        AnimatedVisibility(
-            visible = controlsVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopCenter),
-        ) {
-            Row(
+        if (controlsLocked) {
+            AnimatedVisibility(
+                visible = controlsVisible,
+                enter = fadeIn(),
+                exit = fadeOut(),
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(Color.Black.copy(alpha = 0.65f), Color.Transparent),
-                        ),
-                    )
-                    .padding(horizontal = 4.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                    .align(Alignment.CenterEnd)
+                    .navigationBarsPadding()
+                    .padding(end = 16.dp),
             ) {
-                SideRailButton(onClick = onBack) {
+                SideRailButton(onClick = onLockToggle) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.back),
-                        tint = Color.White,
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = stringResource(R.string.unlock_controls),
+                        tint = Color(0xFFFFD700),
                         modifier = Modifier.size(22.dp),
                     )
                 }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    FullscreenSystemClock()
-                    BatteryLevelIndicator()
-                }
             }
-        }
-
-        AnimatedVisibility(
-            visible = controlsVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter),
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
-                        ),
-                    )
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+        } else {
+            AnimatedVisibility(
+                visible = controlsVisible,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.TopCenter),
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    PlayerCenterControls(
-                        isPlaying = isPlaying,
-                        hasPrevious = hasPrevious,
-                        hasNext = hasNext,
-                        onPlayPauseClick = onPlayPauseClick,
-                        onPreviousClick = onPreviousClick,
-                        onNextClick = onNextClick,
-                        compact = true,
-                    )
-                }
-                PlayerProgressBar(
-                    currentPositionMs = currentPositionMs,
-                    bufferedPositionMs = bufferedPositionMs,
-                    durationMs = durationMs,
-                    onSeek = onSeek,
-                    modifier = Modifier.fillMaxWidth(),
-                )
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 6.dp),
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Black.copy(alpha = 0.65f), Color.Transparent),
+                            ),
+                        )
+                        .padding(horizontal = 4.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    PlayerSideActions(
-                        controlsLocked = controlsLocked,
-                        pipSupported = pipSupported,
-                        isFullscreen = true,
-                        horizontal = true,
-                        showBack = false,
-                        onBack = onBack,
-                        onLockToggle = onLockToggle,
-                        onRotateClick = onRotateClick,
-                        onPipClick = onPipClick,
-                        onFullscreenClick = onFullscreenClick,
+                    SideRailButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back),
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        FullscreenSystemClock()
+                        BatteryLevelIndicator()
+                    }
+                }
+            }
+
+            AnimatedVisibility(
+                visible = controlsVisible,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.BottomCenter),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
+                            ),
+                        )
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        PlayerCenterControls(
+                            isPlaying = isPlaying,
+                            hasPrevious = hasPrevious,
+                            hasNext = hasNext,
+                            onPlayPauseClick = onPlayPauseClick,
+                            onPreviousClick = onPreviousClick,
+                            onNextClick = onNextClick,
+                            compact = true,
+                        )
+                    }
+                    PlayerProgressBar(
+                        currentPositionMs = currentPositionMs,
+                        bufferedPositionMs = bufferedPositionMs,
+                        durationMs = durationMs,
+                        onSeek = onSeek,
+                        canEditSeriesSkip = canEditSeriesSkip,
+                        introEndMs = introEndMs,
+                        outroStartMs = outroStartMs,
+                        introMarked = introMarked,
+                        outroMarked = outroMarked,
+                        onMarkIntro = onMarkIntro,
+                        onMarkOutro = onMarkOutro,
+                        onClearIntro = onClearIntro,
+                        onClearOutro = onClearOutro,
+                        modifier = Modifier.fillMaxWidth(),
                     )
-                    PlayerBottomToolbar(
-                        playbackSpeed = playbackSpeed,
-                        repeatOne = repeatOne,
-                        showEpisodePicker = showEpisodePicker,
-                        onSpeedClick = onSpeedClick,
-                        onLoopClick = onLoopClick,
-                        onEpisodePickerClick = onEpisodePickerClick,
-                        onMoreClick = onMoreClick,
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        PlayerSideActions(
+                            controlsLocked = false,
+                            pipSupported = pipSupported,
+                            isFullscreen = true,
+                            horizontal = true,
+                            showBack = false,
+                            onBack = onBack,
+                            onLockToggle = onLockToggle,
+                            onRotateClick = onRotateClick,
+                            onPipClick = onPipClick,
+                            onFullscreenClick = onFullscreenClick,
+                        )
+                        PlayerBottomToolbar(
+                            playbackSpeed = playbackSpeed,
+                            repeatOne = repeatOne,
+                            showEpisodePicker = showEpisodePicker,
+                            onSpeedClick = onSpeedClick,
+                            onLoopClick = onLoopClick,
+                            onEpisodePickerClick = onEpisodePickerClick,
+                            onMoreClick = onMoreClick,
+                        )
+                    }
                 }
             }
         }
