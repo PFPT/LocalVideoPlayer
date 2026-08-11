@@ -51,8 +51,8 @@
             android:name=".MainActivityPlaySquare"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_play_square"
-            android:roundIcon="@mipmap/ic_launcher_play_square"
+            android:icon="@mipmap/ic_launcher_film_reel"
+            android:roundIcon="@mipmap/ic_launcher_film_reel"
             android:label="@string/app_name"
             android:targetActivity=".MainActivity">
             <intent-filter>
@@ -65,8 +65,8 @@
             android:name=".MainActivityFilmPlay"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_film_play"
-            android:roundIcon="@mipmap/ic_launcher_film_play"
+            android:icon="@mipmap/ic_launcher_clapper_play"
+            android:roundIcon="@mipmap/ic_launcher_clapper_play"
             android:label="@string/app_name"
             android:targetActivity=".MainActivity">
             <intent-filter>
@@ -79,8 +79,8 @@
             android:name=".MainActivityCameraYellow"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_camera_yellow"
-            android:roundIcon="@mipmap/ic_launcher_camera_yellow"
+            android:icon="@mipmap/ic_launcher_tv_play"
+            android:roundIcon="@mipmap/ic_launcher_tv_play"
             android:label="@string/app_name"
             android:targetActivity=".MainActivity">
             <intent-filter>
@@ -93,8 +93,8 @@
             android:name=".MainActivityFolderPlay"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_folder_play"
-            android:roundIcon="@mipmap/ic_launcher_folder_play"
+            android:icon="@mipmap/ic_launcher_filmstrip"
+            android:roundIcon="@mipmap/ic_launcher_filmstrip"
             android:label="@string/app_name"
             android:targetActivity=".MainActivity">
             <intent-filter>
@@ -107,8 +107,106 @@
             android:name=".MainActivityMonitorPlay"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_monitor_play"
-            android:roundIcon="@mipmap/ic_launcher_monitor_play"
+            android:icon="@mipmap/ic_launcher_clapper_open"
+            android:roundIcon="@mipmap/ic_launcher_clapper_open"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".MainActivityCamDuo"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_cam_duo"
+            android:roundIcon="@mipmap/ic_launcher_cam_duo"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".MainActivityLetterPlay"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_letter_play"
+            android:roundIcon="@mipmap/ic_launcher_letter_play"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".MainActivityClapperGreen"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_clapper_green"
+            android:roundIcon="@mipmap/ic_launcher_clapper_green"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".MainActivityCatCam"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_cat_cam"
+            android:roundIcon="@mipmap/ic_launcher_cat_cam"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".MainActivityCamOutline"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_cam_outline"
+            android:roundIcon="@mipmap/ic_launcher_cam_outline"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".MainActivityCamSimple"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_cam_simple"
+            android:roundIcon="@mipmap/ic_launcher_cam_simple"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".MainActivityCamAccent"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_cam_accent"
+            android:roundIcon="@mipmap/ic_launcher_cam_accent"
             android:label="@string/app_name"
             android:targetActivity=".MainActivity">
             <intent-filter>

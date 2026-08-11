@@ -10,6 +10,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -92,8 +93,10 @@ fun LocalVideoPlayerApp(
     val themeStore = remember { ThemePreferencesStore(context) }
     val themeState by themeStore.themeState.collectAsState(initial = ThemeState())
     val activity = context as? ComponentActivity
+    val isSystemDark = isSystemInDarkTheme()
     SideEffect {
-        val barStyle = if (themeState.mode == ThemeMode.Light) {
+        val isLight = !themeState.mode.resolveDark(isSystemDark)
+        val barStyle = if (isLight) {
             SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT)
         } else {
             SystemBarStyle.dark(AndroidColor.TRANSPARENT)

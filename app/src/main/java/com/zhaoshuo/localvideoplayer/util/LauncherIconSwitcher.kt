@@ -7,21 +7,26 @@ import com.zhaoshuo.localvideoplayer.ui.theme.LauncherIcon
 
 object LauncherIconSwitcher {
 
-    fun apply(context: Context, icon: LauncherIcon) {
-        val packageManager = context.packageManager
-        val packageName = context.packageName
-        LauncherIcon.entries.forEach { candidate ->
-            val component = ComponentName(packageName, "$packageName.${candidate.componentSuffix}")
-            val newState = if (candidate == icon) {
-                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-            } else {
-                PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+    fun apply(context: Context, icon: LauncherIcon): Boolean {
+        return try {
+            val packageManager = context.packageManager
+            val packageName = context.packageName
+            LauncherIcon.entries.forEach { candidate ->
+                val component = ComponentName(packageName, "$packageName.${candidate.componentSuffix}")
+                val newState = if (candidate == icon) {
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                } else {
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                }
+                packageManager.setComponentEnabledSetting(
+                    component,
+                    newState,
+                    PackageManager.DONT_KILL_APP,
+                )
             }
-            packageManager.setComponentEnabledSetting(
-                component,
-                newState,
-                PackageManager.DONT_KILL_APP,
-            )
+            true
+        } catch (_: Exception) {
+            false
         }
     }
 

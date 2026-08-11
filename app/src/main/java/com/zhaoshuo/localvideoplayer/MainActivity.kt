@@ -86,8 +86,12 @@ class MainActivity : ComponentActivity() {
         return PictureInPictureHelper.enterPip(this, aspectRatio, hasNext, isPlaying)
     }
 
-    fun updatePipActions(hasNext: Boolean, isPlaying: Boolean) {
-        PictureInPictureHelper.updatePipActions(this, Rational(16, 9), hasNext, isPlaying)
+    fun updatePipActions(
+        hasNext: Boolean,
+        isPlaying: Boolean,
+        aspectRatio: Rational = Rational(16, 9),
+    ) {
+        PictureInPictureHelper.updatePipActions(this, aspectRatio, hasNext, isPlaying)
     }
 
     fun isPipSupported(): Boolean {

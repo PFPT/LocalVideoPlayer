@@ -1,5 +1,7 @@
 package com.zhaoshuo.localvideoplayer.ui.components
 
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -135,26 +137,27 @@ fun PortraitPlayerLayout(
                         )
                     }
                 }
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .then(
-                            if (showChrome) {
-                                Modifier.background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            Color.Black.copy(alpha = 0.5f),
-                                            Color.Transparent,
-                                            Color.Transparent,
-                                            Color.Black.copy(alpha = 0.6f),
-                                        ),
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showChrome,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.matchParentSize(),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Black.copy(alpha = 0.5f),
+                                        Color.Transparent,
+                                        Color.Transparent,
+                                        Color.Black.copy(alpha = 0.6f),
                                     ),
-                                )
-                            } else {
-                                Modifier
-                            },
-                        ),
-                )
+                                ),
+                            ),
+                    )
+                }
                 SeekPreviewOverlay(
                     visible = isSeeking,
                     previewPositionMs = previewPositionMs,
@@ -176,51 +179,58 @@ fun PortraitPlayerLayout(
                     onSkipIntro = onSkipIntro,
                     onSkipOutro = onSkipOutro,
                 )
-                if (showChrome) {
-                    PlayerTopBar(
-                        title = title,
-                        resolution = resolution,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .statusBarsPadding()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                    )
-                    Box(
-                        modifier = Modifier.align(Alignment.Center),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        PlayerCenterControls(
-                            isPlaying = isPlaying,
-                            hasPrevious = hasPrevious,
-                            hasNext = hasNext,
-                            onPlayPauseClick = onPlayPauseClick,
-                            onPreviousClick = onPreviousClick,
-                            onNextClick = onNextClick,
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showChrome,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.matchParentSize(),
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        PlayerTopBar(
+                            title = title,
+                            resolution = resolution,
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .statusBarsPadding()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                        )
+                        Box(
+                            modifier = Modifier.align(Alignment.Center),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            PlayerCenterControls(
+                                isPlaying = isPlaying,
+                                hasPrevious = hasPrevious,
+                                hasNext = hasNext,
+                                onPlayPauseClick = onPlayPauseClick,
+                                onPreviousClick = onPreviousClick,
+                                onNextClick = onNextClick,
+                            )
+                        }
+                        PlayerProgressBar(
+                            currentPositionMs = currentPositionMs,
+                            bufferedPositionMs = bufferedPositionMs,
+                            durationMs = durationMs,
+                            onSeek = onSeek,
+                            showFullscreen = true,
+                            isFullscreen = false,
+                            onFullscreenClick = onFullscreenClick,
+                            compact = true,
+                            canEditSeriesSkip = canEditSeriesSkip,
+                            introEndMs = introEndMs,
+                            outroStartMs = outroStartMs,
+                            introMarked = introMarked,
+                            outroMarked = outroMarked,
+                            onMarkIntro = onMarkIntro,
+                            onMarkOutro = onMarkOutro,
+                            onClearIntro = onClearIntro,
+                            onClearOutro = onClearOutro,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
                         )
                     }
-                    PlayerProgressBar(
-                        currentPositionMs = currentPositionMs,
-                        bufferedPositionMs = bufferedPositionMs,
-                        durationMs = durationMs,
-                        onSeek = onSeek,
-                        showFullscreen = true,
-                        isFullscreen = false,
-                        onFullscreenClick = onFullscreenClick,
-                        compact = true,
-                        canEditSeriesSkip = canEditSeriesSkip,
-                        introEndMs = introEndMs,
-                        outroStartMs = outroStartMs,
-                        introMarked = introMarked,
-                        outroMarked = outroMarked,
-                        onMarkIntro = onMarkIntro,
-                        onMarkOutro = onMarkOutro,
-                        onClearIntro = onClearIntro,
-                        onClearOutro = onClearOutro,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                    )
                 }
             }
         }

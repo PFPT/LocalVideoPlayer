@@ -1,5 +1,6 @@
 package com.zhaoshuo.localvideoplayer.ui.components
 
+import android.os.Build
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -18,12 +19,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
@@ -31,6 +37,8 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -81,13 +89,18 @@ fun ThemeColorBottomSheet(
     themeMode: ThemeMode,
     initialColors: LumenThemeColors,
     selectedLauncherIcon: LauncherIcon,
+    onThemeModeChange: (ThemeMode) -> Unit,
+    onApplyLauncherIcon: suspend (LauncherIcon) -> Boolean,
     onSave: (LumenThemeColors, LauncherIcon) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val theme = LocalLumenTheme.current
+    val snackbarHostState = remember { SnackbarHostState() }
     val modeDefaults = remember(themeMode) { LumenThemeColors.defaults(themeMode) }
+    val supportsDynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val iconUpdatedMessage = stringResource(R.string.theme_launcher_icon_updated)
 
     var draftColors by remember(initialColors) { mutableStateOf(initialColors) }
     var draftLauncherIcon by remember(selectedLauncherIcon) { mutableStateOf(selectedLauncherIcon) }
@@ -161,154 +174,206 @@ fun ThemeColorBottomSheet(
         onDismissRequest = { dismissSheet(save = false) },
         sheetState = sheetState,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp),
-        ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f, fill = false)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 24.dp),
             ) {
-                ThemePreviewBar(colors = draftColors)
-
-                LauncherIconPicker(
-                    selected = draftLauncherIcon,
-                    onSelected = { draftLauncherIcon = it },
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     Text(
-                        text = stringResource(R.string.theme_color),
+                        text = stringResource(R.string.theme_mode),
                         style = MaterialTheme.typography.titleMedium,
                     )
-                    TextButton(
-                        onClick = { resetAllAndSave() },
-                    ) {
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            selected = themeMode == ThemeMode.System,
+                            onClick = { onThemeModeChange(ThemeMode.System) },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
+                        ) {
+                            Text(stringResource(R.string.theme_mode_system_short))
+                        }
+                        SegmentedButton(
+                            selected = themeMode == ThemeMode.Light,
+                            onClick = { onThemeModeChange(ThemeMode.Light) },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
+                        ) {
+                            Text(stringResource(R.string.theme_mode_light_short))
+                        }
+                        SegmentedButton(
+                            selected = themeMode == ThemeMode.Dark,
+                            onClick = { onThemeModeChange(ThemeMode.Dark) },
+                            shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                        ) {
+                            Text(stringResource(R.string.theme_mode_dark_short))
+                        }
+                    }
+
+                    if (supportsDynamicColor) {
                         Text(
-                            text = stringResource(R.string.theme_reset_all),
-                            color = theme.accent,
+                            text = stringResource(R.string.theme_material_you_enabled),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = theme.onSurfaceMuted,
                         )
                     }
-                }
 
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    SegmentedButton(
-                        selected = selectedTarget == ThemeColorTarget.Background,
-                        onClick = {
-                            selectedTarget = ThemeColorTarget.Background
-                            syncPickerFromDraft(ThemeColorTarget.Background)
+                    ThemePreviewBar(colors = draftColors)
+
+                    LauncherIconPicker(
+                        selected = draftLauncherIcon,
+                        onSelected = { icon ->
+                            draftLauncherIcon = icon
+                            scope.launch {
+                                val applied = onApplyLauncherIcon(icon)
+                                if (applied) {
+                                    snackbarHostState.showSnackbar(iconUpdatedMessage)
+                                }
+                            }
                         },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(stringResource(R.string.theme_background))
+                        Text(
+                            text = stringResource(R.string.theme_color),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        TextButton(
+                            onClick = { resetAllAndSave() },
+                        ) {
+                            Text(
+                                text = stringResource(R.string.theme_reset_all),
+                                color = theme.accent,
+                            )
+                        }
                     }
-                    SegmentedButton(
-                        selected = selectedTarget == ThemeColorTarget.Text,
-                        onClick = {
-                            selectedTarget = ThemeColorTarget.Text
-                            syncPickerFromDraft(ThemeColorTarget.Text)
+
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            selected = selectedTarget == ThemeColorTarget.Background,
+                            onClick = {
+                                selectedTarget = ThemeColorTarget.Background
+                                syncPickerFromDraft(ThemeColorTarget.Background)
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
+                        ) {
+                            Text(stringResource(R.string.theme_background))
+                        }
+                        SegmentedButton(
+                            selected = selectedTarget == ThemeColorTarget.Text,
+                            onClick = {
+                                selectedTarget = ThemeColorTarget.Text
+                                syncPickerFromDraft(ThemeColorTarget.Text)
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
+                        ) {
+                            Text(stringResource(R.string.theme_text))
+                        }
+                        SegmentedButton(
+                            selected = selectedTarget == ThemeColorTarget.ListOption,
+                            onClick = {
+                                selectedTarget = ThemeColorTarget.ListOption
+                                syncPickerFromDraft(ThemeColorTarget.ListOption)
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                        ) {
+                            Text(stringResource(R.string.theme_list_option))
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        TextButton(
+                            onClick = {
+                                val defaultColor = when (selectedTarget) {
+                                    ThemeColorTarget.Background -> modeDefaults.background
+                                    ThemeColorTarget.Text -> modeDefaults.onBackground
+                                    ThemeColorTarget.ListOption -> modeDefaults.surface
+                                }
+                                val hsv = defaultColor.toHsv()
+                                hue = hsv.hue
+                                saturation = hsv.saturation
+                                value = hsv.value
+                                alpha = defaultColor.alpha
+                                applyPickerColorToDraft()
+                            },
+                        ) {
+                            Text(
+                                text = stringResource(R.string.theme_reset_default),
+                                color = theme.accent,
+                            )
+                        }
+                    }
+
+                    CurrentColorRow(color = color)
+
+                    SaturationValuePicker(
+                        hue = hue,
+                        saturation = saturation,
+                        value = value,
+                        onChange = { s, v ->
+                            saturation = s
+                            value = v
+                            applyPickerColorToDraft()
                         },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
-                    ) {
-                        Text(stringResource(R.string.theme_text))
-                    }
-                    SegmentedButton(
-                        selected = selectedTarget == ThemeColorTarget.ListOption,
-                        onClick = {
-                            selectedTarget = ThemeColorTarget.ListOption
-                            syncPickerFromDraft(ThemeColorTarget.ListOption)
+                    )
+
+                    HueSlider(
+                        hue = hue,
+                        onHueChange = {
+                            hue = it
+                            applyPickerColorToDraft()
                         },
-                        shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
-                    ) {
-                        Text(stringResource(R.string.theme_list_option))
-                    }
+                    )
+
+                    AlphaSliderSection(
+                        color = opaqueColor,
+                        alpha = alpha,
+                        onAlphaChange = {
+                            alpha = it
+                            applyPickerColorToDraft()
+                        },
+                    )
                 }
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    TextButton(
-                        onClick = {
-                            val defaultColor = when (selectedTarget) {
-                                ThemeColorTarget.Background -> modeDefaults.background
-                                ThemeColorTarget.Text -> modeDefaults.onBackground
-                                ThemeColorTarget.ListOption -> modeDefaults.surface
-                            }
-                            val hsv = defaultColor.toHsv()
-                            hue = hsv.hue
-                            saturation = hsv.saturation
-                            value = hsv.value
-                            alpha = defaultColor.alpha
-                            applyPickerColorToDraft()
-                        },
+                    OutlinedButton(
+                        onClick = { dismissSheet(save = false) },
+                        modifier = Modifier.weight(1f),
                     ) {
-                        Text(
-                            text = stringResource(R.string.theme_reset_default),
-                            color = theme.accent,
-                        )
+                        Text(stringResource(R.string.cancel))
+                    }
+                    Button(
+                        onClick = { dismissSheet(save = true) },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.theme_save))
                     }
                 }
-
-                CurrentColorRow(color = color)
-
-                SaturationValuePicker(
-                    hue = hue,
-                    saturation = saturation,
-                    value = value,
-                    onChange = { s, v ->
-                        saturation = s
-                        value = v
-                        applyPickerColorToDraft()
-                    },
-                )
-
-                HueSlider(
-                    hue = hue,
-                    onHueChange = {
-                        hue = it
-                        applyPickerColorToDraft()
-                    },
-                )
-
-                AlphaSliderSection(
-                    color = opaqueColor,
-                    alpha = alpha,
-                    onAlphaChange = {
-                        alpha = it
-                        applyPickerColorToDraft()
-                    },
-                )
             }
-
-            Row(
+            SnackbarHost(
+                hostState = snackbarHostState,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                OutlinedButton(
-                    onClick = { dismissSheet(save = false) },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(R.string.cancel))
-                }
-                Button(
-                    onClick = { dismissSheet(save = true) },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(R.string.theme_save))
-                }
-            }
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 8.dp),
+            )
         }
     }
 }
@@ -356,45 +421,60 @@ private fun LauncherIconPicker(
     onSelected: (LauncherIcon) -> Unit,
 ) {
     val theme = LocalLumenTheme.current
-    val rows = remember { LauncherIcon.entries.chunked(3) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
             text = stringResource(R.string.theme_launcher_icon),
             style = MaterialTheme.typography.titleMedium,
         )
-        rows.forEach { rowIcons ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                rowIcons.forEach { icon ->
-                    val isSelected = icon == selected
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(theme.surface)
-                            .border(
-                                width = if (isSelected) 2.dp else 1.dp,
-                                color = if (isSelected) theme.accent else theme.sheetBorder,
-                                shape = RoundedCornerShape(14.dp),
-                            )
-                            .clickable { onSelected(icon) }
-                            .padding(10.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Image(
-                            painter = painterResource(icon.previewRes),
-                            contentDescription = stringResource(icon.labelRes),
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(12.dp)),
-                            contentScale = ContentScale.Crop,
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 2.dp),
+        ) {
+            items(LauncherIcon.entries) { icon ->
+                val isSelected = icon == selected
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(theme.surface)
+                        .border(
+                            width = if (isSelected) 2.dp else 1.dp,
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                theme.sheetBorder
+                            },
+                            shape = RoundedCornerShape(16.dp),
                         )
+                        .clickable { onSelected(icon) }
+                        .padding(10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Image(
+                        painter = painterResource(icon.previewRes),
+                        contentDescription = stringResource(icon.labelRes),
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop,
+                    )
+                    if (isSelected) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(18.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(12.dp),
+                            )
+                        }
                     }
-                }
-                repeat(3 - rowIcons.size) {
-                    Box(modifier = Modifier.weight(1f))
                 }
             }
         }

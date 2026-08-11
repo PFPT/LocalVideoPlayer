@@ -21,6 +21,11 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,10 +58,19 @@ fun PlayerProgressBar(
     onClearIntro: () -> Unit = {},
     onClearOutro: () -> Unit = {},
 ) {
-    val sliderPosition = if (durationMs > 0) {
-        currentPositionMs.toFloat() / durationMs.toFloat()
+    var isScrubbing by remember { mutableStateOf(false) }
+    var scrubFraction by remember { mutableFloatStateOf(0f) }
+
+    val playerFraction = if (durationMs > 0) {
+        (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
     } else {
         0f
+    }
+    val sliderPosition = if (isScrubbing) scrubFraction else playerFraction
+    val displayPositionMs = if (isScrubbing && durationMs > 0) {
+        (scrubFraction * durationMs).toLong().coerceIn(0L, durationMs)
+    } else {
+        currentPositionMs
     }
     val bufferedFraction = if (durationMs > 0) {
         bufferedPositionMs.toFloat() / durationMs.toFloat()
@@ -83,7 +97,7 @@ fun PlayerProgressBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = formatDuration(currentPositionMs),
+                    text = formatDuration(displayPositionMs),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White,
                 )
@@ -100,7 +114,7 @@ fun PlayerProgressBar(
         ) {
             if (compact) {
                 Text(
-                    text = formatDuration(currentPositionMs),
+                    text = formatDuration(displayPositionMs),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White,
                     modifier = Modifier.padding(end = 8.dp),
@@ -167,9 +181,17 @@ fun PlayerProgressBar(
                 Slider(
                     value = sliderPosition,
                     onValueChange = { fraction ->
-                        if (durationMs > 0) {
-                            onSeek((fraction * durationMs).toLong())
+                        if (durationMs <= 0) return@Slider
+                        if (!isScrubbing) {
+                            isScrubbing = true
                         }
+                        scrubFraction = fraction.coerceIn(0f, 1f)
+                    },
+                    onValueChangeFinished = {
+                        if (durationMs > 0 && isScrubbing) {
+                            onSeek((scrubFraction * durationMs).toLong().coerceIn(0L, durationMs))
+                        }
+                        isScrubbing = false
                     },
                     colors = SliderDefaults.colors(
                         thumbColor = Color.White,

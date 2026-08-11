@@ -15,13 +15,28 @@ import com.zhaoshuo.localvideoplayer.pip.PipActionReceiver
 
 object PictureInPictureHelper {
 
+    private val MinAspect = Rational(100, 239)
+    private val MaxAspect = Rational(239, 100)
+    private val FallbackAspect = Rational(16, 9)
+
     fun isSupported(activity: Activity): Boolean {
         return activity.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
     }
 
+    fun aspectRatioForVideo(width: Int, height: Int): Rational {
+        if (width <= 0 || height <= 0) return FallbackAspect
+        val raw = Rational(width, height)
+        val value = raw.toFloat()
+        return when {
+            value < MinAspect.toFloat() -> MinAspect
+            value > MaxAspect.toFloat() -> MaxAspect
+            else -> raw
+        }
+    }
+
     fun buildPipParams(
         context: Context,
-        aspectRatio: Rational = Rational(16, 9),
+        aspectRatio: Rational = FallbackAspect,
         hasNext: Boolean,
         isPlaying: Boolean,
     ): PictureInPictureParams {
@@ -37,7 +52,7 @@ object PictureInPictureHelper {
 
     fun enterPip(
         activity: Activity,
-        aspectRatio: Rational = Rational(16, 9),
+        aspectRatio: Rational = FallbackAspect,
         hasNext: Boolean,
         isPlaying: Boolean,
     ): Boolean {
@@ -49,7 +64,7 @@ object PictureInPictureHelper {
 
     fun updatePipActions(
         activity: Activity,
-        aspectRatio: Rational = Rational(16, 9),
+        aspectRatio: Rational = FallbackAspect,
         hasNext: Boolean,
         isPlaying: Boolean,
     ) {

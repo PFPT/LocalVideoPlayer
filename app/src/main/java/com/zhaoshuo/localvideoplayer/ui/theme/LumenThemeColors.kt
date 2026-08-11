@@ -21,9 +21,9 @@ data class LumenThemeColors(
     fun withSurface(color: Color): LumenThemeColors = copy(surface = color)
 
     companion object {
-        fun defaults(mode: ThemeMode): LumenThemeColors {
-            return when (mode) {
-                ThemeMode.Dark -> LumenThemeColors(
+        fun defaultsForDark(isDark: Boolean): LumenThemeColors {
+            return if (isDark) {
+                LumenThemeColors(
                     background = LumenBackground,
                     onBackground = LumenOnBackground,
                     surface = LumenSurface,
@@ -34,7 +34,8 @@ data class LumenThemeColors(
                     sheetBg = LumenSheetBg,
                     sheetBorder = LumenSheetBorder,
                 )
-                ThemeMode.Light -> LumenThemeColors(
+            } else {
+                LumenThemeColors(
                     background = LumenLightBackground,
                     onBackground = LumenLightOnBackground,
                     surface = LumenLightSurface,
@@ -48,14 +49,18 @@ data class LumenThemeColors(
             }
         }
 
-        fun default(): LumenThemeColors = defaults(ThemeMode.Dark)
+        fun defaults(mode: ThemeMode, isSystemDark: Boolean = true): LumenThemeColors {
+            return defaultsForDark(mode.resolveDark(isSystemDark))
+        }
+
+        fun default(): LumenThemeColors = defaultsForDark(true)
     }
 }
 
 data class ThemeState(
-    val mode: ThemeMode = ThemeMode.Dark,
-    val colors: LumenThemeColors = LumenThemeColors.defaults(ThemeMode.Dark),
+    val mode: ThemeMode = ThemeMode.System,
+    val colors: LumenThemeColors = LumenThemeColors.defaults(ThemeMode.System),
 )
 
 val LocalLumenTheme = staticCompositionLocalOf { LumenThemeColors.default() }
-val LocalThemeMode = staticCompositionLocalOf { ThemeMode.Dark }
+val LocalThemeMode = staticCompositionLocalOf { ThemeMode.System }

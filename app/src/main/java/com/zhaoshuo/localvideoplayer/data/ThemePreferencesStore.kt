@@ -1,6 +1,7 @@
 package com.zhaoshuo.localvideoplayer.data
 
 import android.content.Context
+import android.content.res.Configuration
 import androidx.compose.ui.graphics.Color
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -24,9 +25,18 @@ private val Context.themeDataStore: DataStore<Preferences> by preferencesDataSto
 
 class ThemePreferencesStore(private val context: Context) {
 
+    private fun isSystemDark(): Boolean {
+        val nightMask = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        return nightMask == Configuration.UI_MODE_NIGHT_YES
+    }
+
+    private fun defaultsFor(mode: ThemeMode): LumenThemeColors {
+        return LumenThemeColors.defaults(mode, isSystemDark())
+    }
+
     val themeState: Flow<ThemeState> = context.themeDataStore.data.map { prefs ->
         val mode = ThemeMode.fromStorage(prefs[THEME_MODE_KEY])
-        val defaults = LumenThemeColors.defaults(mode)
+        val defaults = defaultsFor(mode)
         ThemeState(
             mode = mode,
             colors = defaults.copy(
@@ -52,7 +62,7 @@ class ThemePreferencesStore(private val context: Context) {
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {
-        val defaults = LumenThemeColors.defaults(mode)
+        val defaults = defaultsFor(mode)
         context.themeDataStore.edit { prefs ->
             prefs[THEME_MODE_KEY] = mode.name
             prefs[BACKGROUND_COLOR_KEY] = defaults.background.toArgbInt()
@@ -90,7 +100,7 @@ class ThemePreferencesStore(private val context: Context) {
     suspend fun resetAll() {
         context.themeDataStore.edit { prefs ->
             val mode = ThemeMode.fromStorage(prefs[THEME_MODE_KEY])
-            val defaults = LumenThemeColors.defaults(mode)
+            val defaults = defaultsFor(mode)
             prefs[BACKGROUND_COLOR_KEY] = defaults.background.toArgbInt()
             prefs[TEXT_COLOR_KEY] = defaults.onBackground.toArgbInt()
             prefs[LIST_OPTION_COLOR_KEY] = defaults.surface.toArgbInt()

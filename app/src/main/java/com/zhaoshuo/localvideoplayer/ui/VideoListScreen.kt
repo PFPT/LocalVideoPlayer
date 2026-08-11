@@ -46,6 +46,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandLess
@@ -665,17 +666,19 @@ fun VideoListScreen(
             themeMode = themeState.mode,
             initialColors = themeState.colors,
             selectedLauncherIcon = selectedLauncherIcon,
+            onThemeModeChange = { mode ->
+                scope.launch { themeStore.setThemeMode(mode) }
+            },
+            onApplyLauncherIcon = { icon ->
+                themeStore.setLauncherIcon(icon)
+                LauncherIconSwitcher.apply(context, icon)
+            },
             onSave = { colors, icon ->
                 scope.launch {
                     themeStore.saveThemeColors(colors)
+                    themeStore.setLauncherIcon(icon)
                     if (icon != selectedLauncherIcon) {
-                        themeStore.setLauncherIcon(icon)
                         LauncherIconSwitcher.apply(context, icon)
-                        Toast.makeText(
-                            context,
-                            context.getString(R.string.theme_launcher_icon_updated),
-                            Toast.LENGTH_SHORT,
-                        ).show()
                     }
                 }
             },
@@ -769,10 +772,10 @@ fun VideoListScreen(
                             }
                             IconButton(
                                 onClick = {
-                                    val nextMode = if (themeState.mode == ThemeMode.Dark) {
-                                        ThemeMode.Light
-                                    } else {
-                                        ThemeMode.Dark
+                                    val nextMode = when (themeState.mode) {
+                                        ThemeMode.System -> ThemeMode.Light
+                                        ThemeMode.Light -> ThemeMode.Dark
+                                        ThemeMode.Dark -> ThemeMode.System
                                     }
                                     scope.launch {
                                         themeStore.setThemeMode(nextMode)
@@ -780,15 +783,15 @@ fun VideoListScreen(
                                 },
                             ) {
                                 Icon(
-                                    imageVector = if (themeState.mode == ThemeMode.Dark) {
-                                        Icons.Default.LightMode
-                                    } else {
-                                        Icons.Default.DarkMode
+                                    imageVector = when (themeState.mode) {
+                                        ThemeMode.System -> Icons.Default.BrightnessAuto
+                                        ThemeMode.Dark -> Icons.Default.LightMode
+                                        ThemeMode.Light -> Icons.Default.DarkMode
                                     },
-                                    contentDescription = if (themeState.mode == ThemeMode.Dark) {
-                                        stringResource(R.string.theme_mode_light)
-                                    } else {
-                                        stringResource(R.string.theme_mode_dark)
+                                    contentDescription = when (themeState.mode) {
+                                        ThemeMode.System -> stringResource(R.string.theme_mode_system)
+                                        ThemeMode.Dark -> stringResource(R.string.theme_mode_light)
+                                        ThemeMode.Light -> stringResource(R.string.theme_mode_dark)
                                     },
                                     tint = MaterialTheme.colorScheme.onBackground,
                                 )

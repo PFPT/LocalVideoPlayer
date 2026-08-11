@@ -19,15 +19,14 @@ fun LumenModalBottomSheet(
 ) {
     val theme = LocalLumenTheme.current
     val mode = LocalThemeMode.current
-    val containerColor = when (mode) {
-        ThemeMode.Light -> theme.sheetBg
-        ThemeMode.Dark -> theme.background
-    }
+    val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val isLight = !mode.resolveDark(isSystemDark)
+    val containerColor = if (isLight) theme.sheetBg else theme.background
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
         containerColor = containerColor,
-        scrimColor = Color.Black.copy(alpha = if (mode == ThemeMode.Light) 0.4f else 0.6f),
+        scrimColor = Color.Black.copy(alpha = if (isLight) 0.4f else 0.6f),
         content = content,
     )
 }

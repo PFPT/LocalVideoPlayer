@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.media.AudioManager
 import android.net.Uri
+import android.util.Rational
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -38,10 +39,10 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
-import androidx.media3.common.C
 import androidx.media3.exoplayer.ExoPlayer
 import com.zhaoshuo.localvideoplayer.MainActivity
 import com.zhaoshuo.localvideoplayer.R
@@ -52,34 +53,36 @@ import com.zhaoshuo.localvideoplayer.data.PlayerPreferencesStore
 import com.zhaoshuo.localvideoplayer.data.SeriesSkipSettings
 import com.zhaoshuo.localvideoplayer.data.SeriesSkipStore
 import com.zhaoshuo.localvideoplayer.model.VideoItem
-import com.zhaoshuo.localvideoplayer.player.applyTrackSelection
-import com.zhaoshuo.localvideoplayer.player.buildExoPlayer
 import com.zhaoshuo.localvideoplayer.player.PlayerProgressState
 import com.zhaoshuo.localvideoplayer.player.PlayerSession
 import com.zhaoshuo.localvideoplayer.player.PlaylistState
+import com.zhaoshuo.localvideoplayer.player.applyTrackSelection
+import com.zhaoshuo.localvideoplayer.player.buildExoPlayer
 import com.zhaoshuo.localvideoplayer.player.rememberPlayerProgressState
 import com.zhaoshuo.localvideoplayer.player.toMediaItemWithSubtitle
 import com.zhaoshuo.localvideoplayer.player.trackOptions
 import com.zhaoshuo.localvideoplayer.ui.components.BrightnessFeedbackOverlay
-import com.zhaoshuo.localvideoplayer.ui.components.VolumeFeedbackOverlay
-import com.zhaoshuo.localvideoplayer.ui.components.SpeedBoostOverlay
 import com.zhaoshuo.localvideoplayer.ui.components.EpisodeListBottomSheet
 import com.zhaoshuo.localvideoplayer.ui.components.FittedPlayerSurface
 import com.zhaoshuo.localvideoplayer.ui.components.LandscapePlayerLayout
-import com.zhaoshuo.localvideoplayer.ui.components.PortraitPlayerLayout
 import com.zhaoshuo.localvideoplayer.ui.components.PlayerMoreSheet
+import com.zhaoshuo.localvideoplayer.ui.components.PortraitPlayerLayout
+import com.zhaoshuo.localvideoplayer.ui.components.SeekPreviewOverlay
 import com.zhaoshuo.localvideoplayer.ui.components.SkipIntroOutroOverlay
+import com.zhaoshuo.localvideoplayer.ui.components.SpeedBoostOverlay
+import com.zhaoshuo.localvideoplayer.ui.components.SpeedSelectorSheet
 import com.zhaoshuo.localvideoplayer.ui.components.TrackSelectorSheet
 import com.zhaoshuo.localvideoplayer.ui.components.VideoInfoDialog
-import com.zhaoshuo.localvideoplayer.ui.components.displayVideoSize
-import com.zhaoshuo.localvideoplayer.ui.components.SeekPreviewOverlay
-import com.zhaoshuo.localvideoplayer.ui.components.SpeedSelectorSheet
 import com.zhaoshuo.localvideoplayer.ui.components.VideoPlayerGesture
+import com.zhaoshuo.localvideoplayer.ui.components.VolumeFeedbackOverlay
+import com.zhaoshuo.localvideoplayer.ui.components.displayVideoSize
+import com.zhaoshuo.localvideoplayer.util.CastHelper
 import com.zhaoshuo.localvideoplayer.util.OrientationController
 import com.zhaoshuo.localvideoplayer.util.PlaybackSystemControls
-import com.zhaoshuo.localvideoplayer.util.CastHelper
+import com.zhaoshuo.localvideoplayer.util.PictureInPictureHelper
 import com.zhaoshuo.localvideoplayer.util.TitleParser
 import com.zhaoshuo.localvideoplayer.util.toMediaItem
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -147,6 +150,8 @@ fun PlayerScreen(
     var isAdjustingVolume by remember { mutableStateOf(false) }
     var brightnessFraction by remember { mutableFloatStateOf(0.5f) }
     var volumeFraction by remember { mutableFloatStateOf(0.5f) }
+    var brightnessHideJob by remember { mutableStateOf<Job?>(null) }
+    var volumeHideJob by remember { mutableStateOf<Job?>(null) }
     val pipSupported = remember(activity) { activity?.isPipSupported() == true }
 
     val exoPlayer = remember(playlist, preferences.softDecode) {
@@ -227,6 +232,8 @@ fun PlayerScreen(
 
     fun handleBrightnessGestureStart() {
         val controls = systemControls ?: return
+        brightnessHideJob?.cancel()
+        brightnessHideJob = null
         brightnessFraction = controls.currentBrightness()
         isAdjustingBrightness = true
         resetControlsTimer()
@@ -239,11 +246,18 @@ fun PlayerScreen(
     }
 
     fun handleBrightnessGestureEnd() {
-        isAdjustingBrightness = false
+        brightnessHideJob?.cancel()
+        brightnessHideJob = scope.launch {
+            delay(1_500)
+            isAdjustingBrightness = false
+            brightnessHideJob = null
+        }
     }
 
     fun handleVolumeGestureStart() {
         val controls = systemControls ?: return
+        volumeHideJob?.cancel()
+        volumeHideJob = null
         volumeFraction = controls.currentVolumeFraction()
         isAdjustingVolume = true
         resetControlsTimer()
@@ -256,7 +270,12 @@ fun PlayerScreen(
     }
 
     fun handleVolumeGestureEnd() {
-        isAdjustingVolume = false
+        volumeHideJob?.cancel()
+        volumeHideJob = scope.launch {
+            delay(1_500)
+            isAdjustingVolume = false
+            volumeHideJob = null
+        }
     }
 
     fun resetZoom() {
@@ -292,10 +311,16 @@ fun PlayerScreen(
         }
     }
 
+    fun restoreSystemBars() {
+        val window = (context as? Activity)?.window ?: return
+        val controller = WindowCompat.getInsetsController(window, view)
+        controller.show(WindowInsetsCompat.Type.systemBars())
+    }
+
     fun updateFullscreenSystemBars() {
         val window = (context as? Activity)?.window ?: return
         val controller = WindowCompat.getInsetsController(window, view)
-        if (!isFullscreen) {
+        if (!isFullscreen || isInPipMode) {
             controller.show(WindowInsetsCompat.Type.systemBars())
             return
         }
@@ -303,6 +328,9 @@ fun PlayerScreen(
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         controller.hide(WindowInsetsCompat.Type.systemBars())
     }
+
+    fun currentPipAspectRatio(): Rational =
+        PictureInPictureHelper.aspectRatioForVideo(videoWidth, videoHeight)
 
     fun toggleControlsVisibility() {
         controlsVisible = !controlsVisible
@@ -320,12 +348,10 @@ fun PlayerScreen(
             orientationController?.lockPortrait()
             forcedLandscapeForFullscreen = false
         }
-        val window = (context as? Activity)?.window ?: return
-        val controller = WindowCompat.getInsetsController(window, view)
         if (enabled) {
             updateFullscreenSystemBars()
         } else {
-            controller.show(WindowInsetsCompat.Type.systemBars())
+            restoreSystemBars()
         }
     }
 
@@ -368,6 +394,7 @@ fun PlayerScreen(
             activity?.enterPipMode(
                 hasNext = currentIndex < playlist.lastIndex,
                 isPlaying = exoPlayer.isPlaying,
+                aspectRatio = currentPipAspectRatio(),
             )
         } else {
             Toast.makeText(
@@ -425,8 +452,12 @@ fun PlayerScreen(
     DisposableEffect(activity) {
         val pipListener: (Boolean) -> Unit = { inPip ->
             isInPipMode = inPip
-            if (!inPip) {
+            if (inPip) {
+                controlsVisible = false
+            } else {
                 resetZoom()
+                controlsVisible = true
+                updateFullscreenSystemBars()
             }
         }
         val pipActionListener: () -> Unit = {
@@ -434,6 +465,13 @@ fun PlayerScreen(
             currentIndex = exoPlayer.currentMediaItemIndex
             isPlaying = exoPlayer.isPlaying
             updateVideoFormat()
+            if (activity?.isInPipMode == true) {
+                activity.updatePipActions(
+                    hasNext = exoPlayer.currentMediaItemIndex < playlist.lastIndex,
+                    isPlaying = exoPlayer.isPlaying,
+                    aspectRatio = currentPipAspectRatio(),
+                )
+            }
         }
         activity?.onPipModeChanged = pipListener
         activity?.onPipAction = pipActionListener
@@ -522,11 +560,14 @@ fun PlayerScreen(
         lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
 
         onDispose {
+            brightnessHideJob?.cancel()
+            volumeHideJob?.cancel()
             PlayerSession.onStateChanged = null
             PlayerSession.detach(exoPlayer)
             exoPlayer.removeListener(listener)
             lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
-            setFullscreen(false)
+            isFullscreen = false
+            restoreSystemBars()
             resetSpeedBoost()
             orientationController?.lockPortrait()
             scope.launch {
@@ -626,11 +667,13 @@ fun PlayerScreen(
         null
     }
     val useLandscapeLayout = isLandscape || isFullscreen
-    val showSkipIntro = effectiveIntroSeconds > 0 &&
-        displayPositionMs in 0..effectiveIntroSeconds * 1_000L
-    val showSkipOutro = effectiveOutroSeconds > 0 &&
+    val showSkipIntro = introEndMs > 0L &&
+        !isSeeking &&
+        displayPositionMs in 0L..introEndMs
+    val showSkipOutro = outroStartMs >= 0L &&
+        !isSeeking &&
         progress.durationMs > 0 &&
-        displayPositionMs >= progress.durationMs - effectiveOutroSeconds * 1_000L
+        displayPositionMs >= outroStartMs
 
     LaunchedEffect(controlsVisible, isPlaying, isSeeking, useLandscapeLayout, controlsLocked, isAdjustingBrightness, isAdjustingVolume, isFullscreen) {
         if (controlsVisible && !isSeeking && !isAdjustingBrightness && !isAdjustingVolume && (controlsLocked || isPlaying)) {
@@ -639,13 +682,17 @@ fun PlayerScreen(
         }
     }
 
-    LaunchedEffect(isFullscreen) {
+    LaunchedEffect(isFullscreen, isInPipMode) {
         updateFullscreenSystemBars()
     }
 
-    LaunchedEffect(isInPipMode, isPlaying, hasNext, currentIndex) {
+    LaunchedEffect(isInPipMode, isPlaying, hasNext, currentIndex, videoWidth, videoHeight) {
         if (isInPipMode) {
-            activity?.updatePipActions(hasNext, isPlaying)
+            activity?.updatePipActions(
+                hasNext = hasNext,
+                isPlaying = isPlaying,
+                aspectRatio = currentPipAspectRatio(),
+            )
         }
     }
 

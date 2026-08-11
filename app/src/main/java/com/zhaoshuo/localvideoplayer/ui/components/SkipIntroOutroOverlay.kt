@@ -29,7 +29,7 @@ fun SkipIntroOutroOverlay(
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         AnimatedVisibility(
-            visible = showSkipIntro,
+            visible = showSkipIntro && !showSkipOutro,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
