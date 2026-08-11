@@ -26,6 +26,6 @@ class CastOptionsProvider : OptionsProvider {
     override fun getAdditionalSessionProviders(context: Context): List<SessionProvider>? = null
 
     companion object {
-        private const val DEFAULT_RECEIVER_APP_ID = "CC1AD845"
+        const val DEFAULT_RECEIVER_APP_ID = "CC1AD845"
     }
 }

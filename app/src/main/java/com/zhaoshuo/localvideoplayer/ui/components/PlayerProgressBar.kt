@@ -57,6 +57,8 @@ fun PlayerProgressBar(
     onMarkOutro: () -> Unit = {},
     onClearIntro: () -> Unit = {},
     onClearOutro: () -> Unit = {},
+    onScrubStart: () -> Unit = {},
+    onScrubEnd: () -> Unit = {},
 ) {
     var isScrubbing by remember { mutableStateOf(false) }
     var scrubFraction by remember { mutableFloatStateOf(0f) }
@@ -184,6 +186,7 @@ fun PlayerProgressBar(
                         if (durationMs <= 0) return@Slider
                         if (!isScrubbing) {
                             isScrubbing = true
+                            onScrubStart()
                         }
                         scrubFraction = fraction.coerceIn(0f, 1f)
                     },
@@ -191,7 +194,10 @@ fun PlayerProgressBar(
                         if (durationMs > 0 && isScrubbing) {
                             onSeek((scrubFraction * durationMs).toLong().coerceIn(0L, durationMs))
                         }
-                        isScrubbing = false
+                        if (isScrubbing) {
+                            isScrubbing = false
+                            onScrubEnd()
+                        }
                     },
                     colors = SliderDefaults.colors(
                         thumbColor = Color.White,

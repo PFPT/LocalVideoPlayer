@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -53,6 +54,7 @@ import com.zhaoshuo.localvideoplayer.data.PlayerPreferencesStore
 import com.zhaoshuo.localvideoplayer.data.SeriesSkipSettings
 import com.zhaoshuo.localvideoplayer.data.SeriesSkipStore
 import com.zhaoshuo.localvideoplayer.model.VideoItem
+import com.zhaoshuo.localvideoplayer.player.PlayerViewModel
 import com.zhaoshuo.localvideoplayer.player.PlayerProgressState
 import com.zhaoshuo.localvideoplayer.player.PlayerSession
 import com.zhaoshuo.localvideoplayer.player.PlaylistState
@@ -61,6 +63,9 @@ import com.zhaoshuo.localvideoplayer.player.buildExoPlayer
 import com.zhaoshuo.localvideoplayer.player.rememberPlayerProgressState
 import com.zhaoshuo.localvideoplayer.player.toMediaItemWithSubtitle
 import com.zhaoshuo.localvideoplayer.player.trackOptions
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.zhaoshuo.localvideoplayer.ui.components.BrightnessFeedbackOverlay
 import com.zhaoshuo.localvideoplayer.ui.components.EpisodeListBottomSheet
 import com.zhaoshuo.localvideoplayer.ui.components.FittedPlayerSurface
@@ -76,15 +81,27 @@ import com.zhaoshuo.localvideoplayer.ui.components.VideoInfoDialog
 import com.zhaoshuo.localvideoplayer.ui.components.VideoPlayerGesture
 import com.zhaoshuo.localvideoplayer.ui.components.VolumeFeedbackOverlay
 import com.zhaoshuo.localvideoplayer.ui.components.displayVideoSize
-import com.zhaoshuo.localvideoplayer.util.CastHelper
 import com.zhaoshuo.localvideoplayer.util.OrientationController
 import com.zhaoshuo.localvideoplayer.util.PlaybackSystemControls
 import com.zhaoshuo.localvideoplayer.util.PictureInPictureHelper
 import com.zhaoshuo.localvideoplayer.util.TitleParser
 import com.zhaoshuo.localvideoplayer.util.toMediaItem
+import com.zhaoshuo.localvideoplayer.cast.CastUiState
+import com.zhaoshuo.localvideoplayer.cast.LocalCastManager
+import com.zhaoshuo.localvideoplayer.ui.components.CastButton
+import com.zhaoshuo.localvideoplayer.ui.components.CastDeviceBottomSheet
+import com.zhaoshuo.localvideoplayer.ui.components.CastMiniController
+import com.zhaoshuo.localvideoplayer.ui.components.rememberCastSheetActions
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 private const val SPEED_BOOST = 2.0f
 private const val PROGRESS_SAVE_INTERVAL_MS = 5_000L
@@ -101,6 +118,14 @@ fun PlayerScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val playerViewModel: PlayerViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return PlayerViewModel(playbackStore) as T
+            }
+        },
+    )
     val activity = context as? MainActivity
     val view = LocalView.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -154,7 +179,10 @@ fun PlayerScreen(
     var volumeHideJob by remember { mutableStateOf<Job?>(null) }
     val pipSupported = remember(activity) { activity?.isPipSupported() == true }
 
-    val exoPlayer = remember(playlist, preferences.softDecode) {
+    var softDecodeGeneration by remember { mutableIntStateOf(0) }
+    var appliedSoftDecode by remember { mutableStateOf(preferences.softDecode) }
+    val exoPlayer = remember(playlist, softDecodeGeneration) {
+        appliedSoftDecode = preferences.softDecode
         buildExoPlayer(
             context = context,
             playlist = playlist,
@@ -163,6 +191,7 @@ fun PlayerScreen(
             subtitleUri = subtitleUri,
         )
     }
+    val progressSaveScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
     val subtitlePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent(),
     ) { uri ->
@@ -179,7 +208,30 @@ fun PlayerScreen(
         }
     }
     val progress = rememberPlayerProgressState(exoPlayer, isSeeking)
-    val displayPositionMs = if (isSeeking) previewPositionMs else progress.currentPositionMs
+    val castManager = LocalCastManager.current
+    val idleCastState = remember { MutableStateFlow<CastUiState>(CastUiState.Idle) }
+    val idleFalse = remember { MutableStateFlow(false) }
+    val idleZero = remember { MutableStateFlow(0L) }
+    val castState by (castManager?.uiState ?: idleCastState).collectAsState()
+    val isCasting by (castManager?.playback?.isCasting ?: idleFalse).collectAsState()
+    val castPositionMs by (castManager?.playback?.positionMs ?: idleZero).collectAsState()
+    val castDurationMs by (castManager?.playback?.durationMs ?: idleZero).collectAsState()
+    val castPlaying by (castManager?.playback?.isPlaying ?: idleFalse).collectAsState()
+    val castSheet = rememberCastSheetActions(castManager, exoPlayer)
+    LaunchedEffect(exoPlayer, castManager) {
+        castManager?.bindLocalPlayer(exoPlayer)
+    }
+    val displayPositionMs = when {
+        isSeeking -> previewPositionMs
+        isCasting -> castPositionMs
+        else -> progress.currentPositionMs
+    }
+    val displayDurationMs = if (isCasting && castDurationMs > 0) castDurationMs else progress.durationMs
+    LaunchedEffect(displayDurationMs, isCasting) {
+        if (isCasting && displayDurationMs > 0) {
+            progress.durationMs = displayDurationMs
+        }
+    }
 
     fun resetSpeedBoost() {
         if (isSpeedBoosted) {
@@ -192,9 +244,8 @@ fun PlayerScreen(
         val video = playlist.getOrNull(currentIndex) ?: return
         val duration = exoPlayer.duration.takeIf { it > 0 } ?: video.durationMs
         if (duration <= 0) return
-        playbackStore.saveProgress(
-            uri = video.uri,
-            title = video.title,
+        playerViewModel.saveProgress(
+            video = video,
             positionMs = exoPlayer.currentPosition.coerceAtLeast(0L),
             durationMs = duration,
         )
@@ -570,11 +621,14 @@ fun PlayerScreen(
             restoreSystemBars()
             resetSpeedBoost()
             orientationController?.lockPortrait()
-            scope.launch {
+            progressSaveScope.launch(NonCancellable) {
                 saveCurrentProgress()
             }
             exoPlayer.release()
         }
+    }
+    DisposableEffect(Unit) {
+        onDispose { progressSaveScope.cancel() }
     }
 
     LaunchedEffect(playbackSpeed) {
@@ -739,7 +793,11 @@ fun PlayerScreen(
             onPickSubtitleFile = { subtitlePicker.launch("*/*") },
             onSoftDecodeToggle = {
                 scope.launch {
-                    playerPreferencesStore.setSoftDecode(!preferences.softDecode)
+                    val next = !preferences.softDecode
+                    playerPreferencesStore.setSoftDecode(next)
+                    if (next != appliedSoftDecode) {
+                        softDecodeGeneration += 1
+                    }
                 }
             },
             onFavoriteToggle = {
@@ -749,7 +807,8 @@ fun PlayerScreen(
             },
             onInfo = { showInfoDialog = true },
             onCast = {
-                currentVideo?.let { CastHelper.startCast(context, it.title, it.uri, exoPlayer) }
+                showMoreSheet = false
+                castSheet.open()
             },
             onSkipIntroSecondsChange = { seconds ->
                 scope.launch { playerPreferencesStore.setSkipIntroSeconds(seconds) }
@@ -758,6 +817,24 @@ fun PlayerScreen(
                 scope.launch { playerPreferencesStore.setSkipOutroSeconds(seconds) }
             },
             onDismiss = { showMoreSheet = false },
+        )
+    }
+
+    if (castSheet.showSheet && castManager != null) {
+        CastDeviceBottomSheet(
+            state = castState,
+            onDeviceClick = { device ->
+                val video = currentVideo ?: return@CastDeviceBottomSheet
+                castManager.connectAndPlay(
+                    device = device,
+                    title = video.title,
+                    contentUri = video.uri,
+                    startPositionMs = exoPlayer.currentPosition,
+                    mimeType = context.contentResolver.getType(video.uri),
+                )
+                castSheet.dismiss(CastUiState.Connecting(device))
+            },
+            onDismiss = { castSheet.dismiss(castState) },
         )
     }
 
@@ -816,9 +893,9 @@ fun PlayerScreen(
                     isSpeedBoosted = isSpeedBoosted,
                     hasPrevious = hasPrevious,
                     hasNext = hasNext,
-                    showSkipIntro = showSkipIntro,
-                    showSkipOutro = showSkipOutro,
-                    canEditSeriesSkip = canEditSeriesSkip,
+                    showSkipIntro = showSkipIntro && !isCasting,
+                    showSkipOutro = showSkipOutro && !isCasting,
+                    canEditSeriesSkip = canEditSeriesSkip && !isCasting,
                     introEndMs = introEndMs,
                     outroStartMs = outroStartMs,
                     introMarked = seriesSkip.introSeconds != null,
@@ -867,7 +944,13 @@ fun PlayerScreen(
                     onBack = ::handleBack,
                     onPlayPauseClick = {
                         resetControlsTimer()
-                        if (exoPlayer.isPlaying) {
+                        if (isCasting) {
+                            if (castManager?.playback?.isPlaying?.value == true) {
+                                castManager.playback.pause()
+                            } else {
+                                castManager?.playback?.play()
+                            }
+                        } else if (exoPlayer.isPlaying) {
                             exoPlayer.pause()
                         } else {
                             exoPlayer.play()
@@ -875,20 +958,30 @@ fun PlayerScreen(
                     },
                     onPreviousClick = {
                         resetControlsTimer()
-                        if (hasPrevious) {
+                        if (!isCasting && hasPrevious) {
                             exoPlayer.seekToPreviousMediaItem()
                         }
                     },
                     onNextClick = {
                         resetControlsTimer()
-                        if (hasNext) {
+                        if (!isCasting && hasNext) {
                             exoPlayer.seekToNextMediaItem()
                         }
                     },
                     onSeek = { position ->
                         resetControlsTimer()
-                        exoPlayer.seekTo(position)
+                        if (isCasting) {
+                            castManager?.playback?.seekTo(position)
+                        } else {
+                            exoPlayer.seekTo(position)
+                        }
                         progress.currentPositionMs = position
+                    },
+                    onScrubStart = {
+                        if (isCasting) castManager?.playback?.beginScrub()
+                    },
+                    onScrubEnd = {
+                        if (isCasting) castManager?.playback?.endScrub()
                     },
                     onLockToggle = ::handleLockToggle,
                     onRotateClick = ::handleRotateClick,
@@ -909,11 +1002,13 @@ fun PlayerScreen(
                         showMoreSheet = true
                     },
                     onSkipIntro = {
+                        if (isCasting) return@LandscapePlayerContent
                         val position = effectiveIntroSeconds * 1_000L
                         exoPlayer.seekTo(position)
                         progress.currentPositionMs = position
                     },
                     onSkipOutro = {
+                        if (isCasting) return@LandscapePlayerContent
                         if (hasNext) {
                             exoPlayer.seekToNextMediaItem()
                         } else {
@@ -943,9 +1038,9 @@ fun PlayerScreen(
                         isPlaying = isPlaying,
                         hasPrevious = hasPrevious,
                         hasNext = hasNext,
-                        showSkipIntro = showSkipIntro,
-                        showSkipOutro = showSkipOutro,
-                        canEditSeriesSkip = canEditSeriesSkip,
+                        showSkipIntro = showSkipIntro && !isCasting,
+                        showSkipOutro = showSkipOutro && !isCasting,
+                        canEditSeriesSkip = canEditSeriesSkip && !isCasting,
                         introEndMs = introEndMs,
                         outroStartMs = outroStartMs,
                         introMarked = seriesSkip.introSeconds != null,
@@ -985,7 +1080,13 @@ fun PlayerScreen(
                         onVideoTap = ::toggleControlsVisibility,
                         onPlayPauseClick = {
                             resetControlsTimer()
-                            if (exoPlayer.isPlaying) {
+                            if (isCasting) {
+                                if (castManager?.playback?.isPlaying?.value == true) {
+                                    castManager.playback.pause()
+                                } else {
+                                    castManager?.playback?.play()
+                                }
+                            } else if (exoPlayer.isPlaying) {
                                 exoPlayer.pause()
                             } else {
                                 exoPlayer.play()
@@ -993,19 +1094,29 @@ fun PlayerScreen(
                         },
                         onPreviousClick = {
                             resetControlsTimer()
-                            if (hasPrevious) {
+                            if (!isCasting && hasPrevious) {
                                 exoPlayer.seekToPreviousMediaItem()
                             }
                         },
                         onNextClick = {
                             resetControlsTimer()
-                            if (hasNext) {
+                            if (!isCasting && hasNext) {
                                 exoPlayer.seekToNextMediaItem()
                             }
                         },
                         onSeek = { position ->
-                            exoPlayer.seekTo(position)
+                            if (isCasting) {
+                                castManager?.playback?.seekTo(position)
+                            } else {
+                                exoPlayer.seekTo(position)
+                            }
                             progress.currentPositionMs = position
+                        },
+                        onScrubStart = {
+                            if (isCasting) castManager?.playback?.beginScrub()
+                        },
+                        onScrubEnd = {
+                            if (isCasting) castManager?.playback?.endScrub()
                         },
                         playbackSpeed = playbackSpeed,
                         repeatOne = repeatOne,
@@ -1014,11 +1125,13 @@ fun PlayerScreen(
                         onLoopClick = { repeatOne = !repeatOne },
                         onMoreClick = { showMoreSheet = true },
                         onSkipIntro = {
+                            if (isCasting) return@PortraitPlayerContent
                             val position = effectiveIntroSeconds * 1_000L
                             exoPlayer.seekTo(position)
                             progress.currentPositionMs = position
                         },
                         onSkipOutro = {
+                            if (isCasting) return@PortraitPlayerContent
                             if (hasNext) {
                                 exoPlayer.seekToNextMediaItem()
                             } else {
@@ -1030,6 +1143,32 @@ fun PlayerScreen(
                     )
                 }
             }
+        }
+
+        if (castManager != null && controlsVisible && !isInPipMode) {
+            CastButton(
+                state = castState,
+                onClick = { castSheet.open() },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding(),
+            )
+        }
+
+        val connected = castState as? CastUiState.Connected
+        if (connected != null && !isInPipMode) {
+            CastMiniController(
+                visible = true,
+                title = connected.title,
+                isPlaying = castPlaying,
+                onPlayPause = {
+                    if (castPlaying) castManager?.playback?.pause() else castManager?.playback?.play()
+                },
+                onDisconnect = { castManager?.disconnect() },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding(),
+            )
         }
     }
 }
@@ -1094,6 +1233,8 @@ private fun LandscapePlayerContent(
     onPreviousClick: () -> Unit,
     onNextClick: () -> Unit,
     onSeek: (Long) -> Unit,
+    onScrubStart: () -> Unit = {},
+    onScrubEnd: () -> Unit = {},
     onLockToggle: () -> Unit,
     onRotateClick: () -> Unit,
     onSpeedClick: () -> Unit,
@@ -1219,6 +1360,8 @@ private fun LandscapePlayerContent(
         onPreviousClick = onPreviousClick,
         onNextClick = onNextClick,
         onSeek = onSeek,
+        onScrubStart = onScrubStart,
+        onScrubEnd = onScrubEnd,
         onLockToggle = onLockToggle,
         onRotateClick = onRotateClick,
         onPipClick = onPipClick,
@@ -1285,6 +1428,8 @@ private fun PortraitPlayerContent(
     onPreviousClick: () -> Unit,
     onNextClick: () -> Unit,
     onSeek: (Long) -> Unit,
+    onScrubStart: () -> Unit = {},
+    onScrubEnd: () -> Unit = {},
     playbackSpeed: Float,
     repeatOne: Boolean,
     onEpisodeSelected: (Int) -> Unit,
@@ -1338,6 +1483,8 @@ private fun PortraitPlayerContent(
         onPreviousClick = onPreviousClick,
         onNextClick = onNextClick,
         onSeek = onSeek,
+        onScrubStart = onScrubStart,
+        onScrubEnd = onScrubEnd,
         playbackSpeed = playbackSpeed,
         repeatOne = repeatOne,
         onEpisodeSelected = onEpisodeSelected,

@@ -15,6 +15,21 @@ import com.zhaoshuo.localvideoplayer.util.isM3u8Title
 class VideoRepository(private val context: Context) {
 
     fun loadVideos(): List<VideoItem> {
+        return queryVideos(selection = null, selectionArgs = null)
+    }
+
+    fun loadVideosAddedAfter(minDateAdded: Long, minId: Long): List<VideoItem> {
+        val selection = "(${MediaStore.Video.Media.DATE_ADDED} > ?) OR " +
+            "(${MediaStore.Video.Media.DATE_ADDED} = ? AND ${MediaStore.Video.Media._ID} > ?)"
+        val selectionArgs = arrayOf(
+            minDateAdded.toString(),
+            minDateAdded.toString(),
+            minId.toString(),
+        )
+        return queryVideos(selection, selectionArgs)
+    }
+
+    private fun queryVideos(selection: String?, selectionArgs: Array<String>?): List<VideoItem> {
         val videos = mutableListOf<VideoItem>()
         val seenUris = mutableSetOf<String>()
         val projection = buildList {
@@ -31,9 +46,9 @@ class VideoRepository(private val context: Context) {
         context.contentResolver.query(
             MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
             projection,
-            null,
-            null,
-            null,
+            selection,
+            selectionArgs,
+            "${MediaStore.Video.Media.DATE_ADDED} ASC, ${MediaStore.Video.Media._ID} ASC",
         )?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)

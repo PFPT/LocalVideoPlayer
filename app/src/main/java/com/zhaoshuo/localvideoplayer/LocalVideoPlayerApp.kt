@@ -13,6 +13,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -20,7 +22,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -31,13 +32,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.data.HiddenVideosStore
-import com.zhaoshuo.localvideoplayer.data.PinnedItemsStore
-import com.zhaoshuo.localvideoplayer.data.PlayCountStore
-import com.zhaoshuo.localvideoplayer.data.LibraryCacheStore
+import com.zhaoshuo.localvideoplayer.cast.CastManager
+import com.zhaoshuo.localvideoplayer.cast.LocalCastManager
+import com.zhaoshuo.localvideoplayer.data.LibraryViewModel
 import com.zhaoshuo.localvideoplayer.data.PlaybackStore
 import com.zhaoshuo.localvideoplayer.data.PlayerPreferencesStore
+import com.zhaoshuo.localvideoplayer.data.PinnedItemsStore
+import com.zhaoshuo.localvideoplayer.data.PlayCountStore
+import com.zhaoshuo.localvideoplayer.data.HiddenVideosStore
 import com.zhaoshuo.localvideoplayer.data.SeriesSkipStore
 import com.zhaoshuo.localvideoplayer.data.ThemePreferencesStore
 import com.zhaoshuo.localvideoplayer.data.VideoRepository
@@ -46,26 +48,17 @@ import com.zhaoshuo.localvideoplayer.download.DownloadTask
 import com.zhaoshuo.localvideoplayer.model.PlaybackRecord
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
-import com.zhaoshuo.localvideoplayer.model.withoutUris
 import com.zhaoshuo.localvideoplayer.player.PlaylistState
 import com.zhaoshuo.localvideoplayer.ui.PlayerScreen
 import com.zhaoshuo.localvideoplayer.ui.DownloadManagerScreen
 import com.zhaoshuo.localvideoplayer.ui.SeriesDetailScreen
 import com.zhaoshuo.localvideoplayer.ui.VideoListScreen
 import com.zhaoshuo.localvideoplayer.ui.theme.LocalVideoPlayerTheme
-import com.zhaoshuo.localvideoplayer.ui.theme.ThemeMode
 import com.zhaoshuo.localvideoplayer.ui.theme.ThemeState
 import com.zhaoshuo.localvideoplayer.util.LauncherIconSwitcher
 import com.zhaoshuo.localvideoplayer.util.Permissions
-import com.zhaoshuo.localvideoplayer.util.SeriesGrouper
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 private const val ROUTE_VIDEO_LIST = "video_list"
 private const val ROUTE_SERIES = "series/{seriesId}"
@@ -79,7 +72,6 @@ fun LocalVideoPlayerApp(
     downloadsNavigationTick: Int = 0,
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val navController = rememberNavController()
     val repository = remember { VideoRepository(context) }
     val downloadManager = remember { DownloadManager.get(context) }
@@ -89,9 +81,22 @@ fun LocalVideoPlayerApp(
     val hiddenVideosStore = remember { HiddenVideosStore(context) }
     val pinnedItemsStore = remember { PinnedItemsStore(context) }
     val playCountStore = remember { PlayCountStore(context) }
-    val libraryCacheStore = remember { LibraryCacheStore(context) }
     val themeStore = remember { ThemePreferencesStore(context) }
+    val libraryViewModel = remember { LibraryViewModel(context) }
+    val castManager = remember { CastManager(context, playbackStore) }
     val themeState by themeStore.themeState.collectAsState(initial = ThemeState())
+    val libraryEntries by libraryViewModel.libraryEntries.collectAsState()
+    val isLibraryLoading by libraryViewModel.isLibraryLoading.collectAsState()
+    val isRefreshing by libraryViewModel.isRefreshing.collectAsState()
+
+    DisposableEffect(castManager) {
+        onDispose { castManager.release() }
+    }
+    DisposableEffect(libraryViewModel) {
+        libraryViewModel.startObserving()
+        onDispose { libraryViewModel.stopObserving() }
+    }
+
     val activity = context as? ComponentActivity
     val isSystemDark = isSystemInDarkTheme()
     SideEffect {
@@ -108,9 +113,6 @@ fun LocalVideoPlayerApp(
     }
 
     var playlistState by remember { mutableStateOf<PlaylistState?>(null) }
-    var libraryEntries by remember { mutableStateOf<List<VideoLibraryEntry>>(emptyList()) }
-    var isLibraryLoading by remember { mutableStateOf(false) }
-    var isRefreshing by remember { mutableStateOf(false) }
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -134,138 +136,6 @@ fun LocalVideoPlayerApp(
         }
     }
 
-    suspend fun scanVideosWithRetry(): List<VideoItem> {
-        var scanned = withContext(Dispatchers.IO) {
-            repository.loadVideos()
-        }
-        if (scanned.isEmpty()) {
-            delay(400)
-            scanned = withContext(Dispatchers.IO) {
-                repository.loadVideos()
-            }
-        }
-        return scanned
-    }
-
-    fun librarySignature(entries: List<VideoLibraryEntry>): List<String> {
-        return entries.map { entry ->
-            when (entry) {
-                is VideoLibraryEntry.Series -> "series:${entry.series.id}:${entry.series.episodes.size}"
-                is VideoLibraryEntry.Single -> "single:${entry.video.uri}"
-            }
-        }
-    }
-
-    suspend fun applyVideos(videos: List<VideoItem>, hiddenUris: Set<String>): List<VideoLibraryEntry> {
-        val entries = withContext(Dispatchers.Default) {
-            SeriesGrouper.groupVideos(
-                videos.filter { it.uri.toString() !in hiddenUris },
-            )
-        }
-        libraryEntries = entries
-        return entries
-    }
-
-    suspend fun loadLibraryFromCache() {
-        coroutineScope {
-            val hiddenUrisDeferred = async(Dispatchers.IO) {
-                hiddenVideosStore.getHiddenUris()
-            }
-            val cachedVideosDeferred = async(Dispatchers.IO) {
-                libraryCacheStore.loadVideos()
-            }
-            val hiddenUris = hiddenUrisDeferred.await()
-            val videos = cachedVideosDeferred.await().filter { video ->
-                video.uri.toString() !in hiddenUris
-            }
-            if (videos.isEmpty()) return@coroutineScope
-            libraryEntries = videos.map { VideoLibraryEntry.Single(it) }
-            applyVideos(videos, hiddenUris = emptySet())
-        }
-    }
-
-    fun removeVideosFromLibrary(uris: Collection<Uri>) {
-        if (uris.isEmpty()) return
-        val uriSet = uris.map { it.toString() }.toSet()
-        val removedSeriesIds = libraryEntries.mapNotNull { entry ->
-            when (entry) {
-                is VideoLibraryEntry.Series -> {
-                    val remaining = entry.series.episodes.filter {
-                        it.uri.toString() !in uriSet
-                    }
-                    if (remaining.isEmpty()) entry.series.id else null
-                }
-                is VideoLibraryEntry.Single -> null
-            }
-        }
-        libraryEntries = libraryEntries.withoutUris(uris)
-        scope.launch(Dispatchers.IO) {
-            libraryCacheStore.removeVideos(uris)
-            pinnedItemsStore.removeKeysForUris(uris)
-            pinnedItemsStore.removeSeriesKeys(removedSeriesIds)
-            playCountStore.removeForUris(uris)
-            playCountStore.removeKeys(removedSeriesIds.map { "series:$it" })
-        }
-    }
-
-    suspend fun saveLibraryCache(videos: List<VideoItem>, fromPull: Boolean) {
-        if (videos.isEmpty() && !fromPull) return
-        withContext(Dispatchers.IO) {
-            runCatching {
-                libraryCacheStore.saveVideos(videos)
-            }
-        }
-    }
-
-    suspend fun performLibraryRefresh(showLoading: Boolean = false, fromPull: Boolean = false) {
-        val previousSignature = if (fromPull) librarySignature(libraryEntries) else emptyList()
-        if (fromPull) isRefreshing = true
-        else if (showLoading) isLibraryLoading = true
-        try {
-            val hiddenUris = hiddenVideosStore.getHiddenUris()
-            val scanned = scanVideosWithRetry()
-            if (scanned.isEmpty() && libraryEntries.isNotEmpty() && !fromPull) {
-                return
-            }
-            if (libraryEntries.isEmpty()) {
-                libraryEntries = scanned
-                    .filter { it.uri.toString() !in hiddenUris }
-                    .map { VideoLibraryEntry.Single(it) }
-                isLibraryLoading = false
-            }
-            applyVideos(scanned, hiddenUris)
-            saveLibraryCache(scanned, fromPull)
-
-            val m3u8Items = withContext(Dispatchers.IO) {
-                repository.loadM3u8Playlists(scanned)
-            }
-            if (m3u8Items.isNotEmpty()) {
-                val merged = scanned + m3u8Items
-                applyVideos(merged, hiddenUris)
-                saveLibraryCache(merged, fromPull)
-            }
-
-            if (fromPull && librarySignature(libraryEntries) == previousSignature) {
-                Toast.makeText(
-                    context,
-                    context.getString(R.string.library_up_to_date),
-                    Toast.LENGTH_SHORT,
-                ).show()
-            }
-        } catch (_: Exception) {
-        } finally {
-            isRefreshing = false
-            isLibraryLoading = false
-        }
-    }
-
-    fun refreshLibrary(showLoading: Boolean = false, fromPull: Boolean = false) {
-        if (!hasPermission) return
-        scope.launch {
-            performLibraryRefresh(showLoading = showLoading, fromPull = fromPull)
-        }
-    }
-
     LaunchedEffect(downloadManager, hasPermission) {
         var knownCompleted = downloadManager.tasks.value
             .filter { it.status.name == "COMPLETED" }
@@ -274,7 +144,7 @@ fun LocalVideoPlayerApp(
         downloadManager.tasks.collect { tasks ->
             val completed = tasks.filter { it.status.name == "COMPLETED" }.map { it.id }.toSet()
             if (hasPermission && (completed - knownCompleted).isNotEmpty()) {
-                refreshLibrary()
+                libraryViewModel.refresh()
             }
             knownCompleted = completed
         }
@@ -300,11 +170,29 @@ fun LocalVideoPlayerApp(
 
     LaunchedEffect(hasPermission) {
         if (!hasPermission) return@LaunchedEffect
-        try {
-            loadLibraryFromCache()
-        } catch (_: Exception) {
+        runCatching { libraryViewModel.loadFromCache() }
+        libraryViewModel.refresh(showLoading = libraryViewModel.libraryEntries.value.isEmpty())
+    }
+
+    LaunchedEffect(libraryViewModel) {
+        libraryViewModel.refreshError.collect { message ->
+            when (message) {
+                LibraryViewModel.REFRESH_UP_TO_DATE -> {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.library_up_to_date),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
+                else -> {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.library_refresh_failed),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            }
         }
-        performLibraryRefresh(showLoading = libraryEntries.isEmpty())
     }
 
     LaunchedEffect(playbackStore) {
@@ -326,103 +214,107 @@ fun LocalVideoPlayerApp(
         mode = themeState.mode,
         colors = themeState.colors,
     ) {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            NavHost(
-                navController = navController,
-                startDestination = ROUTE_VIDEO_LIST,
-            ) {
-                composable(ROUTE_VIDEO_LIST) {
-                    VideoListScreen(
-                        libraryEntries = libraryEntries,
-                        isLibraryLoading = isLibraryLoading && libraryEntries.isEmpty(),
-                        isRefreshing = isRefreshing,
-                        hasPermission = hasPermission,
-                        recentRecords = recentRecords,
-                        playbackRecords = playbackRecords,
-                        repository = repository,
-                        hiddenVideosStore = hiddenVideosStore,
-                        playbackStore = playbackStore,
-                        pinnedItemsStore = pinnedItemsStore,
-                        playCountStore = playCountStore,
-                        themeStore = themeStore,
-                        themeState = themeState,
-                        onRequestPermission = {
-                            permissionLauncher.launch(Permissions.readVideoPermission)
-                        },
-                        onPlayVideo = { state ->
-                            playlistState = state
-                            navController.navigate(ROUTE_PLAYER)
-                        },
-                        onOpenSeries = { seriesId ->
-                            navController.navigate("series/$seriesId")
-                        },
-                        onOpenDownloads = { navController.navigate(ROUTE_DOWNLOADS) },
-                        onVideosRemoved = { uris -> removeVideosFromLibrary(uris) },
-                        onPullRefresh = { refreshLibrary(fromPull = true) },
-                    )
-                }
-                composable(
-                    route = ROUTE_SERIES,
-                    arguments = listOf(
-                        navArgument("seriesId") { type = NavType.StringType },
-                    ),
-                ) { backStackEntry ->
-                    val seriesId = backStackEntry.arguments?.getString("seriesId")
-                    val series = libraryEntries
-                        .filterIsInstance<VideoLibraryEntry.Series>()
-                        .map { it.series }
-                        .find { it.id == seriesId }
-
-                    if (series == null) {
-                        navController.popBackStack()
-                    } else {
-                        SeriesDetailScreen(
-                            series = series,
+        CompositionLocalProvider(LocalCastManager provides castManager) {
+            Surface(modifier = Modifier.fillMaxSize()) {
+                NavHost(
+                    navController = navController,
+                    startDestination = ROUTE_VIDEO_LIST,
+                ) {
+                    composable(ROUTE_VIDEO_LIST) {
+                        VideoListScreen(
+                            libraryEntries = libraryEntries,
+                            isLibraryLoading = isLibraryLoading && libraryEntries.isEmpty(),
+                            isRefreshing = isRefreshing,
+                            hasPermission = hasPermission,
+                            recentRecords = recentRecords,
                             playbackRecords = playbackRecords,
                             repository = repository,
                             hiddenVideosStore = hiddenVideosStore,
                             playbackStore = playbackStore,
+                            pinnedItemsStore = pinnedItemsStore,
                             playCountStore = playCountStore,
-                            onBack = { navController.popBackStack() },
-                            onPlayEpisode = { state ->
-                                val current = state.items.getOrNull(state.currentIndex)
-                                playlistState = if (current != null) {
-                                    val resolved = repository.playlistStateFor(current, libraryEntries)
-                                    if (resolved.items.size > 1) resolved else state
-                                } else {
-                                    state
-                                }
+                            themeStore = themeStore,
+                            themeState = themeState,
+                            onRequestPermission = {
+                                permissionLauncher.launch(Permissions.readVideoPermission)
+                            },
+                            onPlayVideo = { state ->
+                                playlistState = state
                                 navController.navigate(ROUTE_PLAYER)
                             },
-                            onVideosRemoved = { uris -> removeVideosFromLibrary(uris) },
+                            onOpenSeries = { seriesId ->
+                                navController.navigate("series/$seriesId")
+                            },
+                            onOpenDownloads = { navController.navigate(ROUTE_DOWNLOADS) },
+                            onVideosRemoved = { uris -> libraryViewModel.removeVideos(uris) },
+                            onPullRefresh = {
+                                libraryViewModel.refresh(fromPull = true)
+                            },
                         )
                     }
-                }
-                composable(ROUTE_PLAYER) {
-                    val state = playlistState
-                    if (state == null) {
-                        navController.popBackStack()
-                    } else {
-                        PlayerScreen(
-                            playlistState = state,
-                            playbackStore = playbackStore,
-                            playerPreferencesStore = playerPreferencesStore,
-                            pinnedItemsStore = pinnedItemsStore,
-                            seriesSkipStore = seriesSkipStore,
+                    composable(
+                        route = ROUTE_SERIES,
+                        arguments = listOf(
+                            navArgument("seriesId") { type = NavType.StringType },
+                        ),
+                    ) { backStackEntry ->
+                        val seriesId = backStackEntry.arguments?.getString("seriesId")
+                        val series = libraryEntries
+                            .filterIsInstance<VideoLibraryEntry.Series>()
+                            .map { it.series }
+                            .find { it.id == seriesId }
+
+                        if (series == null) {
+                            navController.popBackStack()
+                        } else {
+                            SeriesDetailScreen(
+                                series = series,
+                                playbackRecords = playbackRecords,
+                                repository = repository,
+                                hiddenVideosStore = hiddenVideosStore,
+                                playbackStore = playbackStore,
+                                playCountStore = playCountStore,
+                                onBack = { navController.popBackStack() },
+                                onPlayEpisode = { state ->
+                                    val current = state.items.getOrNull(state.currentIndex)
+                                    playlistState = if (current != null) {
+                                        val resolved = libraryViewModel.playlistStateFor(current)
+                                        if (resolved.items.size > 1) resolved else state
+                                    } else {
+                                        state
+                                    }
+                                    navController.navigate(ROUTE_PLAYER)
+                                },
+                                onVideosRemoved = { uris -> libraryViewModel.removeVideos(uris) },
+                            )
+                        }
+                    }
+                    composable(ROUTE_PLAYER) {
+                        val state = playlistState
+                        if (state == null) {
+                            navController.popBackStack()
+                        } else {
+                            PlayerScreen(
+                                playlistState = state,
+                                playbackStore = playbackStore,
+                                playerPreferencesStore = playerPreferencesStore,
+                                pinnedItemsStore = pinnedItemsStore,
+                                seriesSkipStore = seriesSkipStore,
+                                onBack = { navController.popBackStack() },
+                            )
+                        }
+                    }
+                    composable(ROUTE_DOWNLOADS) {
+                        DownloadManagerScreen(
+                            manager = downloadManager,
+                            initialShareText = sharedDownloadText,
+                            onInitialShareConsumed = onSharedDownloadConsumed,
+                            onOpenCompleted = { task ->
+                                openCompletedDownload(context, task, navController) { playlistState = it }
+                            },
                             onBack = { navController.popBackStack() },
                         )
                     }
-                }
-                composable(ROUTE_DOWNLOADS) {
-                    DownloadManagerScreen(
-                        manager = downloadManager,
-                        initialShareText = sharedDownloadText,
-                        onInitialShareConsumed = onSharedDownloadConsumed,
-                        onOpenCompleted = { task ->
-                            openCompletedDownload(context, task, navController) { playlistState = it }
-                        },
-                        onBack = { navController.popBackStack() },
-                    )
                 }
             }
         }

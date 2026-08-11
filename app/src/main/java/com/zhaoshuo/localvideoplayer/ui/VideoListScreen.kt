@@ -112,6 +112,12 @@ import com.zhaoshuo.localvideoplayer.model.partitionWithPinned
 import com.zhaoshuo.localvideoplayer.model.sortLibrary
 import com.zhaoshuo.localvideoplayer.model.withoutUris
 import com.zhaoshuo.localvideoplayer.player.PlaylistState
+import com.zhaoshuo.localvideoplayer.cast.CastUiState
+import com.zhaoshuo.localvideoplayer.cast.LocalCastManager
+import com.zhaoshuo.localvideoplayer.ui.components.CastButton
+import com.zhaoshuo.localvideoplayer.ui.components.CastDeviceBottomSheet
+import com.zhaoshuo.localvideoplayer.ui.components.CastMiniController
+import com.zhaoshuo.localvideoplayer.ui.components.rememberCastSheetActions
 import com.zhaoshuo.localvideoplayer.ui.components.DeleteVideoDialog
 import com.zhaoshuo.localvideoplayer.ui.components.LibraryOptionsBottomSheet
 import com.zhaoshuo.localvideoplayer.ui.components.LumenEmptyState
@@ -213,6 +219,13 @@ fun VideoListScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val theme = LocalLumenTheme.current
+    val castManager = LocalCastManager.current
+    val idleCastState = remember { kotlinx.coroutines.flow.MutableStateFlow<CastUiState>(CastUiState.Idle) }
+    val idlePlaying = remember { kotlinx.coroutines.flow.MutableStateFlow(false) }
+    val castState by (castManager?.uiState ?: idleCastState).collectAsState()
+    val castPlaying by (castManager?.playback?.isPlaying ?: idlePlaying).collectAsState()
+    val castSheet = rememberCastSheetActions(castManager)
+    var castTarget by remember { mutableStateOf<VideoItem?>(null) }
     var sortOrder by rememberSaveable { mutableStateOf(VideoSortOrder.DATE_DESC) }
     var collapseSingles by rememberSaveable { mutableStateOf(false) }
     var viewLayout by rememberSaveable { mutableStateOf(LibraryViewLayout.SECTIONED) }
@@ -537,10 +550,16 @@ fun VideoListScreen(
             selectedKeys = if (isSelected) selectedKeys - key else selectedKeys + key
         }
     }
-    val enterSelectionHandler = remember {
-        { key: String ->
-            selectionMode = true
-            selectedKeys = setOf(key)
+    val enterSelectionHandler = { key: String ->
+        selectionMode = true
+        selectedKeys = setOf(key)
+        castTarget = displayLibrary.firstNotNullOfOrNull { entry ->
+            when (entry) {
+                is VideoLibraryEntry.Single ->
+                    entry.video.takeIf { entryKey(entry) == key }
+                is VideoLibraryEntry.Series ->
+                    entry.series.episodes.firstOrNull().takeIf { entryKey(entry) == key }
+            }
         }
     }
 
@@ -686,6 +705,63 @@ fun VideoListScreen(
         )
     }
 
+    if (castSheet.showSheet && castManager != null) {
+        CastDeviceBottomSheet(
+            state = castState,
+            onDeviceClick = { device ->
+                val selectedVideo = when {
+                    castTarget != null -> castTarget
+                    selectedKeys.size == 1 -> {
+                        val key = selectedKeys.first()
+                        displayLibrary.firstNotNullOfOrNull { entry ->
+                            when (entry) {
+                                is VideoLibraryEntry.Single ->
+                                    entry.video.takeIf { entryKey(entry) == key }
+                                is VideoLibraryEntry.Series ->
+                                    entry.series.episodes.firstOrNull()
+                                        .takeIf { entryKey(entry) == key }
+                            }
+                        }
+                    }
+                    else -> null
+                }
+                val recent = recentRecords.firstOrNull()
+                val title: String
+                val uri: android.net.Uri
+                val position: Long
+                when {
+                    selectedVideo != null -> {
+                        title = selectedVideo.title
+                        uri = selectedVideo.uri
+                        position = playbackRecords[selectedVideo.uri.toString()]?.positionMs ?: 0L
+                    }
+                    recent != null -> {
+                        title = recent.title
+                        uri = recent.uri
+                        position = recent.positionMs
+                    }
+                    else -> {
+                        Toast.makeText(context, R.string.cast_unavailable, Toast.LENGTH_SHORT).show()
+                        return@CastDeviceBottomSheet
+                    }
+                }
+                castManager.connectAndPlay(
+                    device = device,
+                    title = title,
+                    contentUri = uri,
+                    startPositionMs = position,
+                    mimeType = context.contentResolver.getType(uri),
+                )
+                castTarget = null
+                castSheet.dismiss(CastUiState.Connecting(device))
+            },
+            onDismiss = {
+                castTarget = null
+                castSheet.dismiss(castState)
+            },
+        )
+    }
+
     if (showDeleteDialog) {
         val uris = pendingDeleteUris
         if (uris != null) {
@@ -740,6 +816,12 @@ fun VideoListScreen(
                         },
                         applyStatusBarPadding = false,
                         actions = {
+                            if (castManager != null) {
+                                CastButton(
+                                    state = castState,
+                                    onClick = { castSheet.open() },
+                                )
+                            }
                             IconButton(onClick = onOpenDownloads) {
                                 Icon(
                                     imageVector = Icons.Filled.Download,
@@ -874,6 +956,18 @@ fun VideoListScreen(
                     )
                 }
             }
+        },
+        bottomBar = {
+            val connected = castState as? CastUiState.Connected
+            CastMiniController(
+                visible = connected != null,
+                title = connected?.title.orEmpty(),
+                isPlaying = castPlaying,
+                onPlayPause = {
+                    if (castPlaying) castManager?.playback?.pause() else castManager?.playback?.play()
+                },
+                onDisconnect = { castManager?.disconnect() },
+            )
         },
     ) { innerPadding ->
         val pullRefreshState = rememberPullToRefreshState()

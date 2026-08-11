@@ -20,13 +20,30 @@ android {
         }
     }
 
+    flavorDimensions += "features"
+    productFlavors {
+        create("full") {
+            dimension = "features"
+            isDefault = true
+            buildConfigField("boolean", "HAS_ADVANCED_DOWNLOAD", "true")
+        }
+        create("lite") {
+            dimension = "features"
+            buildConfigField("boolean", "HAS_ADVANCED_DOWNLOAD", "false")
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        debug {
+            isMinifyEnabled = false
         }
     }
 
@@ -41,6 +58,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -48,6 +66,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
 
     implementation(platform(libs.androidx.compose.bom))
@@ -63,7 +82,8 @@ dependencies {
     implementation(libs.media3.ui)
     implementation(libs.media3.ui.compose)
     implementation(libs.media3.cast)
-    implementation("com.google.android.gms:play-services-cast-framework:21.5.0")
+    implementation(libs.play.services.cast.framework)
+    implementation(libs.androidx.mediarouter)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.room.runtime)
@@ -77,5 +97,6 @@ dependencies {
     implementation(libs.libtorrent4j.android.arm64)
     implementation(libs.libtorrent4j.android.x64)
 
-    testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
 }

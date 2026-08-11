@@ -84,6 +84,17 @@
     <string name="shuffle">随机播放</string>
     <string name="repeat_playback">循环播放</string>
     <string name="cast">投屏</string>
+    <string name="cast_unavailable">当前无法投屏</string>
+    <string name="cast_no_devices">未发现可用投屏设备</string>
+    <string name="cast_searching">正在搜索投屏设备…</string>
+    <string name="cast_connected">已连接到 %1$s</string>
+    <string name="cast_disconnect">断开投屏</string>
+    <string name="cast_permission_required">需要附近设备权限以搜索投屏设备</string>
+    <string name="cast_mini_playing">正在投屏</string>
+    <string name="cast_keepalive_channel">投屏服务</string>
+    <string name="cast_keepalive_title">正在投屏</string>
+    <string name="cast_keepalive_text">保持本地视频流可用</string>
+    <string name="library_refresh_failed">媒体库刷新失败</string>
     <string name="info">信息</string>
     <string name="favorite">收藏</string>
     <string name="settings">设置</string>
@@ -111,8 +122,6 @@
     <string name="series_skip_invalid">当前位置无效，无法设置</string>
     <string name="series_intro_cleared">已清除本剧片头</string>
     <string name="series_outro_cleared">已清除本剧片尾</string>
-    <string name="cast_unavailable">当前无法投屏</string>
-    <string name="cast_no_devices">未发现可用投屏设备</string>
     <string name="soft_decode_enabled">软解已开启</string>
     <string name="soft_decode_disabled">软解已关闭</string>
     <string name="player_info_title">视频信息</string>
