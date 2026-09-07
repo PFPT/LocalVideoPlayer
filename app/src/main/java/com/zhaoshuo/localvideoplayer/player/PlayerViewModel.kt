@@ -2,9 +2,11 @@ package com.zhaoshuo.localvideoplayer.player
 
 import android.net.Uri
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.zhaoshuo.localvideoplayer.data.PlaybackStore
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class PlayerViewModel(
@@ -23,6 +25,16 @@ class PlayerViewModel(
                 positionMs = positionMs.coerceAtLeast(0L),
                 durationMs = durationMs,
             )
+        }
+    }
+
+    fun enqueueSaveProgress(
+        video: VideoItem,
+        positionMs: Long,
+        durationMs: Long,
+    ) {
+        viewModelScope.launch {
+            saveProgress(video, positionMs, durationMs)
         }
     }
 

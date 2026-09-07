@@ -42,7 +42,7 @@ fun VideoPlayerGesture(
     onScaleChange: (Float) -> Unit,
     onOffsetChange: (Float, Float) -> Unit,
     getCurrentPositionMs: () -> Long,
-    durationMs: Long,
+    getDurationMs: () -> Long,
     onSeekPreview: (Long) -> Unit,
     onSeekPreviewFrame: (Long) -> Unit,
     onSeekCommitted: (Long) -> Unit,
@@ -142,24 +142,30 @@ fun VideoPlayerGesture(
                     }
                     enabled -> {
                         Modifier
-                            .pointerInput(scale) {
-                                detectTransformGestures { _, pan, zoom, _ ->
-                                    if (zoom != 1f) {
-                                        val newScale = (scale * zoom).coerceIn(MIN_SCALE, MAX_SCALE)
-                                        onScaleChange(newScale)
-                                        if (newScale <= MIN_SCALE) {
-                                            onOffsetChange(0f, 0f)
+                            .then(
+                                if (scale > MIN_SCALE) {
+                                    Modifier.pointerInput(scale) {
+                                        detectTransformGestures { _, pan, zoom, _ ->
+                                            if (zoom != 1f) {
+                                                val newScale = (scale * zoom).coerceIn(MIN_SCALE, MAX_SCALE)
+                                                onScaleChange(newScale)
+                                                if (newScale <= MIN_SCALE) {
+                                                    onOffsetChange(0f, 0f)
+                                                }
+                                            } else {
+                                                val maxOffsetX = (size.width * (scale - 1f)) / 2f
+                                                val maxOffsetY = (size.height * (scale - 1f)) / 2f
+                                                onOffsetChange(
+                                                    (offsetX + pan.x).coerceIn(-maxOffsetX, maxOffsetX),
+                                                    (offsetY + pan.y).coerceIn(-maxOffsetY, maxOffsetY),
+                                                )
+                                            }
                                         }
-                                    } else if (scale > MIN_SCALE) {
-                                        val maxOffsetX = (size.width * (scale - 1f)) / 2f
-                                        val maxOffsetY = (size.height * (scale - 1f)) / 2f
-                                        onOffsetChange(
-                                            (offsetX + pan.x).coerceIn(-maxOffsetX, maxOffsetX),
-                                            (offsetY + pan.y).coerceIn(-maxOffsetY, maxOffsetY),
-                                        )
                                     }
-                                }
-                            }
+                                } else {
+                                    Modifier
+                                },
+                            )
                             .pointerInput(scale) {
                                 coroutineScope {
                                 if (scale > MIN_SCALE) {
@@ -203,7 +209,7 @@ fun VideoPlayerGesture(
                                                     deltaFromStart = deltaFromStart,
                                                     downX = down.position.x,
                                                     width = size.width.toFloat(),
-                                                    durationMs = durationMs,
+                                                    durationMs = getDurationMs(),
                                                     onBrightnessAvailable = onBrightnessGestureStart != null &&
                                                         onBrightnessChange != null,
                                                     onVolumeAvailable = onVolumeGestureStart != null &&
@@ -274,7 +280,7 @@ fun VideoPlayerGesture(
                                                     startPositionMs = startPositionMs,
                                                     startBrightness = startBrightness,
                                                     startVolume = startVolume,
-                                                    durationMs = durationMs,
+                                                    durationMs = getDurationMs(),
                                                     onSeekPreview = onSeekPreview,
                                                     onSeekPreviewFrame = onSeekPreviewFrame,
                                                     onBrightnessChange = onBrightnessChange,

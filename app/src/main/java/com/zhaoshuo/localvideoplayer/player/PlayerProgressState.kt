@@ -44,6 +44,9 @@ fun rememberPlayerProgressState(
     isSeeking: Boolean,
 ): PlayerProgressState {
     val state = remember { PlayerProgressState() }
+    LaunchedEffect(player) {
+        state.syncFromPlayer(player)
+    }
     LaunchedEffect(player, isSeeking) {
         while (true) {
             if (!isSeeking) {
