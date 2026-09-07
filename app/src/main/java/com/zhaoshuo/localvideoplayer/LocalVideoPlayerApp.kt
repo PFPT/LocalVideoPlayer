@@ -292,7 +292,9 @@ fun LocalVideoPlayerApp(
                     composable(ROUTE_PLAYER) {
                         val state = playlistState
                         if (state == null) {
-                            navController.popBackStack()
+                            LaunchedEffect(Unit) {
+                                navController.popBackStack()
+                            }
                         } else {
                             PlayerScreen(
                                 playlistState = state,

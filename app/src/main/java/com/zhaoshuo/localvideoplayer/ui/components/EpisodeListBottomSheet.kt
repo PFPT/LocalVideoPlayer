@@ -1,12 +1,16 @@
 package com.zhaoshuo.localvideoplayer.ui.components
 
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -23,19 +27,34 @@ fun EpisodeListBottomSheet(
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val listState = rememberLazyListState()
     val theme = LocalLumenTheme.current
+
+    LaunchedEffect(currentIndex, episodes.size) {
+        if (currentIndex in episodes.indices) {
+            listState.scrollToItem(currentIndex + 1)
+        }
+    }
 
     LumenModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {
-        Column(modifier = Modifier.padding(bottom = 32.dp)) {
-            Text(
-                text = stringResource(R.string.episode_picker),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-            )
-            episodes.forEachIndexed { index, episode ->
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(bottom = 32.dp),
+        ) {
+            item {
+                Text(
+                    text = stringResource(R.string.episode_picker),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                )
+            }
+            itemsIndexed(
+                items = episodes,
+                key = { _, episode -> episode.id },
+            ) { index, episode ->
                 EpisodeListItem(
                     episode = episode,
                     isCurrent = index == currentIndex,
