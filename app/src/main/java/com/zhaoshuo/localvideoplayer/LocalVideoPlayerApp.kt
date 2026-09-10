@@ -34,12 +34,14 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.zhaoshuo.localvideoplayer.cast.CastManager
 import com.zhaoshuo.localvideoplayer.cast.LocalCastManager
+import com.zhaoshuo.localvideoplayer.data.LibraryPreferencesStore
 import com.zhaoshuo.localvideoplayer.data.LibraryViewModel
 import com.zhaoshuo.localvideoplayer.data.PlaybackStore
 import com.zhaoshuo.localvideoplayer.data.PlayerPreferencesStore
 import com.zhaoshuo.localvideoplayer.data.PinnedItemsStore
 import com.zhaoshuo.localvideoplayer.data.PlayCountStore
 import com.zhaoshuo.localvideoplayer.data.HiddenVideosStore
+import com.zhaoshuo.localvideoplayer.data.FolderSourceStore
 import com.zhaoshuo.localvideoplayer.data.SeriesSkipStore
 import com.zhaoshuo.localvideoplayer.data.ThemePreferencesStore
 import com.zhaoshuo.localvideoplayer.data.VideoRepository
@@ -52,6 +54,7 @@ import com.zhaoshuo.localvideoplayer.player.PlaylistState
 import com.zhaoshuo.localvideoplayer.ui.PlayerScreen
 import com.zhaoshuo.localvideoplayer.ui.DownloadManagerScreen
 import com.zhaoshuo.localvideoplayer.ui.SeriesDetailScreen
+import com.zhaoshuo.localvideoplayer.ui.SettingsScreen
 import com.zhaoshuo.localvideoplayer.ui.VideoListScreen
 import com.zhaoshuo.localvideoplayer.ui.theme.LocalVideoPlayerTheme
 import com.zhaoshuo.localvideoplayer.ui.theme.ThemeState
@@ -64,6 +67,7 @@ private const val ROUTE_VIDEO_LIST = "video_list"
 private const val ROUTE_SERIES = "series/{seriesId}"
 private const val ROUTE_PLAYER = "player"
 private const val ROUTE_DOWNLOADS = "downloads"
+private const val ROUTE_SETTINGS = "settings"
 
 @Composable
 fun LocalVideoPlayerApp(
@@ -82,6 +86,8 @@ fun LocalVideoPlayerApp(
     val pinnedItemsStore = remember { PinnedItemsStore(context) }
     val playCountStore = remember { PlayCountStore(context) }
     val themeStore = remember { ThemePreferencesStore(context) }
+    val libraryPreferencesStore = remember { LibraryPreferencesStore(context) }
+    val folderSourceStore = remember { FolderSourceStore(context) }
     val libraryViewModel = remember { LibraryViewModel(context) }
     val castManager = remember { CastManager(context, playbackStore) }
     val themeState by themeStore.themeState.collectAsState(initial = ThemeState())
@@ -234,6 +240,7 @@ fun LocalVideoPlayerApp(
                             pinnedItemsStore = pinnedItemsStore,
                             playCountStore = playCountStore,
                             themeStore = themeStore,
+                            libraryPreferencesStore = libraryPreferencesStore,
                             themeState = themeState,
                             onRequestPermission = {
                                 permissionLauncher.launch(Permissions.readVideoPermission)
@@ -246,6 +253,7 @@ fun LocalVideoPlayerApp(
                                 navController.navigate("series/$seriesId")
                             },
                             onOpenDownloads = { navController.navigate(ROUTE_DOWNLOADS) },
+                            onOpenSettings = { navController.navigate(ROUTE_SETTINGS) },
                             onVideosRemoved = { uris -> libraryViewModel.removeVideos(uris) },
                             onPullRefresh = {
                                 libraryViewModel.refresh(fromPull = true)
@@ -305,6 +313,16 @@ fun LocalVideoPlayerApp(
                                 onBack = { navController.popBackStack() },
                             )
                         }
+                    }
+                    composable(ROUTE_SETTINGS) {
+                        SettingsScreen(
+                            themeStore = themeStore,
+                            themeState = themeState,
+                            libraryPreferencesStore = libraryPreferencesStore,
+                            playerPreferencesStore = playerPreferencesStore,
+                            folderSourceStore = folderSourceStore,
+                            onBack = { navController.popBackStack() },
+                        )
                     }
                     composable(ROUTE_DOWNLOADS) {
                         DownloadManagerScreen(

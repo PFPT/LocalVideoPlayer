@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
-import androidx.media3.common.MimeTypes
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -43,10 +42,7 @@ fun buildExoPlayer(
 }
 
 fun VideoItem.toMediaItemWithSubtitle(subtitleUri: Uri): MediaItem {
-    val mime = when {
-        subtitleUri.toString().endsWith(".vtt", ignoreCase = true) -> MimeTypes.TEXT_VTT
-        else -> MimeTypes.APPLICATION_SUBRIP
-    }
+    val mime = subtitleMimeType(subtitleUri.toString())
     val subtitle = MediaItem.SubtitleConfiguration.Builder(subtitleUri)
         .setMimeType(mime)
         .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)

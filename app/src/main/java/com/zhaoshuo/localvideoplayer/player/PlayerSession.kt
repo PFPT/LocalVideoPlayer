@@ -9,6 +9,8 @@ object PlayerSession {
     var hasNextProvider: () -> Boolean = { false }
     var onStateChanged: (() -> Unit)? = null
 
+    fun current(): ExoPlayer? = player
+
     fun attach(player: ExoPlayer) {
         this.player = player
     }

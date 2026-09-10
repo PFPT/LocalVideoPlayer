@@ -32,6 +32,8 @@ class LibraryViewModel(
     private val hiddenVideosStore: HiddenVideosStore = HiddenVideosStore(context),
     private val pinnedItemsStore: PinnedItemsStore = PinnedItemsStore(context),
     private val playCountStore: PlayCountStore = PlayCountStore(context),
+    private val folderSourceStore: FolderSourceStore = FolderSourceStore(context),
+    private val folderVideoScanner: FolderVideoScanner = FolderVideoScanner(context),
 ) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -49,6 +51,7 @@ class LibraryViewModel(
     val refreshError: SharedFlow<String> = _refreshError.asSharedFlow()
 
     private var observerRegistered = false
+    private var folderWatchStarted = false
     private var debounceJob: Job? = null
     private var lastKnownMaxId = 0L
     private var lastKnownMaxDateAdded = 0L
@@ -78,6 +81,14 @@ class LibraryViewModel(
             observerRegistered = true
         } catch (e: Exception) {
             Log.w(TAG, "Failed to register MediaStore observer", e)
+        }
+        if (!folderWatchStarted) {
+            folderWatchStarted = true
+            scope.launch {
+                folderSourceStore.sources.collect {
+                    refresh(showLoading = false, fromPull = false, incrementalPreferred = false)
+                }
+            }
         }
     }
 
@@ -177,23 +188,25 @@ class LibraryViewModel(
             if (scanned == null) {
                 return
             }
-            if (scanned.isEmpty() && _libraryEntries.value.isNotEmpty() && !fromPull) {
+            val folderVideos = withContext(Dispatchers.IO) { loadFolderSourceVideos() }
+            val scannedWithFolders = mergeVideos(scanned, folderVideos)
+            if (scannedWithFolders.isEmpty() && _libraryEntries.value.isNotEmpty() && !fromPull) {
                 return
             }
             if (_libraryEntries.value.isEmpty()) {
-                _libraryEntries.value = scanned
+                _libraryEntries.value = scannedWithFolders
                     .filter { it.uri.toString() !in hiddenUris }
                     .map { VideoLibraryEntry.Single(it) }
                 _isLibraryLoading.value = false
             }
-            applyVideos(scanned, hiddenUris)
-            saveCaches(scanned)
+            applyVideos(scannedWithFolders, hiddenUris)
+            saveCaches(scannedWithFolders)
 
             val m3u8Items = withContext(Dispatchers.IO) {
-                repository.loadM3u8Playlists(scanned)
+                repository.loadM3u8Playlists(scannedWithFolders)
             }
             if (m3u8Items.isNotEmpty()) {
-                val merged = scanned + m3u8Items
+                val merged = scannedWithFolders + m3u8Items
                 applyVideos(merged, hiddenUris)
                 saveCaches(merged)
             }
@@ -256,6 +269,21 @@ class LibraryViewModel(
     private fun List<VideoLibraryEntry>.filterNotHidden(hiddenUris: Set<String>): List<VideoLibraryEntry> {
         if (hiddenUris.isEmpty()) return this
         return withoutUris(hiddenUris.map(Uri::parse))
+    }
+
+    private suspend fun loadFolderSourceVideos(): List<VideoItem> {
+        val sources = folderSourceStore.getSources()
+        if (sources.isEmpty()) return emptyList()
+        return sources.flatMap { source ->
+            val uri = runCatching { Uri.parse(source.treeUri) }.getOrNull() ?: return@flatMap emptyList()
+            runCatching { folderVideoScanner.loadVideos(uri) }.getOrDefault(emptyList())
+        }
+    }
+
+    private fun mergeVideos(primary: List<VideoItem>, extra: List<VideoItem>): List<VideoItem> {
+        if (extra.isEmpty()) return primary
+        val seen = primary.mapTo(mutableSetOf()) { it.uri.toString() }
+        return primary + extra.filter { seen.add(it.uri.toString()) }
     }
 
     companion object {

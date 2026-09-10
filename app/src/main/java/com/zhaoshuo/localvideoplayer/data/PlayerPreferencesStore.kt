@@ -5,8 +5,11 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.zhaoshuo.localvideoplayer.model.AspectRatioMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -20,6 +23,14 @@ data class PlayerPreferences(
     val skipIntroSeconds: Int = 0,
     val skipOutroSeconds: Int = 0,
     val shuffleEnabled: Boolean = false,
+    val defaultSpeed: Float = 1.0f,
+    val aspectRatioMode: AspectRatioMode = AspectRatioMode.FIT,
+    val repeatOne: Boolean = false,
+    val gestureBrightness: Boolean = true,
+    val gestureVolume: Boolean = true,
+    val gestureSeek: Boolean = true,
+    val gestureDoubleTapSeek: Boolean = true,
+    val gesturePinchZoom: Boolean = true,
 )
 
 class PlayerPreferencesStore(private val context: Context) {
@@ -30,6 +41,14 @@ class PlayerPreferencesStore(private val context: Context) {
             skipIntroSeconds = (prefs[SKIP_INTRO_SECONDS] ?: 0).coerceIn(0, 600),
             skipOutroSeconds = (prefs[SKIP_OUTRO_SECONDS] ?: 0).coerceIn(0, 600),
             shuffleEnabled = prefs[SHUFFLE_ENABLED] ?: false,
+            defaultSpeed = (prefs[DEFAULT_SPEED] ?: 1.0f).coerceIn(0.5f, 3.0f),
+            aspectRatioMode = AspectRatioMode.fromStorage(prefs[ASPECT_RATIO_MODE]),
+            repeatOne = prefs[REPEAT_ONE] ?: false,
+            gestureBrightness = prefs[GESTURE_BRIGHTNESS] ?: true,
+            gestureVolume = prefs[GESTURE_VOLUME] ?: true,
+            gestureSeek = prefs[GESTURE_SEEK] ?: true,
+            gestureDoubleTapSeek = prefs[GESTURE_DOUBLE_TAP_SEEK] ?: true,
+            gesturePinchZoom = prefs[GESTURE_PINCH_ZOOM] ?: true,
         )
     }
 
@@ -55,10 +74,50 @@ class PlayerPreferencesStore(private val context: Context) {
         context.playerPreferencesDataStore.edit { it[SHUFFLE_ENABLED] = enabled }
     }
 
+    suspend fun setDefaultSpeed(speed: Float) {
+        context.playerPreferencesDataStore.edit { it[DEFAULT_SPEED] = speed.coerceIn(0.5f, 3.0f) }
+    }
+
+    suspend fun setAspectRatioMode(mode: AspectRatioMode) {
+        context.playerPreferencesDataStore.edit { it[ASPECT_RATIO_MODE] = mode.name }
+    }
+
+    suspend fun setRepeatOne(enabled: Boolean) {
+        context.playerPreferencesDataStore.edit { it[REPEAT_ONE] = enabled }
+    }
+
+    suspend fun setGestureBrightness(enabled: Boolean) {
+        context.playerPreferencesDataStore.edit { it[GESTURE_BRIGHTNESS] = enabled }
+    }
+
+    suspend fun setGestureVolume(enabled: Boolean) {
+        context.playerPreferencesDataStore.edit { it[GESTURE_VOLUME] = enabled }
+    }
+
+    suspend fun setGestureSeek(enabled: Boolean) {
+        context.playerPreferencesDataStore.edit { it[GESTURE_SEEK] = enabled }
+    }
+
+    suspend fun setGestureDoubleTapSeek(enabled: Boolean) {
+        context.playerPreferencesDataStore.edit { it[GESTURE_DOUBLE_TAP_SEEK] = enabled }
+    }
+
+    suspend fun setGesturePinchZoom(enabled: Boolean) {
+        context.playerPreferencesDataStore.edit { it[GESTURE_PINCH_ZOOM] = enabled }
+    }
+
     companion object {
         private val SOFT_DECODE = booleanPreferencesKey("soft_decode")
         private val SKIP_INTRO_SECONDS = intPreferencesKey("skip_intro_seconds")
         private val SKIP_OUTRO_SECONDS = intPreferencesKey("skip_outro_seconds")
         private val SHUFFLE_ENABLED = booleanPreferencesKey("shuffle_enabled")
+        private val DEFAULT_SPEED = floatPreferencesKey("default_speed")
+        private val ASPECT_RATIO_MODE = stringPreferencesKey("aspect_ratio_mode")
+        private val REPEAT_ONE = booleanPreferencesKey("repeat_one")
+        private val GESTURE_BRIGHTNESS = booleanPreferencesKey("gesture_brightness")
+        private val GESTURE_VOLUME = booleanPreferencesKey("gesture_volume")
+        private val GESTURE_SEEK = booleanPreferencesKey("gesture_seek")
+        private val GESTURE_DOUBLE_TAP_SEEK = booleanPreferencesKey("gesture_double_tap_seek")
+        private val GESTURE_PINCH_ZOOM = booleanPreferencesKey("gesture_pinch_zoom")
     }
 }

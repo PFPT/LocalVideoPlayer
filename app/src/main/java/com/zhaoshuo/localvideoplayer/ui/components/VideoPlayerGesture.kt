@@ -47,7 +47,7 @@ fun VideoPlayerGesture(
     onSeekPreviewFrame: (Long) -> Unit,
     onSeekCommitted: (Long) -> Unit,
     onTap: (Offset, Float, Float) -> Unit,
-    onDoubleTap: () -> Unit,
+    onDoubleTap: (Offset, Float) -> Unit,
     onSeekingChange: (Boolean) -> Unit,
     onBrightnessGestureStart: (() -> Unit)? = null,
     onBrightnessChange: ((Float) -> Unit)? = null,
@@ -61,6 +61,8 @@ fun VideoPlayerGesture(
     onSpeedBoostEnd: (() -> Unit)? = null,
     enabled: Boolean,
     speedBoostOnly: Boolean = false,
+    seekEnabled: Boolean = true,
+    pinchEnabled: Boolean = true,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -143,7 +145,7 @@ fun VideoPlayerGesture(
                     enabled -> {
                         Modifier
                             .then(
-                                if (scale > MIN_SCALE) {
+                                if (scale > MIN_SCALE && pinchEnabled) {
                                     Modifier.pointerInput(scale) {
                                         detectTransformGestures { _, pan, zoom, _ ->
                                             if (zoom != 1f) {
@@ -166,14 +168,14 @@ fun VideoPlayerGesture(
                                     Modifier
                                 },
                             )
-                            .pointerInput(scale) {
+                            .pointerInput(scale, seekEnabled) {
                                 coroutineScope {
                                 if (scale > MIN_SCALE) {
                                     detectTapGestures(
                                         onTap = { offset ->
                                             onTap(offset, size.width.toFloat(), size.height.toFloat())
                                         },
-                                        onDoubleTap = { onDoubleTap() },
+                                        onDoubleTap = { offset -> onDoubleTap(offset, size.width.toFloat()) },
                                     )
                                     return@coroutineScope
                                 }
@@ -210,6 +212,7 @@ fun VideoPlayerGesture(
                                                     downX = down.position.x,
                                                     width = size.width.toFloat(),
                                                     durationMs = getDurationMs(),
+                                                    seekEnabled = seekEnabled,
                                                     onBrightnessAvailable = onBrightnessGestureStart != null &&
                                                         onBrightnessChange != null,
                                                     onVolumeAvailable = onVolumeGestureStart != null &&
@@ -248,7 +251,7 @@ fun VideoPlayerGesture(
                                                 pendingSingleTapJob?.cancel()
                                                 pendingSingleTapJob = null
                                                 lastTapUptimeMs = 0L
-                                                onDoubleTap()
+                                                onDoubleTap(position, size.width.toFloat())
                                             } else {
                                                 lastTapUptimeMs = now
                                                 lastTapPosition = position
@@ -342,11 +345,12 @@ private fun resolveDragMode(
     downX: Float,
     width: Float,
     durationMs: Long,
+    seekEnabled: Boolean,
     onBrightnessAvailable: Boolean,
     onVolumeAvailable: Boolean,
 ): DragMode? {
     return when {
-        abs(deltaFromStart.x) >= abs(deltaFromStart.y) && durationMs > 0 -> DragMode.Seek
+        abs(deltaFromStart.x) >= abs(deltaFromStart.y) && durationMs > 0 && seekEnabled -> DragMode.Seek
         downX <= width / 2f && onBrightnessAvailable -> DragMode.Brightness
         downX > width / 2f && onVolumeAvailable -> DragMode.Volume
         else -> null

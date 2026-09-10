@@ -2,6 +2,7 @@ package com.zhaoshuo.localvideoplayer.ui
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.media.AudioManager
 import android.net.Uri
 import android.util.Rational
@@ -49,6 +50,7 @@ import com.zhaoshuo.localvideoplayer.data.PlayerPreferencesStore
 import com.zhaoshuo.localvideoplayer.data.SeriesSkipSettings
 import com.zhaoshuo.localvideoplayer.data.SeriesSkipStore
 import com.zhaoshuo.localvideoplayer.model.VideoItem
+import com.zhaoshuo.localvideoplayer.player.PlaybackMediaService
 import com.zhaoshuo.localvideoplayer.player.PlayerViewModel
 import com.zhaoshuo.localvideoplayer.player.PlayerProgressState
 import com.zhaoshuo.localvideoplayer.player.PlayerSession
@@ -56,11 +58,13 @@ import com.zhaoshuo.localvideoplayer.player.PlaylistState
 import com.zhaoshuo.localvideoplayer.player.applyTrackSelection
 import com.zhaoshuo.localvideoplayer.player.buildExoPlayer
 import com.zhaoshuo.localvideoplayer.player.rememberPlayerProgressState
+import com.zhaoshuo.localvideoplayer.player.findSidecarSubtitle
 import com.zhaoshuo.localvideoplayer.player.toMediaItemWithSubtitle
 import com.zhaoshuo.localvideoplayer.player.trackOptions
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.zhaoshuo.localvideoplayer.ui.components.AspectRatioSheet
 import com.zhaoshuo.localvideoplayer.ui.components.BrightnessFeedbackOverlay
 import com.zhaoshuo.localvideoplayer.ui.components.EpisodeListBottomSheet
 import com.zhaoshuo.localvideoplayer.ui.components.FittedPlayerSurface
@@ -80,6 +84,7 @@ import com.zhaoshuo.localvideoplayer.util.OrientationController
 import com.zhaoshuo.localvideoplayer.util.PlaybackSystemControls
 import com.zhaoshuo.localvideoplayer.util.PictureInPictureHelper
 import com.zhaoshuo.localvideoplayer.util.TitleParser
+import com.zhaoshuo.localvideoplayer.util.VideoFrameCapture
 import com.zhaoshuo.localvideoplayer.util.toMediaItem
 import com.zhaoshuo.localvideoplayer.cast.CastUiState
 import com.zhaoshuo.localvideoplayer.cast.LocalCastManager
@@ -93,6 +98,7 @@ import kotlinx.coroutines.launch
 
 private const val SPEED_BOOST = 2.0f
 private const val PROGRESS_SAVE_INTERVAL_MS = 5_000L
+private const val DOUBLE_TAP_SEEK_MS = 10_000L
 
 @Composable
 fun PlayerScreen(
@@ -135,6 +141,9 @@ fun PlayerScreen(
         PlayerUiState(
             initialIndex = playlistState.currentIndex,
             initialSoftDecode = preferences.softDecode,
+            initialSpeed = preferences.defaultSpeed,
+            initialAspect = preferences.aspectRatioMode,
+            initialRepeatOne = preferences.repeatOne,
         ).also {
             it.isLandscape = orientationController?.isLandscape() == true
             it.isInPipMode = activity?.isInPipMode == true
@@ -143,14 +152,19 @@ fun PlayerScreen(
     val resumedIndices = remember(playlist) { mutableSetOf<Int>() }
     val pipSupported = remember(activity) { activity?.isPipSupported() == true }
     val exoPlayer = remember(playlist, ui.softDecodeGeneration) {
+        val sidecar = playlist.getOrNull(playlistState.currentIndex)?.let { findSidecarSubtitle(context, it) }
+        if (ui.subtitleUri == null && sidecar != null) {
+            ui.subtitleUri = sidecar
+        }
         buildExoPlayer(
             context = context,
             playlist = playlist,
             startIndex = playlistState.currentIndex,
             softDecode = ui.appliedSoftDecode,
-            subtitleUri = ui.subtitleUri,
+            subtitleUri = ui.subtitleUri ?: sidecar,
         )
     }
+    val progress = rememberPlayerProgressState(exoPlayer, ui.isSeeking)
     val subtitlePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent(),
     ) { uri ->
@@ -166,7 +180,14 @@ fun PlayerScreen(
             }
         }
     }
-    val progress = rememberPlayerProgressState(exoPlayer, ui.isSeeking)
+    LaunchedEffect(preferences.defaultSpeed, preferences.aspectRatioMode, preferences.repeatOne) {
+        if (!ui.isSpeedBoosted) {
+            ui.playbackSpeed = preferences.defaultSpeed
+            ui.savedPlaybackSpeed = preferences.defaultSpeed
+        }
+        ui.aspectRatioMode = preferences.aspectRatioMode
+        ui.repeatOne = preferences.repeatOne
+    }
     val castManager = LocalCastManager.current
     val idleCastState = remember { MutableStateFlow<CastUiState>(CastUiState.Idle) }
     val idleFalse = remember { MutableStateFlow(false) }
@@ -396,6 +417,7 @@ fun PlayerScreen(
         when {
             ui.showSpeedSheet -> ui.showSpeedSheet = false
             ui.showEpisodeSheet -> ui.showEpisodeSheet = false
+            ui.showAspectSheet -> ui.showAspectSheet = false
             ui.showMoreSheet -> ui.showMoreSheet = false
             ui.showTrackSheet != null -> ui.showTrackSheet = null
             ui.showInfoDialog -> ui.showInfoDialog = false
@@ -441,17 +463,49 @@ fun PlayerScreen(
         orientationController?.togglePortraitLandscape()
     }
 
-    fun handleDoubleTap() {
+    fun seekBy(deltaMs: Long) {
+        val duration = resolvedDurationMs()
+        if (duration <= 0) return
+        val target = (exoPlayer.currentPosition + deltaMs).coerceIn(0L, duration)
+        exoPlayer.seekTo(target)
+        progress.currentPositionMs = target
+        ui.previewPositionMs = target
+        ui.seekStartPositionMs = (target - deltaMs).coerceIn(0L, duration)
+        ui.doubleTapSeekDeltaMs = deltaMs
+        ui.showDoubleTapSeek = true
+    }
+
+    fun handleDoubleTap(offset: Offset, width: Float) {
         if (ui.controlsLocked) return
-        if (ui.isFullscreen) {
-            if (ui.videoScale > 1f) {
-                ui.resetZoom()
-            } else {
-                setFullscreen(false)
-            }
-        } else {
+        if (ui.videoScale > 1f) {
             ui.resetZoom()
+            return
         }
+        if (!preferences.gestureDoubleTapSeek) {
+            if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+            return
+        }
+        val ratio = offset.x / width.coerceAtLeast(1f)
+        when {
+            ratio < 0.33f -> seekBy(-DOUBLE_TAP_SEEK_MS)
+            ratio > 0.67f -> seekBy(DOUBLE_TAP_SEEK_MS)
+            else -> if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+        }
+    }
+
+    fun captureScreenshot() {
+        if (ui.controlsLocked) return
+        val video = playlist.getOrNull(ui.currentIndex) ?: return
+        val saved = VideoFrameCapture.captureAndSave(
+            context = context,
+            videoUri = video.uri,
+            positionMs = exoPlayer.currentPosition,
+        )
+        Toast.makeText(
+            context,
+            if (saved) R.string.screenshot_saved else R.string.screenshot_failed,
+            Toast.LENGTH_SHORT,
+        ).show()
     }
 
     fun handleLockToggle() {
@@ -537,6 +591,8 @@ fun PlayerScreen(
         PlayerSession.onStateChanged = {
             activity?.onPipAction?.invoke()
         }
+        val sessionIntent = Intent(context, PlaybackMediaService::class.java)
+        runCatching { context.startForegroundService(sessionIntent) }
 
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
@@ -567,13 +623,8 @@ fun PlayerScreen(
 
         val lifecycleObserver = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_PAUSE -> {
-                    if (activity?.isInPipMode != true) {
-                        exoPlayer.pause()
-                    }
-                }
                 Lifecycle.Event.ON_STOP -> {
-                    if (activity?.isInPipMode != true) {
+                    if (activity?.isInPipMode != true && activity?.isFinishing == true) {
                         exoPlayer.pause()
                     }
                 }
@@ -596,6 +647,7 @@ fun PlayerScreen(
             }.getOrNull()
             PlayerSession.onStateChanged = null
             PlayerSession.detach(exoPlayer)
+            runCatching { context.stopService(sessionIntent) }
             exoPlayer.removeListener(listener)
             lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
             ui.isFullscreen = false
@@ -606,6 +658,13 @@ fun PlayerScreen(
             progressSnapshot?.let { (snapshotVideo, positionMs, durationMs) ->
                 playerViewModel.enqueueSaveProgress(snapshotVideo, positionMs, durationMs)
             }
+        }
+    }
+
+    LaunchedEffect(ui.showDoubleTapSeek) {
+        if (ui.showDoubleTapSeek) {
+            delay(800)
+            ui.showDoubleTapSeek = false
         }
     }
 
@@ -735,8 +794,21 @@ fun PlayerScreen(
                 ui.playbackSpeed = it
                 ui.savedPlaybackSpeed = it
                 ui.resetControlsTimer()
+                scope.launch { playerPreferencesStore.setDefaultSpeed(it) }
             },
             onDismiss = { ui.showSpeedSheet = false },
+        )
+    }
+
+    if (ui.showAspectSheet) {
+        AspectRatioSheet(
+            currentMode = ui.aspectRatioMode,
+            onModeSelected = { mode ->
+                ui.aspectRatioMode = mode
+                ui.resetZoom()
+                scope.launch { playerPreferencesStore.setAspectRatioMode(mode) }
+            },
+            onDismiss = { ui.showAspectSheet = false },
         )
     }
 
@@ -769,6 +841,14 @@ fun PlayerScreen(
             onVideoTrack = { ui.showTrackSheet = C.TRACK_TYPE_VIDEO },
             onSubtitles = { ui.showTrackSheet = C.TRACK_TYPE_TEXT },
             onPickSubtitleFile = { subtitlePicker.launch("*/*") },
+            onAspectRatio = {
+                ui.showMoreSheet = false
+                ui.showAspectSheet = true
+            },
+            onScreenshot = {
+                ui.showMoreSheet = false
+                captureScreenshot()
+            },
             onSoftDecodeToggle = {
                 scope.launch {
                     val next = !preferences.softDecode
@@ -909,12 +989,12 @@ fun PlayerScreen(
                         }
                     },
                     onSpeedBoostEnd = { ui.resetSpeedBoost() },
-                    onBrightnessGestureStart = ::handleBrightnessGestureStart,
-                    onBrightnessChange = ::handleBrightnessChange,
-                    onBrightnessGestureEnd = ::handleBrightnessGestureEnd,
-                    onVolumeGestureStart = ::handleVolumeGestureStart,
-                    onVolumeChange = ::handleVolumeChange,
-                    onVolumeGestureEnd = ::handleVolumeGestureEnd,
+                    onBrightnessGestureStart = ::handleBrightnessGestureStart.takeIf { preferences.gestureBrightness },
+                    onBrightnessChange = ::handleBrightnessChange.takeIf { preferences.gestureBrightness },
+                    onBrightnessGestureEnd = ::handleBrightnessGestureEnd.takeIf { preferences.gestureBrightness },
+                    onVolumeGestureStart = ::handleVolumeGestureStart.takeIf { preferences.gestureVolume },
+                    onVolumeChange = ::handleVolumeChange.takeIf { preferences.gestureVolume },
+                    onVolumeGestureEnd = ::handleVolumeGestureEnd.takeIf { preferences.gestureVolume },
                     getCurrentBrightness = { systemControls?.currentBrightness() ?: ui.brightnessFraction },
                     getCurrentVolume = { systemControls?.currentVolumeFraction() ?: ui.volumeFraction },
                     isAdjustingBrightness = ui.isAdjustingBrightness,
@@ -972,6 +1052,7 @@ fun PlayerScreen(
                     onLoopClick = {
                         ui.resetControlsTimer()
                         ui.repeatOne = !ui.repeatOne
+                        scope.launch { playerPreferencesStore.setRepeatOne(ui.repeatOne) }
                     },
                     onEpisodePickerClick = {
                         ui.resetControlsTimer()
@@ -998,6 +1079,10 @@ fun PlayerScreen(
                     pipSupported = pipSupported,
                     onPipClick = ::handlePipClick,
                     onFullscreenClick = ::handleFullscreenToggleClick,
+                    contentScale = ui.aspectRatioMode.contentScale,
+                    frameAspectRatio = ui.aspectRatioMode.frameAspectRatio,
+                    seekEnabled = preferences.gestureSeek,
+                    pinchEnabled = preferences.gesturePinchZoom,
                 )
             }
             else -> {
@@ -1103,7 +1188,10 @@ fun PlayerScreen(
                         repeatOne = ui.repeatOne,
                         onEpisodeSelected = ::selectEpisode,
                         onSpeedClick = { ui.showSpeedSheet = true },
-                        onLoopClick = { ui.repeatOne = !ui.repeatOne },
+                        onLoopClick = {
+                            ui.repeatOne = !ui.repeatOne
+                            scope.launch { playerPreferencesStore.setRepeatOne(ui.repeatOne) }
+                        },
                         onMoreClick = { ui.showMoreSheet = true },
                         onSkipIntro = {
                             if (isCasting) return@PortraitPlayerContent
@@ -1119,12 +1207,25 @@ fun PlayerScreen(
                                 exoPlayer.seekTo(displayDurationMs)
                             }
                         },
-                        onVideoDoubleTap = ::enterLandscapeFullscreen,
+                        onVideoDoubleTap = ::handleDoubleTap,
                         onFullscreenClick = ::enterLandscapeFullscreen,
+                        contentScale = ui.aspectRatioMode.contentScale,
+                        frameAspectRatio = ui.aspectRatioMode.frameAspectRatio,
+                        seekEnabled = preferences.gestureSeek,
+                        pinchEnabled = preferences.gesturePinchZoom,
+                        brightnessEnabled = preferences.gestureBrightness,
+                        volumeEnabled = preferences.gestureVolume,
                     )
                 }
             }
         }
+
+        SeekPreviewOverlay(
+            visible = ui.showDoubleTapSeek,
+            previewPositionMs = ui.previewPositionMs,
+            durationMs = displayDurationMs,
+            seekStartPositionMs = ui.seekStartPositionMs,
+        )
 
         if (castManager != null && ui.controlsVisible && !ui.isInPipMode) {
             CastButton(
@@ -1194,16 +1295,16 @@ private fun LandscapePlayerContent(
     onSeekPreviewFrame: (Long) -> Unit,
     onSeekCommitted: (Long) -> Unit,
     onTap: (Offset, Float, Float) -> Unit,
-    onDoubleTap: () -> Unit,
+    onDoubleTap: (Offset, Float) -> Unit,
     onSeekingChange: (Boolean) -> Unit,
     onSpeedBoostStart: () -> Unit,
     onSpeedBoostEnd: () -> Unit,
-    onBrightnessGestureStart: () -> Unit,
-    onBrightnessChange: (Float) -> Unit,
-    onBrightnessGestureEnd: () -> Unit,
-    onVolumeGestureStart: () -> Unit,
-    onVolumeChange: (Float) -> Unit,
-    onVolumeGestureEnd: () -> Unit,
+    onBrightnessGestureStart: (() -> Unit)? = null,
+    onBrightnessChange: ((Float) -> Unit)? = null,
+    onBrightnessGestureEnd: (() -> Unit)? = null,
+    onVolumeGestureStart: (() -> Unit)? = null,
+    onVolumeChange: ((Float) -> Unit)? = null,
+    onVolumeGestureEnd: (() -> Unit)? = null,
     getCurrentBrightness: () -> Float,
     getCurrentVolume: () -> Float,
     isAdjustingBrightness: Boolean,
@@ -1228,6 +1329,10 @@ private fun LandscapePlayerContent(
     pipSupported: Boolean,
     onPipClick: () -> Unit,
     onFullscreenClick: () -> Unit,
+    contentScale: androidx.compose.ui.layout.ContentScale = androidx.compose.ui.layout.ContentScale.Fit,
+    frameAspectRatio: Float? = null,
+    seekEnabled: Boolean = true,
+    pinchEnabled: Boolean = true,
 ) {
     Box(
         modifier = Modifier
@@ -1273,6 +1378,8 @@ private fun LandscapePlayerContent(
         getCurrentVolume = getCurrentVolume,
         enabled = durationMs > 0,
         speedBoostOnly = controlsLocked,
+        seekEnabled = seekEnabled,
+        pinchEnabled = pinchEnabled,
         modifier = Modifier.fillMaxSize(),
     ) {
         Box(
@@ -1284,6 +1391,8 @@ private fun LandscapePlayerContent(
             FittedPlayerSurface(
                 player = exoPlayer,
                 modifier = Modifier.fillMaxSize(),
+                contentScale = contentScale,
+                frameAspectRatio = frameAspectRatio,
             )
             SkipIntroOutroOverlay(
                 showSkipIntro = showSkipIntro,
@@ -1408,7 +1517,7 @@ private fun PortraitPlayerContent(
     volumeFraction: Float,
     isSpeedBoosted: Boolean,
     onVideoTap: () -> Unit,
-    onVideoDoubleTap: () -> Unit,
+    onVideoDoubleTap: (Offset, Float) -> Unit,
     onPlayPauseClick: () -> Unit,
     onPreviousClick: () -> Unit,
     onNextClick: () -> Unit,
@@ -1424,6 +1533,12 @@ private fun PortraitPlayerContent(
     onSkipIntro: () -> Unit,
     onSkipOutro: () -> Unit,
     onFullscreenClick: () -> Unit,
+    contentScale: androidx.compose.ui.layout.ContentScale = androidx.compose.ui.layout.ContentScale.Fit,
+    frameAspectRatio: Float? = null,
+    seekEnabled: Boolean = true,
+    pinchEnabled: Boolean = true,
+    brightnessEnabled: Boolean = true,
+    volumeEnabled: Boolean = true,
 ) {
     PortraitPlayerLayout(
         title = title,
@@ -1492,6 +1607,12 @@ private fun PortraitPlayerContent(
         onClearIntro = onClearIntro,
         onClearOutro = onClearOutro,
         onFullscreenClick = onFullscreenClick,
+        contentScale = contentScale,
+        frameAspectRatio = frameAspectRatio,
+        seekEnabled = seekEnabled,
+        pinchEnabled = pinchEnabled,
+        brightnessEnabled = brightnessEnabled,
+        volumeEnabled = volumeEnabled,
         modifier = Modifier.fillMaxSize(),
     )
 }

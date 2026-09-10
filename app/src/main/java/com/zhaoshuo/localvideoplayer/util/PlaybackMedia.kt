@@ -2,11 +2,19 @@ package com.zhaoshuo.localvideoplayer.util
 
 import android.net.Uri
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 
 fun VideoItem.toMediaItem(): MediaItem {
-    val builder = MediaItem.Builder().setUri(uri)
+    val builder = MediaItem.Builder()
+        .setUri(uri)
+        .setMediaMetadata(
+            MediaMetadata.Builder()
+                .setTitle(title)
+                .setDisplayTitle(title)
+                .build(),
+        )
     playbackMimeType(uri, title)?.let { builder.setMimeType(it) }
     return builder.build()
 }

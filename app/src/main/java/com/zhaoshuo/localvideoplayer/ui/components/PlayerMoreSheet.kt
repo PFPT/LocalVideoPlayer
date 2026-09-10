@@ -37,6 +37,8 @@ fun PlayerMoreSheet(
     onVideoTrack: () -> Unit,
     onSubtitles: () -> Unit,
     onPickSubtitleFile: () -> Unit,
+    onAspectRatio: () -> Unit,
+    onScreenshot: () -> Unit,
     onSoftDecodeToggle: () -> Unit,
     onFavoriteToggle: () -> Unit,
     onInfo: () -> Unit,
@@ -95,6 +97,16 @@ fun PlayerMoreSheet(
                 title = stringResource(R.string.subtitle_pick_file),
                 trailing = true,
                 onClick = onPickSubtitleFile,
+            )
+            MoreActionRow(
+                title = stringResource(R.string.aspect_ratio),
+                trailing = true,
+                onClick = onAspectRatio,
+            )
+            MoreActionRow(
+                title = stringResource(R.string.screenshot),
+                trailing = true,
+                onClick = onScreenshot,
             )
             MoreActionRow(
                 title = stringResource(R.string.soft_decode),

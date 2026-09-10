@@ -82,6 +82,7 @@ dependencies {
     implementation(libs.media3.ui)
     implementation(libs.media3.ui.compose)
     implementation(libs.media3.cast)
+    implementation(libs.media3.session)
     implementation(libs.play.services.cast.framework)
     implementation(libs.androidx.mediarouter)
     implementation(libs.androidx.datastore.preferences)

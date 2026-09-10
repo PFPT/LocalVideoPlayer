@@ -53,6 +53,35 @@ fun filterLibrary(
     }
 }
 
+fun searchLibrary(
+    entries: List<VideoLibraryEntry>,
+    query: String,
+): List<VideoLibraryEntry> {
+    val needle = query.trim()
+    if (needle.isEmpty()) return entries
+    return entries.mapNotNull { entry ->
+        when (entry) {
+            is VideoLibraryEntry.Single -> {
+                if (entry.video.title.contains(needle, ignoreCase = true)) entry else null
+            }
+            is VideoLibraryEntry.Series -> {
+                if (entry.series.title.contains(needle, ignoreCase = true)) {
+                    entry
+                } else {
+                    val matched = entry.series.episodes.filter {
+                        it.title.contains(needle, ignoreCase = true)
+                    }
+                    when {
+                        matched.isEmpty() -> null
+                        matched.size == entry.series.episodes.size -> entry
+                        else -> VideoLibraryEntry.Series(entry.series.copy(episodes = matched))
+                    }
+                }
+            }
+        }
+    }
+}
+
 fun applyTypeTab(
     entries: List<VideoLibraryEntry>,
     tab: LibraryTypeTab,

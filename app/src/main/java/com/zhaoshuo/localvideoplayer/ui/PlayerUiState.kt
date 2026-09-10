@@ -8,17 +8,21 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.zhaoshuo.localvideoplayer.model.AspectRatioMode
 import kotlinx.coroutines.Job
 
 @Stable
 class PlayerUiState(
     initialIndex: Int,
     initialSoftDecode: Boolean,
+    initialSpeed: Float = 1.0f,
+    initialAspect: AspectRatioMode = AspectRatioMode.FIT,
+    initialRepeatOne: Boolean = false,
 ) {
     var currentIndex by mutableIntStateOf(initialIndex)
     var isPlaying by mutableStateOf(true)
-    var playbackSpeed by mutableFloatStateOf(1.0f)
-    var savedPlaybackSpeed by mutableFloatStateOf(1.0f)
+    var playbackSpeed by mutableFloatStateOf(initialSpeed)
+    var savedPlaybackSpeed by mutableFloatStateOf(initialSpeed)
     var isSpeedBoosted by mutableStateOf(false)
     var controlsVisible by mutableStateOf(true)
     var controlsLocked by mutableStateOf(false)
@@ -39,7 +43,11 @@ class PlayerUiState(
     var previewPositionMs by mutableLongStateOf(0L)
     var seekStartPositionMs by mutableLongStateOf(0L)
     var lastPreviewSeekAt by mutableLongStateOf(0L)
-    var repeatOne by mutableStateOf(false)
+    var repeatOne by mutableStateOf(initialRepeatOne)
+    var aspectRatioMode by mutableStateOf(initialAspect)
+    var showAspectSheet by mutableStateOf(false)
+    var doubleTapSeekDeltaMs by mutableLongStateOf(0L)
+    var showDoubleTapSeek by mutableStateOf(false)
     var videoWidth by mutableIntStateOf(0)
     var videoHeight by mutableIntStateOf(0)
     var isAdjustingBrightness by mutableStateOf(false)

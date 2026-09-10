@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -43,7 +44,13 @@ fun LumenListHeader(
                     Modifier
                 },
             )
-            .height(56.dp)
+            .then(
+                if (titleContent != null) {
+                    Modifier.heightIn(min = 56.dp)
+                } else {
+                    Modifier.height(56.dp)
+                },
+            )
             .padding(horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

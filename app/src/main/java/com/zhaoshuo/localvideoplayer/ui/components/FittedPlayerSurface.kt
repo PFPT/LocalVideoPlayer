@@ -1,7 +1,11 @@
 package com.zhaoshuo.localvideoplayer.ui.components
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -10,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
 import androidx.media3.common.text.CueGroup
@@ -28,6 +33,7 @@ fun FittedPlayerSurface(
     player: Player,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Fit,
+    frameAspectRatio: Float? = null,
 ) {
     val presentationState = rememberPresentationState(player)
     var cueGroup by remember { mutableStateOf<List<androidx.media3.common.text.Cue>>(emptyList()) }
@@ -42,16 +48,29 @@ fun FittedPlayerSurface(
         onDispose { player.removeListener(listener) }
     }
 
-    Box(modifier = modifier) {
-        PlayerSurface(
-            player = player,
-            modifier = Modifier
+    BoxWithConstraints(modifier = modifier, contentAlignment = Alignment.Center) {
+        val surfaceModifier = if (frameAspectRatio != null) {
+            val viewRatio = if (maxHeight > 0.dp) {
+                maxWidth / maxHeight
+            } else {
+                frameAspectRatio
+            }
+            if (viewRatio > frameAspectRatio) {
+                Modifier.fillMaxHeight().aspectRatio(frameAspectRatio)
+            } else {
+                Modifier.fillMaxWidth().aspectRatio(frameAspectRatio)
+            }
+        } else {
+            Modifier
                 .fillMaxSize()
                 .resizeWithContentScale(
                     contentScale = contentScale,
                     sourceSizeDp = presentationState.videoSizeDp,
                 )
-                .align(Alignment.Center),
+        }
+        PlayerSurface(
+            player = player,
+            modifier = surfaceModifier,
         )
         AndroidView(
             factory = { context ->

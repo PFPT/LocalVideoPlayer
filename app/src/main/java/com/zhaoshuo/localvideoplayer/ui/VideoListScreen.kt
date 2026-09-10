@@ -34,6 +34,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -48,11 +50,13 @@ import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.outlined.StarOutline
@@ -61,6 +65,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -92,6 +98,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
 import com.zhaoshuo.localvideoplayer.data.HiddenVideosStore
+import com.zhaoshuo.localvideoplayer.data.LibraryPreferences
+import com.zhaoshuo.localvideoplayer.data.LibraryPreferencesStore
 import com.zhaoshuo.localvideoplayer.data.PinnedItemsStore
 import com.zhaoshuo.localvideoplayer.data.PlayCountStore
 import com.zhaoshuo.localvideoplayer.data.PlaybackStore
@@ -109,6 +117,7 @@ import com.zhaoshuo.localvideoplayer.model.entryKey
 import com.zhaoshuo.localvideoplayer.model.filterLibrary
 import com.zhaoshuo.localvideoplayer.model.isAppDownloadFolder
 import com.zhaoshuo.localvideoplayer.model.partitionWithPinned
+import com.zhaoshuo.localvideoplayer.model.searchLibrary
 import com.zhaoshuo.localvideoplayer.model.sortLibrary
 import com.zhaoshuo.localvideoplayer.model.withoutUris
 import com.zhaoshuo.localvideoplayer.player.PlaylistState
@@ -126,16 +135,13 @@ import com.zhaoshuo.localvideoplayer.ui.components.LumenListHeader
 import com.zhaoshuo.localvideoplayer.ui.components.RecentPlaybackSection
 import com.zhaoshuo.localvideoplayer.ui.components.SelectionTopBar
 import com.zhaoshuo.localvideoplayer.ui.components.SeriesFolderItem
-import com.zhaoshuo.localvideoplayer.ui.components.ThemeColorBottomSheet
 import com.zhaoshuo.localvideoplayer.ui.components.VideoListItem
 import com.zhaoshuo.localvideoplayer.ui.components.rememberEpisodeProgressList
 import com.zhaoshuo.localvideoplayer.ui.components.rememberPlaybackProgress
 import com.zhaoshuo.localvideoplayer.ui.components.rememberSeriesPlaybackStats
-import com.zhaoshuo.localvideoplayer.ui.theme.LauncherIcon
 import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
 import com.zhaoshuo.localvideoplayer.ui.theme.ThemeMode
 import com.zhaoshuo.localvideoplayer.ui.theme.ThemeState
-import com.zhaoshuo.localvideoplayer.util.LauncherIconSwitcher
 import com.zhaoshuo.localvideoplayer.util.M3uPlaylistParser
 import com.zhaoshuo.localvideoplayer.util.SeriesGrouper
 import com.zhaoshuo.localvideoplayer.util.isM3u8Title
@@ -207,11 +213,13 @@ fun VideoListScreen(
     pinnedItemsStore: PinnedItemsStore,
     playCountStore: PlayCountStore,
     themeStore: ThemePreferencesStore,
+    libraryPreferencesStore: LibraryPreferencesStore,
     themeState: ThemeState,
     onRequestPermission: () -> Unit,
     onPlayVideo: (PlaylistState) -> Unit,
     onOpenSeries: (String) -> Unit,
     onOpenDownloads: () -> Unit,
+    onOpenSettings: () -> Unit,
     onVideosRemoved: (List<Uri>) -> Unit,
     onPullRefresh: () -> Unit,
     modifier: Modifier = Modifier,
@@ -226,13 +234,15 @@ fun VideoListScreen(
     val castPlaying by (castManager?.playback?.isPlaying ?: idlePlaying).collectAsState()
     val castSheet = rememberCastSheetActions(castManager)
     var castTarget by remember { mutableStateOf<VideoItem?>(null) }
-    var sortOrder by rememberSaveable { mutableStateOf(VideoSortOrder.DATE_DESC) }
-    var collapseSingles by rememberSaveable { mutableStateOf(false) }
-    var viewLayout by rememberSaveable { mutableStateOf(LibraryViewLayout.SECTIONED) }
-    var libraryFilter by remember { mutableStateOf(LibraryFilter()) }
-    var selectedTypeTab by rememberSaveable { mutableStateOf(LibraryTypeTab.ALL) }
+    val libraryPrefs by libraryPreferencesStore.preferences.collectAsState(initial = LibraryPreferences())
+    val sortOrder = libraryPrefs.sortOrder
+    val collapseSingles = libraryPrefs.collapseSingles
+    val viewLayout = libraryPrefs.viewLayout
+    val libraryFilter = libraryPrefs.libraryFilter
+    val selectedTypeTab = libraryPrefs.typeTab
+    var isSearching by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     var showOptionsSheet by rememberSaveable { mutableStateOf(false) }
-    var showThemeSheet by rememberSaveable { mutableStateOf(false) }
     var selectionMode by rememberSaveable { mutableStateOf(false) }
     var selectedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     var pendingDeleteUris by remember { mutableStateOf<List<Uri>?>(null) }
@@ -292,16 +302,19 @@ fun VideoListScreen(
         isUnfilteredAllTab -> allTabSourceEntries
         else -> emptyList()
     }
-    val pinnedSections = remember(displayLibrary, pinnedKeys, viewLayout) {
+    val visibleLibrary = remember(displayLibrary, searchQuery) {
+        searchLibrary(displayLibrary, searchQuery)
+    }
+    val pinnedSections = remember(visibleLibrary, pinnedKeys, viewLayout) {
         if (viewLayout == LibraryViewLayout.SECTIONED) {
-            partitionWithPinned(displayLibrary, pinnedKeys)
+            partitionWithPinned(visibleLibrary, pinnedKeys)
         } else {
             null
         }
     }
-    val flatLibrary = remember(displayLibrary, viewLayout) {
+    val flatLibrary = remember(visibleLibrary, viewLayout) {
         if (viewLayout == LibraryViewLayout.FLAT) {
-            displayLibrary
+            visibleLibrary
         } else {
             emptyList()
         }
@@ -469,6 +482,10 @@ fun VideoListScreen(
 
     BackHandler(enabled = selectionMode) {
         exitSelectionMode()
+    }
+    BackHandler(enabled = isSearching) {
+        isSearching = false
+        searchQuery = ""
     }
 
     val deleteFromDevice = rememberVideoDeleter(
@@ -671,37 +688,11 @@ fun VideoListScreen(
             viewLayout = viewLayout,
             libraryFilter = libraryFilter,
             collapseSingles = collapseSingles,
-            onOrderSelected = { sortOrder = it },
-            onViewLayoutSelected = { viewLayout = it },
-            onFilterChanged = { libraryFilter = it },
-            onCollapseSinglesChanged = { collapseSingles = it },
+            onOrderSelected = { scope.launch { libraryPreferencesStore.setSortOrder(it) } },
+            onViewLayoutSelected = { scope.launch { libraryPreferencesStore.setViewLayout(it) } },
+            onFilterChanged = { scope.launch { libraryPreferencesStore.setLibraryFilter(it) } },
+            onCollapseSinglesChanged = { scope.launch { libraryPreferencesStore.setCollapseSingles(it) } },
             onDismiss = { showOptionsSheet = false },
-        )
-    }
-
-    val selectedLauncherIcon by themeStore.launcherIcon.collectAsState(initial = LauncherIcon.Default)
-    if (showThemeSheet) {
-        ThemeColorBottomSheet(
-            themeMode = themeState.mode,
-            initialColors = themeState.colors,
-            selectedLauncherIcon = selectedLauncherIcon,
-            onThemeModeChange = { mode ->
-                scope.launch { themeStore.setThemeMode(mode) }
-            },
-            onApplyLauncherIcon = { icon ->
-                themeStore.setLauncherIcon(icon)
-                LauncherIconSwitcher.apply(context, icon)
-            },
-            onSave = { colors, icon ->
-                scope.launch {
-                    themeStore.saveThemeColors(colors)
-                    themeStore.setLauncherIcon(icon)
-                    if (icon != selectedLauncherIcon) {
-                        LauncherIconSwitcher.apply(context, icon)
-                    }
-                }
-            },
-            onDismiss = { showThemeSheet = false },
         )
     }
 
@@ -804,6 +795,41 @@ fun VideoListScreen(
                         },
                         onCancel = ::exitSelectionMode,
                     )
+                } else if (isSearching) {
+                    LumenListHeader(
+                        title = stringResource(R.string.search),
+                        onBack = {
+                            isSearching = false
+                            searchQuery = ""
+                        },
+                        applyStatusBarPadding = false,
+                        titleContent = {
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                placeholder = { Text(stringResource(R.string.search_hint)) },
+                                singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = theme.accent,
+                                    cursorColor = theme.accent,
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 52.dp),
+                            )
+                        },
+                        actions = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = stringResource(R.string.search_clear),
+                                        tint = MaterialTheme.colorScheme.onBackground,
+                                    )
+                                }
+                            }
+                        },
+                    )
                 } else {
                     LumenListHeader(
                         title = stringResource(R.string.video_list_title),
@@ -822,6 +848,13 @@ fun VideoListScreen(
                                     onClick = { castSheet.open() },
                                 )
                             }
+                            IconButton(onClick = { isSearching = true }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Search,
+                                    contentDescription = stringResource(R.string.search),
+                                    tint = MaterialTheme.colorScheme.onBackground,
+                                )
+                            }
                             IconButton(onClick = onOpenDownloads) {
                                 Icon(
                                     imageVector = Icons.Filled.Download,
@@ -831,11 +864,12 @@ fun VideoListScreen(
                             }
                             IconButton(
                                 onClick = {
-                                    selectedTypeTab = if (isMarkedTabActive) {
+                                    val next = if (isMarkedTabActive) {
                                         LibraryTypeTab.ALL
                                     } else {
                                         LibraryTypeTab.MARKED
                                     }
+                                    scope.launch { libraryPreferencesStore.setTypeTab(next) }
                                 },
                             ) {
                                 Icon(
@@ -878,10 +912,10 @@ fun VideoListScreen(
                                     tint = MaterialTheme.colorScheme.onBackground,
                                 )
                             }
-                            IconButton(onClick = { showThemeSheet = true }) {
+                            IconButton(onClick = onOpenSettings) {
                                 Icon(
-                                    imageVector = Icons.Default.Palette,
-                                    contentDescription = stringResource(R.string.theme_color),
+                                    imageVector = Icons.Filled.Settings,
+                                    contentDescription = stringResource(R.string.settings),
                                     tint = MaterialTheme.colorScheme.onBackground,
                                 )
                             }
@@ -1018,7 +1052,7 @@ fun VideoListScreen(
                             ),
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            if (!selectionMode && recentRecords.isNotEmpty()) {
+                            if (!selectionMode && !isSearching && recentRecords.isNotEmpty()) {
                                 item(key = "recent-playback") {
                                     RecentPlaybackSection(
                                         records = recentRecords,
@@ -1033,7 +1067,9 @@ fun VideoListScreen(
                                     LumenLibraryTabBar(
                                         tabs = typeTabs,
                                         selectedTab = selectedTypeTab,
-                                        onTabSelected = { selectedTypeTab = it },
+                                        onTabSelected = { tab ->
+                                            scope.launch { libraryPreferencesStore.setTypeTab(tab) }
+                                        },
                                         contentPadding = PaddingValues(0.dp),
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -1074,23 +1110,24 @@ fun VideoListScreen(
                             if (
                                 !isLibraryLoading &&
                                 !isSortingLibrary &&
-                                displayLibrary.isEmpty() &&
+                                visibleLibrary.isEmpty() &&
                                 libraryEntries.isNotEmpty()
                             ) {
                                 item(key = "no-filter-results") {
-                                    Box(
+                                    LumenEmptyState(
+                                        title = stringResource(
+                                            if (searchQuery.isNotBlank()) {
+                                                R.string.no_search_results
+                                            } else {
+                                                R.string.no_filter_results
+                                            },
+                                        ),
+                                        icon = Icons.Filled.Search,
                                         modifier = Modifier
                                             .fillParentMaxWidth()
-                                            .padding(vertical = 48.dp)
+                                            .padding(24.dp)
                                             .animateItem(placementSpec = null),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Text(
-                                            text = stringResource(R.string.no_filter_results),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = theme.onSurfaceMuted,
-                                        )
-                                    }
+                                    )
                                 }
                             }
 
@@ -1204,7 +1241,11 @@ fun VideoListScreen(
                                                         )
                                                     },
                                                     expanded = !collapseSingles,
-                                                    onClick = { collapseSingles = !collapseSingles },
+                                                    onClick = {
+                                                        scope.launch {
+                                                            libraryPreferencesStore.setCollapseSingles(!collapseSingles)
+                                                        }
+                                                    },
                                                     modifier = Modifier.animateItem(placementSpec = null),
                                                 )
                                             }

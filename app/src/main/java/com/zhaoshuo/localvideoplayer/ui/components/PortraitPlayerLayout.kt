@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -60,7 +61,7 @@ fun PortraitPlayerLayout(
     volumeFraction: Float,
     isSpeedBoosted: Boolean,
     onVideoTap: () -> Unit,
-    onVideoDoubleTap: () -> Unit,
+    onVideoDoubleTap: (Offset, Float) -> Unit,
     onPlayPauseClick: () -> Unit,
     onPreviousClick: () -> Unit,
     onNextClick: () -> Unit,
@@ -87,6 +88,12 @@ fun PortraitPlayerLayout(
     onMarkOutro: () -> Unit = {},
     onClearIntro: () -> Unit = {},
     onClearOutro: () -> Unit = {},
+    contentScale: androidx.compose.ui.layout.ContentScale = androidx.compose.ui.layout.ContentScale.Fit,
+    frameAspectRatio: Float? = null,
+    seekEnabled: Boolean = true,
+    pinchEnabled: Boolean = true,
+    brightnessEnabled: Boolean = true,
+    volumeEnabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val showChrome = controlsVisible || isSeeking
@@ -118,15 +125,17 @@ fun PortraitPlayerLayout(
                     onSeekingChange = onSeekingChange,
                     onSpeedBoostStart = onSpeedBoostStart,
                     onSpeedBoostEnd = onSpeedBoostEnd,
-                    onBrightnessGestureStart = onBrightnessGestureStart,
-                    onBrightnessChange = onBrightnessChange,
-                    onBrightnessGestureEnd = onBrightnessGestureEnd,
-                    onVolumeGestureStart = onVolumeGestureStart,
-                    onVolumeChange = onVolumeChange,
-                    onVolumeGestureEnd = onVolumeGestureEnd,
+                    onBrightnessGestureStart = onBrightnessGestureStart.takeIf { brightnessEnabled },
+                    onBrightnessChange = onBrightnessChange.takeIf { brightnessEnabled },
+                    onBrightnessGestureEnd = onBrightnessGestureEnd.takeIf { brightnessEnabled },
+                    onVolumeGestureStart = onVolumeGestureStart.takeIf { volumeEnabled },
+                    onVolumeChange = onVolumeChange.takeIf { volumeEnabled },
+                    onVolumeGestureEnd = onVolumeGestureEnd.takeIf { volumeEnabled },
                     getCurrentBrightness = getCurrentBrightness,
                     getCurrentVolume = getCurrentVolume,
                     enabled = durationMs > 0,
+                    seekEnabled = seekEnabled,
+                    pinchEnabled = pinchEnabled,
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color.Black),
@@ -138,6 +147,8 @@ fun PortraitPlayerLayout(
                         FittedPlayerSurface(
                             player = exoPlayer,
                             modifier = Modifier.fillMaxSize(),
+                            contentScale = contentScale,
+                            frameAspectRatio = frameAspectRatio,
                         )
                     }
                 }
