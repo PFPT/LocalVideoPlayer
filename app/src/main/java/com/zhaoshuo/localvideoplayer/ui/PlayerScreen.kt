@@ -350,10 +350,20 @@ fun PlayerScreen(
         exoPlayer.seekTo(ui.currentIndex, position)
     }
 
+    fun commitSeek(targetMs: Long): Boolean {
+        val duration = exoPlayer.duration.takeIf { it > 0 } ?: resolvedDurationMs()
+        val current = exoPlayer.currentPosition.coerceAtLeast(0L)
+        if (duration <= 0L && !exoPlayer.isCurrentMediaItemSeekable && targetMs <= current) {
+            return false
+        }
+        exoPlayer.seekTo(targetMs)
+        progress.currentPositionMs = targetMs
+        ui.previewPositionMs = targetMs
+        return true
+    }
+
     fun handleSeekCommitted(position: Long) {
-        exoPlayer.seekTo(ui.currentIndex, position)
-        progress.currentPositionMs = position
-        ui.previewPositionMs = position
+        commitSeek(position)
     }
 
     fun handleSeekingChange(seeking: Boolean) {
@@ -468,12 +478,16 @@ fun PlayerScreen(
     }
 
     fun seekBy(deltaMs: Long) {
-        val duration = resolvedDurationMs()
+        val duration = exoPlayer.duration.takeIf { it > 0 } ?: resolvedDurationMs()
         val position = exoPlayer.currentPosition.coerceAtLeast(0L)
-        val target = seekTargetMs(position, deltaMs, duration)
-        exoPlayer.seekTo(target)
-        progress.currentPositionMs = target
-        ui.previewPositionMs = target
+        val target = seekTargetMs(
+            positionMs = position,
+            deltaMs = deltaMs,
+            durationMs = duration,
+            bufferedPositionMs = exoPlayer.bufferedPosition.coerceAtLeast(0L),
+            seekable = exoPlayer.isCurrentMediaItemSeekable,
+        )
+        if (!commitSeek(target)) return
         ui.seekStartPositionMs = position
         ui.doubleTapSeekDeltaMs = deltaMs
         ui.showDoubleTapSeek = true
@@ -1375,6 +1389,8 @@ private fun LandscapePlayerContent(
         getDurationMs = {
             progress.durationMs.takeIf { it > 0 } ?: durationMs
         },
+        getBufferedPositionMs = { exoPlayer.bufferedPosition.coerceAtLeast(0L) },
+        isSeekable = { exoPlayer.isCurrentMediaItemSeekable },
         onSeekPreview = onSeekPreview,
         onSeekPreviewFrame = onSeekPreviewFrame,
         onSeekCommitted = onSeekCommitted,
@@ -1569,6 +1585,8 @@ private fun PortraitPlayerContent(
         durationMs = durationMs,
         getDurationMs = { progress.durationMs.takeIf { it > 0 } ?: durationMs },
         getCurrentPositionMs = { progress.currentPositionMs },
+        getBufferedPositionMs = { exoPlayer.bufferedPosition.coerceAtLeast(0L) },
+        isSeekable = { exoPlayer.isCurrentMediaItemSeekable },
         isSeeking = isSeeking,
         previewPositionMs = previewPositionMs,
         seekStartPositionMs = seekStartPositionMs,

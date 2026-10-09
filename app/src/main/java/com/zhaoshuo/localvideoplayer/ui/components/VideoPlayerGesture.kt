@@ -44,6 +44,8 @@ fun VideoPlayerGesture(
     onOffsetChange: (Float, Float) -> Unit,
     getCurrentPositionMs: () -> Long,
     getDurationMs: () -> Long,
+    getBufferedPositionMs: () -> Long = { Long.MAX_VALUE },
+    isSeekable: () -> Boolean = { true },
     onSeekPreview: (Long) -> Unit,
     onSeekPreviewFrame: (Long) -> Unit,
     onSeekCommitted: (Long) -> Unit,
@@ -284,6 +286,8 @@ fun VideoPlayerGesture(
                                                     startBrightness = startBrightness,
                                                     startVolume = startVolume,
                                                     durationMs = getDurationMs(),
+                                                    bufferedPositionMs = getBufferedPositionMs(),
+                                                    seekable = isSeekable(),
                                                     onSeekPreview = onSeekPreview,
                                                     onSeekPreviewFrame = onSeekPreviewFrame,
                                                     onBrightnessChange = onBrightnessChange,
@@ -370,6 +374,8 @@ private fun applyDragDelta(
     startBrightness: Float,
     startVolume: Float,
     durationMs: Long,
+    bufferedPositionMs: Long,
+    seekable: Boolean,
     onSeekPreview: (Long) -> Unit,
     onSeekPreviewFrame: (Long) -> Unit,
     onBrightnessChange: ((Float) -> Unit)?,
@@ -380,7 +386,13 @@ private fun applyDragDelta(
         DragMode.Seek -> {
             val seekRangeMs = swipeSeekRangeMs(durationMs)
             val deltaMs = (delta.x / width) * seekRangeMs
-            val previewMs = seekTargetMs(startPositionMs, deltaMs.toLong(), durationMs)
+            val previewMs = seekTargetMs(
+                positionMs = startPositionMs,
+                deltaMs = deltaMs.toLong(),
+                durationMs = durationMs,
+                bufferedPositionMs = bufferedPositionMs,
+                seekable = seekable,
+            )
             onSeekPreview(previewMs)
             var frameAt = lastPreviewFrameAt
             val now = System.currentTimeMillis()

@@ -17,8 +17,32 @@ class SeekTargetTest {
     }
 
     @Test
-    fun swipeRangeUsesTenMinutesWhenDurationIsUnknown() {
-        assertEquals(SEEK_FULL_SWIPE_MS, swipeSeekRangeMs(durationMs = 0L))
+    fun unseekableUnknownDurationStaysWithinBuffer() {
+        assertEquals(
+            12_000L,
+            seekTargetMs(
+                positionMs = 10_000L,
+                deltaMs = 30_000L,
+                durationMs = 0L,
+                bufferedPositionMs = 12_000L,
+                seekable = false,
+            ),
+        )
+        assertEquals(
+            10_000L,
+            seekTargetMs(
+                positionMs = 10_000L,
+                deltaMs = 30_000L,
+                durationMs = 0L,
+                bufferedPositionMs = 8_000L,
+                seekable = false,
+            ),
+        )
+    }
+
+    @Test
+    fun swipeRangeUsesOneMinuteWhenDurationIsUnknown() {
+        assertEquals(SEEK_UNKNOWN_DURATION_SWIPE_MS, swipeSeekRangeMs(durationMs = 0L))
     }
 
     @Test
