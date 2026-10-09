@@ -48,8 +48,32 @@ object DownloadNameResolver {
     private const val SCORE_CDN_KEY = 80
     private const val SCORE_LABEL_PRECISE = 60
 
+    data class DownloadFieldChange(
+        val text: String,
+        val title: String?,
+        val pasted: Boolean,
+    )
+
+    fun applyDownloadFieldChange(current: String, incoming: String): DownloadFieldChange {
+        val cleaned = stripInvisibleChars(incoming)
+        val pasted = cleaned.contains('\n') ||
+            cleaned.contains('\r') ||
+            cleaned.length - current.length > 1
+        if (!pasted) return DownloadFieldChange(text = cleaned, title = null, pasted = false)
+        val parsed = parseSharedText(cleaned)
+        if (!parsed.url.isNullOrBlank()) {
+            return DownloadFieldChange(text = parsed.url, title = parsed.title, pasted = true)
+        }
+        val flattened = cleaned.replace("\r", "").replace("\n", "").trim()
+        val reparsed = parseSharedText(flattened)
+        if (!reparsed.url.isNullOrBlank()) {
+            return DownloadFieldChange(text = reparsed.url, title = reparsed.title, pasted = true)
+        }
+        return DownloadFieldChange(text = flattened, title = null, pasted = true)
+    }
+
     fun parseSharedText(text: String): ParsedShare {
-        val trimmed = text.trim()
+        val trimmed = stripInvisibleChars(text).trim()
         if (trimmed.isEmpty()) return ParsedShare(null, null)
         if ('|' in trimmed) {
             val parts = trimmed.split('|', limit = 2)
@@ -886,7 +910,7 @@ object DownloadNameResolver {
     }.getOrDefault(value)
 
     private fun String.isHttpUrl(): Boolean =
-        startsWith("http://") || startsWith("https://")
+        startsWith("http://", ignoreCase = true) || startsWith("https://", ignoreCase = true)
 
     private fun String.isDownloadUrl(): Boolean =
         isHttpUrl() || DownloadUrlClassifier.isMagnetUrl(this) || contains("magnet:?", ignoreCase = true)
@@ -895,15 +919,33 @@ object DownloadNameResolver {
         if (DownloadUrlClassifier.isMagnetUrl(this) || contains("magnet:?", ignoreCase = true)) {
             DownloadUrlClassifier.extractFirstMagnet(this) ?: this
         } else {
-            this
+            normalizeHttpScheme()
         }
+
+    private fun String.normalizeHttpScheme(): String {
+        val scheme = when {
+            startsWith("https://", ignoreCase = true) -> "https://"
+            startsWith("http://", ignoreCase = true) -> "http://"
+            else -> return this
+        }
+        return scheme + substring(scheme.length)
+    }
+
+    private fun stripInvisibleChars(text: String): String = buildString(text.length) {
+        text.forEach { ch ->
+            if (ch != '\uFEFF' && ch != '\u200B' && ch != '\u200C' && ch != '\u200D' && ch != '\u2060') {
+                append(ch)
+            }
+        }
+    }
 
     private fun extractInlineDownloadUrl(text: String): String? =
         DownloadUrlClassifier.extractFirstMagnet(text)
             ?: INLINE_HTTP_URL_PATTERN.find(text)?.value
                 ?.trimEnd(',', '.', ';', ')', ']', '}', '"', '\'')
+                ?.normalizeHttpScheme()
 
-    private val INLINE_HTTP_URL_PATTERN = Regex("""https?://\S+""")
+    private val INLINE_HTTP_URL_PATTERN = Regex("""https?://\S+""", RegexOption.IGNORE_CASE)
 
     private val TITLE_QUERY_KEYS = setOf("name", "title", "filename", "n", "vod_name")
 

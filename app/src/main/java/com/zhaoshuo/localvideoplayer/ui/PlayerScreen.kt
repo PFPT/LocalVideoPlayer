@@ -2,7 +2,7 @@ package com.zhaoshuo.localvideoplayer.ui
 
 import android.app.Activity
 import android.content.Context
-import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.media.AudioManager
 import android.net.Uri
 import android.util.Rational
@@ -14,15 +14,20 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -30,39 +35,47 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.C
+import androidx.media3.common.ColorInfo
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import com.zhaoshuo.localvideoplayer.MainActivity
 import com.zhaoshuo.localvideoplayer.R
+import com.zhaoshuo.localvideoplayer.data.BookmarkStore
 import com.zhaoshuo.localvideoplayer.data.PlaybackStore
+import com.zhaoshuo.localvideoplayer.data.VideoDurationResolver
 import com.zhaoshuo.localvideoplayer.data.PinnedItemsStore
 import com.zhaoshuo.localvideoplayer.data.PlayerPreferences
 import com.zhaoshuo.localvideoplayer.data.PlayerPreferencesStore
 import com.zhaoshuo.localvideoplayer.data.SeriesSkipSettings
 import com.zhaoshuo.localvideoplayer.data.SeriesSkipStore
-import com.zhaoshuo.localvideoplayer.data.VideoDurationResolver
 import com.zhaoshuo.localvideoplayer.model.VideoItem
-import com.zhaoshuo.localvideoplayer.player.PlaybackMediaService
+import com.zhaoshuo.localvideoplayer.player.PlaybackSession
 import com.zhaoshuo.localvideoplayer.player.PlayerViewModel
 import com.zhaoshuo.localvideoplayer.player.PlayerProgressState
 import com.zhaoshuo.localvideoplayer.player.PlayerSession
 import com.zhaoshuo.localvideoplayer.player.PlaylistState
 import com.zhaoshuo.localvideoplayer.player.applyTrackSelection
-import com.zhaoshuo.localvideoplayer.player.buildExoPlayer
-import com.zhaoshuo.localvideoplayer.player.rememberPlayerProgressState
-import com.zhaoshuo.localvideoplayer.player.findSidecarSubtitle
-import com.zhaoshuo.localvideoplayer.player.toMediaItemWithSubtitle
-import com.zhaoshuo.localvideoplayer.player.trackOptions
+import com.zhaoshuo.localvideoplayer.player.abLoopTarget
+import com.zhaoshuo.localvideoplayer.player.episodeStartPositionMs
 import com.zhaoshuo.localvideoplayer.player.seekTargetMs
+import com.zhaoshuo.localvideoplayer.player.isSoftwareDecodeRetryable
+import com.zhaoshuo.localvideoplayer.player.isSourceReadFailure
+import com.zhaoshuo.localvideoplayer.player.rememberPlayerProgressState
+import com.zhaoshuo.localvideoplayer.player.trackOptions
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -70,11 +83,15 @@ import com.zhaoshuo.localvideoplayer.ui.components.AspectRatioSheet
 import com.zhaoshuo.localvideoplayer.ui.components.BrightnessFeedbackOverlay
 import com.zhaoshuo.localvideoplayer.ui.components.EpisodeListBottomSheet
 import com.zhaoshuo.localvideoplayer.ui.components.FittedPlayerSurface
+import com.zhaoshuo.localvideoplayer.ui.components.LiveSeekPreview
+import com.zhaoshuo.localvideoplayer.ui.components.LiveSkipIntroOutro
+import com.zhaoshuo.localvideoplayer.ui.components.LocalSubtitleAppearance
+import com.zhaoshuo.localvideoplayer.ui.components.LocalTimelineMarks
+import com.zhaoshuo.localvideoplayer.ui.components.SubtitleAppearance
+import com.zhaoshuo.localvideoplayer.ui.components.TimelineMarks
 import com.zhaoshuo.localvideoplayer.ui.components.LandscapePlayerLayout
 import com.zhaoshuo.localvideoplayer.ui.components.PlayerMoreSheet
 import com.zhaoshuo.localvideoplayer.ui.components.PortraitPlayerLayout
-import com.zhaoshuo.localvideoplayer.ui.components.SeekPreviewOverlay
-import com.zhaoshuo.localvideoplayer.ui.components.SkipIntroOutroOverlay
 import com.zhaoshuo.localvideoplayer.ui.components.SpeedBoostOverlay
 import com.zhaoshuo.localvideoplayer.ui.components.SpeedSelectorSheet
 import com.zhaoshuo.localvideoplayer.ui.components.TrackSelectorSheet
@@ -86,6 +103,7 @@ import com.zhaoshuo.localvideoplayer.util.OrientationController
 import com.zhaoshuo.localvideoplayer.util.PlaybackSystemControls
 import com.zhaoshuo.localvideoplayer.util.PictureInPictureHelper
 import com.zhaoshuo.localvideoplayer.util.TitleParser
+import com.zhaoshuo.localvideoplayer.util.SeekPreviewFrames
 import com.zhaoshuo.localvideoplayer.util.VideoFrameCapture
 import com.zhaoshuo.localvideoplayer.util.toMediaItem
 import com.zhaoshuo.localvideoplayer.cast.CastUiState
@@ -94,14 +112,15 @@ import com.zhaoshuo.localvideoplayer.ui.components.CastButton
 import com.zhaoshuo.localvideoplayer.ui.components.CastDeviceBottomSheet
 import com.zhaoshuo.localvideoplayer.ui.components.CastMiniController
 import com.zhaoshuo.localvideoplayer.ui.components.rememberCastSheetActions
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val SPEED_BOOST = 2.0f
-private const val PROGRESS_SAVE_INTERVAL_MS = 5_000L
 private const val DOUBLE_TAP_SEEK_MS = 10_000L
 
 @Composable
@@ -111,11 +130,12 @@ fun PlayerScreen(
     playerPreferencesStore: PlayerPreferencesStore,
     pinnedItemsStore: PinnedItemsStore,
     seriesSkipStore: SeriesSkipStore,
+    bookmarkStore: BookmarkStore,
+    playbackSession: PlaybackSession,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val playerViewModel: PlayerViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -129,8 +149,8 @@ fun PlayerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val configuration = LocalConfiguration.current
     val playlist = playlistState.items
-    val preferences by playerPreferencesStore.preferences.collectAsState(initial = PlayerPreferences())
-    val pinnedKeys by pinnedItemsStore.pinnedKeys.collectAsState(initial = emptySet())
+    val preferences by playerPreferencesStore.preferences.collectAsStateWithLifecycle(initialValue = PlayerPreferences())
+    val pinnedKeys by pinnedItemsStore.pinnedKeys.collectAsStateWithLifecycle(initialValue = emptySet())
     val audioManager = remember(context) {
         context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     }
@@ -153,35 +173,107 @@ fun PlayerScreen(
             it.isInPipMode = activity?.isInPipMode == true
         }
     }
-    val resumedIndices = remember(playlist) { mutableSetOf<Int>() }
     val pipSupported = remember(activity) { activity?.isPipSupported() == true }
-    val exoPlayer = remember(playlist, ui.softDecodeGeneration) {
-        val sidecar = playlist.getOrNull(playlistState.currentIndex)?.let { findSidecarSubtitle(context, it) }
-        if (ui.subtitleUri == null && sidecar != null) {
-            ui.subtitleUri = sidecar
+    val exoPlayer by produceState<ExoPlayer?>(
+        initialValue = null,
+        playlist,
+        ui.softDecodeGeneration,
+    ) {
+        if (playlist.isEmpty()) {
+            value = null
+            return@produceState
         }
-        buildExoPlayer(
-            context = context,
-            playlist = playlist,
-            startIndex = playlistState.currentIndex,
-            softDecode = ui.appliedSoftDecode,
-            subtitleUri = ui.subtitleUri ?: sidecar,
+        val playIndex = ui.currentIndex.coerceIn(0, playlist.lastIndex)
+        val replay = ui.replayPositionMs
+        ui.replayPositionMs = null
+        value = playbackSession.open(
+            items = playlist,
+            startIndex = playIndex,
+            requestedSoftDecode = ui.appliedSoftDecode,
+            startPositionMs = replay,
         )
     }
-    val progress = rememberPlayerProgressState(exoPlayer, ui.isSeeking)
+    val player = exoPlayer
+    if (player == null) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(Color.Black),
+        )
+    } else {
+        PlayerScreenContent(
+            exoPlayer = player,
+            playlist = playlist,
+            playbackStore = playbackStore,
+            playerPreferencesStore = playerPreferencesStore,
+            pinnedItemsStore = pinnedItemsStore,
+            seriesSkipStore = seriesSkipStore,
+            bookmarkStore = bookmarkStore,
+            playbackSession = playbackSession,
+            onBack = onBack,
+            modifier = modifier,
+            preferences = preferences,
+            pinnedKeys = pinnedKeys,
+            ui = ui,
+            pipSupported = pipSupported,
+            playerViewModel = playerViewModel,
+            activity = activity,
+            view = view,
+            lifecycleOwner = lifecycleOwner,
+            configuration = configuration,
+            audioManager = audioManager,
+            orientationController = orientationController,
+            systemControls = systemControls,
+        )
+    }
+}
+
+@Composable
+private fun PlayerScreenContent(
+    exoPlayer: ExoPlayer,
+    playlist: List<VideoItem>,
+    playbackStore: PlaybackStore,
+    playerPreferencesStore: PlayerPreferencesStore,
+    pinnedItemsStore: PinnedItemsStore,
+    seriesSkipStore: SeriesSkipStore,
+    bookmarkStore: BookmarkStore,
+    playbackSession: PlaybackSession,
+    onBack: () -> Unit,
+    modifier: Modifier,
+    preferences: PlayerPreferences,
+    pinnedKeys: Set<String>,
+    ui: PlayerUiState,
+    pipSupported: Boolean,
+    playerViewModel: PlayerViewModel,
+    activity: MainActivity?,
+    view: android.view.View,
+    lifecycleOwner: androidx.lifecycle.LifecycleOwner,
+    configuration: android.content.res.Configuration,
+    audioManager: AudioManager,
+    orientationController: OrientationController?,
+    systemControls: PlaybackSystemControls?,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val bookmarkUri = playlist.getOrNull(ui.currentIndex)?.uri
+    val bookmarkFlow = remember(bookmarkUri) {
+        bookmarkUri?.let { bookmarkStore.bookmarks(it) } ?: flowOf(emptyList())
+    }
+    val bookmarks by bookmarkFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+    val castingOnLeave = remember { mutableStateOf(false) }
+    val progress = rememberPlayerProgressState(
+        player = exoPlayer,
+        isSeeking = ui.isSeeking,
+        controlsVisible = ui.controlsVisible,
+    )
     val subtitlePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent(),
     ) { uri ->
         if (uri != null) {
-            ui.subtitleUri = uri
             val index = exoPlayer.currentMediaItemIndex
-            val position = exoPlayer.currentPosition
-            val video = playlist.getOrNull(index)
-            if (video != null) {
-                exoPlayer.setMediaItem(video.toMediaItemWithSubtitle(uri), position)
-                exoPlayer.prepare()
-                exoPlayer.playWhenReady = ui.isPlaying
-            }
+            val video = playlist.getOrNull(index) ?: return@rememberLauncherForActivityResult
+            playbackSession.bindManualSubtitle(video.uri, uri)
+            scope.launch { playbackSession.attachSubtitle(index) }
         }
     }
     LaunchedEffect(preferences.defaultSpeed, preferences.aspectRatioMode, preferences.repeatOne) {
@@ -196,19 +288,14 @@ fun PlayerScreen(
     val idleCastState = remember { MutableStateFlow<CastUiState>(CastUiState.Idle) }
     val idleFalse = remember { MutableStateFlow(false) }
     val idleZero = remember { MutableStateFlow(0L) }
-    val castState by (castManager?.uiState ?: idleCastState).collectAsState()
-    val isCasting by (castManager?.playback?.isCasting ?: idleFalse).collectAsState()
-    val castPositionMs by (castManager?.playback?.positionMs ?: idleZero).collectAsState()
-    val castDurationMs by (castManager?.playback?.durationMs ?: idleZero).collectAsState()
-    val castPlaying by (castManager?.playback?.isPlaying ?: idleFalse).collectAsState()
+    val castState by (castManager?.uiState ?: idleCastState).collectAsStateWithLifecycle()
+    val isCasting by (castManager?.playback?.isCasting ?: idleFalse).collectAsStateWithLifecycle()
+    val castDurationMs by (castManager?.playback?.durationMs ?: idleZero).collectAsStateWithLifecycle()
+    val castPlaying by (castManager?.playback?.isPlaying ?: idleFalse).collectAsStateWithLifecycle()
+    castingOnLeave.value = isCasting
     val castSheet = rememberCastSheetActions(castManager, exoPlayer)
     LaunchedEffect(exoPlayer, castManager) {
         castManager?.bindLocalPlayer(exoPlayer)
-    }
-    val displayPositionMs = when {
-        ui.isSeeking -> ui.previewPositionMs
-        isCasting -> castPositionMs
-        else -> progress.currentPositionMs
     }
     fun resolvedDurationMs(): Long {
         val live = progress.durationMs
@@ -238,29 +325,29 @@ fun PlayerScreen(
         )
     }
 
-    suspend fun seekToResumePosition(index: Int) {
-        if (ui.isSeeking || index in resumedIndices) return
+    suspend fun openEpisode(index: Int) {
         val video = playlist.getOrNull(index) ?: return
-        val startMs = playbackStore.getResumePositionMs(video.uri, video.durationMs)
-        resumedIndices.add(index)
-        if (startMs > 0) {
+        val startMs = episodeStartPositionMs(
+            resumePositionMs = playbackStore.getResumePositionMs(video.uri, video.durationMs),
+            replayPositionMs = ui.replayPositionMs,
+        )
+        ui.replayPositionMs = null
+        playbackSession.attachSubtitle(index)
+        playbackSession.resumedIndices.add(index)
+        if (startMs > 0L || exoPlayer.currentMediaItemIndex != index) {
             exoPlayer.seekTo(index, startMs)
-            progress.currentPositionMs = startMs
-            ui.previewPositionMs = startMs
         }
+        progress.currentPositionMs = startMs
+        ui.previewPositionMs = startMs
+        ui.currentIndex = index
     }
 
     fun selectEpisode(index: Int) {
         if (index !in playlist.indices) return
         scope.launch {
             saveCurrentProgress()
-            val video = playlist[index]
-            val startMs = playbackStore.getResumePositionMs(video.uri, video.durationMs)
-            resumedIndices.add(index)
-            exoPlayer.seekTo(index, startMs)
-            progress.currentPositionMs = startMs
-            ui.previewPositionMs = startMs
-            ui.currentIndex = index
+            playbackSession.resumedIndices.remove(index)
+            openEpisode(index)
         }
     }
 
@@ -281,11 +368,8 @@ fun PlayerScreen(
             } else {
                 saveCurrentProgress()
             }
-            resumedIndices.add(target)
-            exoPlayer.seekTo(target, 0L)
-            progress.currentPositionMs = 0L
-            ui.previewPositionMs = 0L
-            ui.currentIndex = target
+            playbackSession.resumedIndices.remove(target)
+            openEpisode(target)
         }
     }
 
@@ -344,10 +428,7 @@ fun PlayerScreen(
     }
 
     fun handleSeekPreviewFrame(position: Long) {
-        val now = System.currentTimeMillis()
-        if (now - ui.lastPreviewSeekAt < 100L) return
-        ui.lastPreviewSeekAt = now
-        exoPlayer.seekTo(ui.currentIndex, position)
+        ui.previewPositionMs = position
     }
 
     fun commitSeek(targetMs: Long): Boolean {
@@ -369,8 +450,10 @@ fun PlayerScreen(
     fun handleSeekingChange(seeking: Boolean) {
         ui.isSeeking = seeking
         if (seeking) {
-            ui.seekStartPositionMs = progress.currentPositionMs
-            ui.previewPositionMs = progress.currentPositionMs
+            val position = exoPlayer.currentPosition.coerceAtLeast(0L)
+            progress.currentPositionMs = position
+            ui.seekStartPositionMs = position
+            ui.previewPositionMs = position
         } else {
             ui.resetControlsTimer()
         }
@@ -514,16 +597,21 @@ fun PlayerScreen(
     fun captureScreenshot() {
         if (ui.controlsLocked) return
         val video = playlist.getOrNull(ui.currentIndex) ?: return
-        val saved = VideoFrameCapture.captureAndSave(
-            context = context,
-            videoUri = video.uri,
-            positionMs = exoPlayer.currentPosition,
-        )
-        Toast.makeText(
-            context,
-            if (saved) R.string.screenshot_saved else R.string.screenshot_failed,
-            Toast.LENGTH_SHORT,
-        ).show()
+        val positionMs = exoPlayer.currentPosition
+        scope.launch {
+            val saved = withContext(Dispatchers.IO) {
+                VideoFrameCapture.captureAndSave(
+                    context = context,
+                    videoUri = video.uri,
+                    positionMs = positionMs,
+                )
+            }
+            Toast.makeText(
+                context,
+                if (saved) R.string.screenshot_saved else R.string.screenshot_failed,
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
     }
 
     fun handleLockToggle() {
@@ -540,9 +628,43 @@ fun PlayerScreen(
     BackHandler { handleBack() }
 
     fun updateVideoFormat() {
-        val size = exoPlayer.displayVideoSize() ?: return
-        ui.videoWidth = size.first
-        ui.videoHeight = size.second
+        val size = exoPlayer.displayVideoSize()
+        if (size != null) {
+            ui.videoWidth = size.first
+            ui.videoHeight = size.second
+        }
+        val window = activity?.window ?: return
+        val hdr = ColorInfo.isTransferHdr(exoPlayer.videoFormat?.colorInfo)
+        window.colorMode = if (hdr) {
+            ActivityInfo.COLOR_MODE_HDR
+        } else {
+            ActivityInfo.COLOR_MODE_DEFAULT
+        }
+    }
+
+    fun handlePlayerError(error: PlaybackException) {
+        val canRetry = error.isSoftwareDecodeRetryable() &&
+            !ui.appliedSoftDecode &&
+            !ui.softDecodeRetried
+        if (canRetry) {
+            ui.softDecodeRetried = true
+            ui.softDecodeRetryPending = true
+            ui.playbackFailure = null
+            ui.replayPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+            playbackSession.resumedIndices.remove(ui.currentIndex)
+            scope.launch {
+                runCatching { saveCurrentProgress() }
+                ui.appliedSoftDecode = true
+                ui.softDecodeGeneration += 1
+            }
+            return
+        }
+        if (ui.softDecodeRetryPending) return
+        ui.playbackFailure = if (error.isSourceReadFailure()) {
+            PlaybackFailure.Read
+        } else {
+            PlaybackFailure.Decode
+        }
     }
 
     DisposableEffect(activity) {
@@ -593,24 +715,37 @@ fun PlayerScreen(
         ui.isLandscape = orientationController?.isLandscape() == true
     }
 
-    LaunchedEffect(playlist) {
-        seekToResumePosition(playlistState.currentIndex)
+    LaunchedEffect(exoPlayer) {
+        ui.currentIndex = exoPlayer.currentMediaItemIndex
+        progress.syncFromPlayer(exoPlayer)
     }
 
-    LaunchedEffect(exoPlayer, ui.currentIndex) {
-        while (true) {
-            delay(PROGRESS_SAVE_INTERVAL_MS)
-            saveCurrentProgress()
+    LaunchedEffect(exoPlayer, ui.abPointA, ui.abPointB, ui.currentIndex) {
+        val pointB = ui.abPointB ?: return@LaunchedEffect
+        val loopTo = abLoopTarget(ui.abPointA, pointB, pointB) ?: return@LaunchedEffect
+        val message = exoPlayer.createMessage { _, _ ->
+            val target = abLoopTarget(ui.abPointA, ui.abPointB, ui.abPointB ?: Long.MIN_VALUE)
+            if (target != null) {
+                exoPlayer.seekTo(ui.currentIndex, target)
+            }
+        }
+            .setPosition(ui.currentIndex, pointB)
+            .setDeleteAfterDelivery(false)
+            .send()
+        try {
+            awaitCancellation()
+        } finally {
+            message.cancel()
         }
     }
 
     DisposableEffect(exoPlayer) {
+        playbackSession.onEnterScreen()
         PlayerSession.attach(exoPlayer)
+        PlayerSession.onPlayNext = { playAdjacentEpisode(1) }
         PlayerSession.onStateChanged = {
             activity?.onPipAction?.invoke()
         }
-        val sessionIntent = Intent(context, PlaybackMediaService::class.java)
-        runCatching { context.startForegroundService(sessionIntent) }
 
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
@@ -619,14 +754,32 @@ fun PlayerScreen(
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_READY) {
+                    ui.playbackFailure = null
+                    ui.softDecodeRetryPending = false
                     progress.syncFromPlayer(exoPlayer)
                     updateVideoFormat()
                 }
             }
 
+            override fun onPlayerError(error: PlaybackException) {
+                handlePlayerError(error)
+            }
+
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                ui.currentIndex = exoPlayer.currentMediaItemIndex
+                val previousIndex = ui.currentIndex
+                val index = exoPlayer.currentMediaItemIndex
+                if (index != previousIndex) {
+                    ui.abPointA = null
+                    ui.abPointB = null
+                    SeekPreviewFrames.release()
+                }
+                ui.currentIndex = index
+                ui.playbackFailure = null
                 progress.resetForNewItem()
+                val knownDuration = playlist.getOrNull(index)?.durationMs ?: 0L
+                if (knownDuration > 0L) {
+                    progress.durationMs = knownDuration
+                }
                 progress.syncFromPlayer(exoPlayer)
                 ui.resetZoom()
                 updateVideoFormat()
@@ -636,7 +789,9 @@ fun PlayerScreen(
                 updateVideoFormat()
             }
         }
+        ui.softDecodeRetryPending = false
         exoPlayer.addListener(listener)
+        exoPlayer.playerError?.let(::handlePlayerError)
         progress.syncFromPlayer(exoPlayer)
 
         val lifecycleObserver = LifecycleEventObserver { _, event ->
@@ -652,30 +807,40 @@ fun PlayerScreen(
         lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
 
         onDispose {
+            SeekPreviewFrames.release()
             ui.brightnessHideJob?.cancel()
             ui.volumeHideJob?.cancel()
             castManager?.bindLocalPlayer(null)
-            val video = playlist.getOrNull(ui.currentIndex)
-            val progressSnapshot = runCatching {
-                if (video == null) return@runCatching null
-                val duration = exoPlayer.duration.takeIf { it > 0 } ?: video.durationMs
-                if (duration <= 0) return@runCatching null
-                val position = exoPlayer.currentPosition.coerceAtLeast(0L)
-                Triple(video, position, duration)
-            }.getOrNull()
-            PlayerSession.onStateChanged = null
-            PlayerSession.detach(exoPlayer)
-            runCatching { context.stopService(sessionIntent) }
-            exoPlayer.removeListener(listener)
+            val stillOwned = playbackSession.player() === exoPlayer
+            if (stillOwned) {
+                val video = playlist.getOrNull(ui.currentIndex)
+                val progressSnapshot = runCatching {
+                    if (video == null) return@runCatching null
+                    val duration = exoPlayer.duration.takeIf { it > 0 } ?: video.durationMs
+                    if (duration <= 0) return@runCatching null
+                    val position = exoPlayer.currentPosition.coerceAtLeast(0L)
+                    Triple(video, position, duration)
+                }.getOrNull()
+                PlayerSession.onStateChanged = null
+                PlayerSession.onPlayNext = null
+                exoPlayer.removeListener(listener)
+                if (ui.isSpeedBoosted) {
+                    exoPlayer.setPlaybackSpeed(ui.savedPlaybackSpeed)
+                }
+                playbackSession.onLeaveScreen(
+                    pauseLocal = castingOnLeave.value,
+                    save = progressSnapshot == null,
+                )
+                progressSnapshot?.let { (snapshotVideo, positionMs, durationMs) ->
+                    playerViewModel.enqueueSaveProgress(snapshotVideo, positionMs, durationMs)
+                }
+            }
             lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
             ui.isFullscreen = false
+            activity?.window?.colorMode = ActivityInfo.COLOR_MODE_DEFAULT
             restoreSystemBars()
             ui.resetSpeedBoost()
             orientationController?.lockPortrait()
-            exoPlayer.release()
-            progressSnapshot?.let { (snapshotVideo, positionMs, durationMs) ->
-                playerViewModel.enqueueSaveProgress(snapshotVideo, positionMs, durationMs)
-            }
         }
     }
 
@@ -717,7 +882,7 @@ fun PlayerScreen(
         }
     }
     val seriesKey = currentVideo?.seriesKey
-    val seriesSkip by seriesSkipStore.observe(seriesKey).collectAsState(initial = SeriesSkipSettings())
+    val seriesSkip by seriesSkipStore.observe(seriesKey).collectAsStateWithLifecycle(initialValue = SeriesSkipSettings())
     val effectiveIntroSeconds = seriesSkip.introSeconds ?: preferences.skipIntroSeconds
     val effectiveOutroSeconds = seriesSkip.outroSeconds ?: preferences.skipOutroSeconds
     val canEditSeriesSkip = !seriesKey.isNullOrBlank()
@@ -729,7 +894,7 @@ fun PlayerScreen(
     }
     fun markSeriesIntro() {
         val key = seriesKey ?: return
-        val seconds = (displayPositionMs / 1_000L).toInt().coerceIn(0, 600)
+        val seconds = (exoPlayer.currentPosition.coerceAtLeast(0L) / 1_000L).toInt().coerceIn(0, 600)
         if (seconds <= 0) {
             Toast.makeText(context, context.getString(R.string.series_skip_invalid), Toast.LENGTH_SHORT).show()
             return
@@ -745,11 +910,12 @@ fun PlayerScreen(
     }
     fun markSeriesOutro() {
         val key = seriesKey ?: return
-        if (displayDurationMs <= 0 || displayPositionMs >= displayDurationMs) {
+        val positionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+        if (displayDurationMs <= 0 || positionMs >= displayDurationMs) {
             Toast.makeText(context, context.getString(R.string.series_skip_invalid), Toast.LENGTH_SHORT).show()
             return
         }
-        val seconds = ((displayDurationMs - displayPositionMs) / 1_000L).toInt().coerceIn(0, 600)
+        val seconds = ((displayDurationMs - positionMs) / 1_000L).toInt().coerceIn(0, 600)
         if (seconds <= 0) {
             Toast.makeText(context, context.getString(R.string.series_skip_invalid), Toast.LENGTH_SHORT).show()
             return
@@ -787,14 +953,15 @@ fun PlayerScreen(
         null
     }
     val useLandscapeLayout = ui.isLandscape || ui.isFullscreen
-    val showSkipIntro = introEndMs > 0L &&
-        !ui.isSeeking &&
-        displayPositionMs in 0L..introEndMs
-    val showSkipOutro = outroStartMs >= 0L &&
-        !ui.isSeeking &&
-        displayDurationMs > 0 &&
-        displayPositionMs >= outroStartMs
-
+    LaunchedEffect(exoPlayer, ui.controlsVisible, effectiveIntroSeconds, effectiveOutroSeconds) {
+        val trackWhileHidden = !ui.controlsVisible &&
+            (effectiveIntroSeconds > 0 || effectiveOutroSeconds > 0)
+        if (!trackWhileHidden) return@LaunchedEffect
+        while (true) {
+            ui.hiddenPlaybackPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+            delay(1_000)
+        }
+    }
     LaunchedEffect(ui.controlsVisible, ui.isPlaying, ui.isSeeking, useLandscapeLayout, ui.controlsLocked, ui.isAdjustingBrightness, ui.isAdjustingVolume, ui.isFullscreen) {
         if (ui.controlsVisible && !ui.isSeeking && !ui.isAdjustingBrightness && !ui.isAdjustingVolume && (ui.controlsLocked || ui.isPlaying)) {
             delay(3000)
@@ -853,10 +1020,15 @@ fun PlayerScreen(
     if (ui.showMoreSheet) {
         PlayerMoreSheet(
             shuffleEnabled = preferences.shuffleEnabled,
-            softDecodeEnabled = preferences.softDecode,
+            softDecodeEnabled = ui.appliedSoftDecode,
             isFavorite = isFavorite,
             skipIntroSeconds = preferences.skipIntroSeconds,
             skipOutroSeconds = preferences.skipOutroSeconds,
+            subtitleTextSize = preferences.subtitleTextSize,
+            subtitleYellow = preferences.subtitleYellow,
+            subtitleDelayMs = preferences.subtitleDelayMs,
+            abPointA = ui.abPointA,
+            abPointB = ui.abPointB,
             onShuffleToggle = {
                 scope.launch {
                     playerPreferencesStore.setShuffleEnabled(!preferences.shuffleEnabled)
@@ -880,9 +1052,13 @@ fun PlayerScreen(
             },
             onSoftDecodeToggle = {
                 scope.launch {
-                    val next = !preferences.softDecode
+                    val next = !ui.appliedSoftDecode
                     playerPreferencesStore.setSoftDecode(next)
                     if (next != ui.appliedSoftDecode) {
+                        ui.playbackFailure = null
+                        ui.softDecodeRetried = false
+                        ui.replayPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+                        playbackSession.resumedIndices.remove(ui.currentIndex)
                         ui.appliedSoftDecode = next
                         ui.softDecodeGeneration += 1
                     }
@@ -904,6 +1080,43 @@ fun PlayerScreen(
             onSkipOutroSecondsChange = { seconds ->
                 scope.launch { playerPreferencesStore.setSkipOutroSeconds(seconds) }
             },
+            onSubtitleTextSize = { size ->
+                scope.launch { playerPreferencesStore.setSubtitleTextSize(size) }
+            },
+            onSubtitleYellowToggle = {
+                scope.launch { playerPreferencesStore.setSubtitleYellow(!preferences.subtitleYellow) }
+            },
+            onSubtitleDelayChange = { delayMs ->
+                scope.launch { playerPreferencesStore.setSubtitleDelayMs(delayMs) }
+            },
+            onSetAbPointA = {
+                ui.abPointA = exoPlayer.currentPosition.coerceAtLeast(0L)
+            },
+            onSetAbPointB = {
+                ui.abPointB = exoPlayer.currentPosition.coerceAtLeast(0L)
+            },
+            onClearAb = {
+                ui.abPointA = null
+                ui.abPointB = null
+            },
+            bookmarks = bookmarks,
+            onAddBookmark = {
+                val uri = playlist.getOrNull(ui.currentIndex)?.uri ?: return@PlayerMoreSheet
+                scope.launch {
+                    bookmarkStore.add(uri, exoPlayer.currentPosition.coerceAtLeast(0L))
+                }
+            },
+            onJumpBookmark = { positionMs ->
+                exoPlayer.seekTo(ui.currentIndex, positionMs)
+                progress.currentPositionMs = positionMs
+                ui.showMoreSheet = false
+            },
+            onRemoveBookmark = { positionMs ->
+                val uri = playlist.getOrNull(ui.currentIndex)?.uri ?: return@PlayerMoreSheet
+                scope.launch { bookmarkStore.remove(uri, positionMs) }
+            },
+            playbackSession = playbackSession,
+            onSleepSelected = { playbackSession.setSleep(it) },
             onDismiss = { ui.showMoreSheet = false },
         )
     }
@@ -947,6 +1160,18 @@ fun PlayerScreen(
         )
     }
 
+    CompositionLocalProvider(
+        LocalSubtitleAppearance provides SubtitleAppearance(
+            textScale = preferences.subtitleTextSize.scale,
+            yellow = preferences.subtitleYellow,
+            delayMs = preferences.subtitleDelayMs,
+        ),
+        LocalTimelineMarks provides TimelineMarks(
+            bookmarkPositionsMs = bookmarks,
+            abPointA = ui.abPointA,
+            abPointB = ui.abPointB,
+        ),
+    ) {
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -964,13 +1189,13 @@ fun PlayerScreen(
                     exoPlayer = exoPlayer,
                     progress = progress,
                     durationMs = displayDurationMs,
+                    videoUri = currentVideo?.uri,
                     videoScale = ui.videoScale,
                     offsetX = ui.offsetX,
                     offsetY = ui.offsetY,
-                    displayPositionMs = displayPositionMs,
+                    ui = ui,
+                    isCasting = isCasting,
                     isSeeking = ui.isSeeking,
-                    previewPositionMs = ui.previewPositionMs,
-                    seekStartPositionMs = ui.seekStartPositionMs,
                     controlsVisible = ui.controlsVisible,
                     controlsLocked = ui.controlsLocked,
                     isFullscreen = ui.isFullscreen,
@@ -982,8 +1207,6 @@ fun PlayerScreen(
                     isSpeedBoosted = ui.isSpeedBoosted,
                     hasPrevious = hasPrevious,
                     hasNext = hasNext,
-                    showSkipIntro = showSkipIntro && !isCasting,
-                    showSkipOutro = showSkipOutro && !isCasting,
                     canEditSeriesSkip = canEditSeriesSkip && !isCasting,
                     introEndMs = introEndMs,
                     outroStartMs = outroStartMs,
@@ -1122,19 +1345,16 @@ fun PlayerScreen(
                         seriesTitle = seriesTitle,
                         exoPlayer = exoPlayer,
                         progress = progress,
-                        displayPositionMs = displayPositionMs,
+                        ui = ui,
+                        isCasting = isCasting,
                         durationMs = displayDurationMs,
                         isSeeking = ui.isSeeking,
-                        previewPositionMs = ui.previewPositionMs,
-                        seekStartPositionMs = ui.seekStartPositionMs,
                         controlsVisible = ui.controlsVisible,
                         episodes = playlist,
                         currentIndex = ui.currentIndex,
                         isPlaying = ui.isPlaying,
                         hasPrevious = hasPrevious,
                         hasNext = hasNext,
-                        showSkipIntro = showSkipIntro && !isCasting,
-                        showSkipOutro = showSkipOutro && !isCasting,
                         canEditSeriesSkip = canEditSeriesSkip && !isCasting,
                         introEndMs = introEndMs,
                         outroStartMs = outroStartMs,
@@ -1249,11 +1469,10 @@ fun PlayerScreen(
             }
         }
 
-        SeekPreviewOverlay(
-            visible = ui.showDoubleTapSeek,
-            previewPositionMs = ui.previewPositionMs,
+        LiveSeekPreview(
+            ui = ui,
             durationMs = displayDurationMs,
-            seekStartPositionMs = ui.seekStartPositionMs,
+            forDoubleTap = true,
         )
 
         if (castManager != null && ui.controlsVisible && !ui.isInPipMode) {
@@ -1281,21 +1500,39 @@ fun PlayerScreen(
                     .navigationBarsPadding(),
             )
         }
+
+        ui.playbackFailure?.let { failure ->
+            Text(
+                text = stringResource(
+                    if (failure == PlaybackFailure.Read) {
+                        R.string.playback_error_read
+                    } else {
+                        R.string.playback_error_decode
+                    },
+                ),
+                color = Color.White,
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 32.dp),
+            )
+        }
+    }
     }
 }
-
 @Composable
 private fun LandscapePlayerContent(
     exoPlayer: ExoPlayer,
     progress: PlayerProgressState,
     durationMs: Long,
+    videoUri: Uri?,
     videoScale: Float,
     offsetX: Float,
     offsetY: Float,
-    displayPositionMs: Long,
+    ui: PlayerUiState,
+    isCasting: Boolean,
     isSeeking: Boolean,
-    previewPositionMs: Long,
-    seekStartPositionMs: Long,
     controlsVisible: Boolean,
     controlsLocked: Boolean,
     isFullscreen: Boolean,
@@ -1307,8 +1544,6 @@ private fun LandscapePlayerContent(
     isSpeedBoosted: Boolean,
     hasPrevious: Boolean,
     hasNext: Boolean,
-    showSkipIntro: Boolean,
-    showSkipOutro: Boolean,
     canEditSeriesSkip: Boolean,
     introEndMs: Long,
     outroStartMs: Long,
@@ -1385,9 +1620,9 @@ private fun LandscapePlayerContent(
         offsetY = offsetY,
         onScaleChange = onScaleChange,
         onOffsetChange = onOffsetChange,
-        getCurrentPositionMs = { progress.currentPositionMs },
+        getCurrentPositionMs = { exoPlayer.currentPosition.coerceAtLeast(0L) },
         getDurationMs = {
-            progress.durationMs.takeIf { it > 0 } ?: durationMs
+            exoPlayer.duration.takeIf { it > 0 } ?: durationMs
         },
         getBufferedPositionMs = { exoPlayer.bufferedPosition.coerceAtLeast(0L) },
         isSeekable = { exoPlayer.isCurrentMediaItemSeekable },
@@ -1425,21 +1660,18 @@ private fun LandscapePlayerContent(
                 contentScale = contentScale,
                 frameAspectRatio = frameAspectRatio,
             )
-            SkipIntroOutroOverlay(
-                showSkipIntro = showSkipIntro,
-                showSkipOutro = showSkipOutro,
+            LiveSkipIntroOutro(
+                progress = progress,
+                ui = ui,
+                isCasting = isCasting,
+                introEndMs = introEndMs,
+                outroStartMs = outroStartMs,
+                durationMs = durationMs,
                 onSkipIntro = onSkipIntro,
                 onSkipOutro = onSkipOutro,
             )
         }
     }
-
-    SeekPreviewOverlay(
-        visible = isSeeking,
-        previewPositionMs = previewPositionMs,
-        durationMs = durationMs,
-        seekStartPositionMs = seekStartPositionMs,
-    )
 
     BrightnessFeedbackOverlay(
         visible = isAdjustingBrightness,
@@ -1463,9 +1695,10 @@ private fun LandscapePlayerContent(
         isFullscreen = isFullscreen,
         pipSupported = pipSupported,
         showEpisodePicker = true,
-        currentPositionMs = displayPositionMs,
+        progress = progress,
+        ui = ui,
+        isCasting = isCasting,
         durationMs = durationMs,
-        bufferedPositionMs = progress.bufferedPositionMs,
         playbackSpeed = playbackSpeed,
         repeatOne = repeatOne,
         hasPrevious = hasPrevious,
@@ -1496,6 +1729,11 @@ private fun LandscapePlayerContent(
         onMoreClick = onMoreClick,
         modifier = Modifier.fillMaxSize(),
     )
+        LiveSeekPreview(
+            ui = ui,
+            durationMs = durationMs,
+            videoUri = videoUri,
+        )
     }
 }
 
@@ -1506,19 +1744,16 @@ private fun PortraitPlayerContent(
     seriesTitle: String,
     exoPlayer: ExoPlayer,
     progress: PlayerProgressState,
-    displayPositionMs: Long,
+    ui: PlayerUiState,
+    isCasting: Boolean,
     durationMs: Long,
     isSeeking: Boolean,
-    previewPositionMs: Long,
-    seekStartPositionMs: Long,
     controlsVisible: Boolean,
     episodes: List<VideoItem>,
     currentIndex: Int,
     isPlaying: Boolean,
     hasPrevious: Boolean,
     hasNext: Boolean,
-    showSkipIntro: Boolean,
-    showSkipOutro: Boolean,
     canEditSeriesSkip: Boolean,
     introEndMs: Long,
     outroStartMs: Long,
@@ -1579,17 +1814,16 @@ private fun PortraitPlayerContent(
         episodes = episodes,
         currentIndex = currentIndex,
         isPlaying = isPlaying,
-        currentPositionMs = displayPositionMs,
-        seekPositionMs = progress.currentPositionMs,
-        bufferedPositionMs = progress.bufferedPositionMs,
+        progress = progress,
+        ui = ui,
+        isCasting = isCasting,
+        videoUri = episodes.getOrNull(currentIndex)?.uri,
         durationMs = durationMs,
-        getDurationMs = { progress.durationMs.takeIf { it > 0 } ?: durationMs },
-        getCurrentPositionMs = { progress.currentPositionMs },
+        getDurationMs = { exoPlayer.duration.takeIf { it > 0 } ?: durationMs },
+        getCurrentPositionMs = { exoPlayer.currentPosition.coerceAtLeast(0L) },
         getBufferedPositionMs = { exoPlayer.bufferedPosition.coerceAtLeast(0L) },
         isSeekable = { exoPlayer.isCurrentMediaItemSeekable },
         isSeeking = isSeeking,
-        previewPositionMs = previewPositionMs,
-        seekStartPositionMs = seekStartPositionMs,
         controlsVisible = controlsVisible,
         hasPrevious = hasPrevious,
         hasNext = hasNext,
@@ -1626,8 +1860,6 @@ private fun PortraitPlayerContent(
         onSpeedClick = onSpeedClick,
         onLoopClick = onLoopClick,
         onMoreClick = onMoreClick,
-        showSkipIntro = showSkipIntro,
-        showSkipOutro = showSkipOutro,
         onSkipIntro = onSkipIntro,
         onSkipOutro = onSkipOutro,
         canEditSeriesSkip = canEditSeriesSkip,

@@ -1,6 +1,5 @@
 package com.zhaoshuo.localvideoplayer.ui.components
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -45,13 +44,13 @@ fun LumenListHeader(
                 },
             )
             .then(
-                if (titleContent != null) {
+                if (titleContent != null && onBack != null) {
                     Modifier.heightIn(min = 56.dp)
                 } else {
                     Modifier.height(56.dp)
                 },
             )
-            .padding(horizontal = 24.dp),
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (onBack != null) {
@@ -93,7 +92,6 @@ fun LumenListHeader(
             }
         }
         Row(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             actions()

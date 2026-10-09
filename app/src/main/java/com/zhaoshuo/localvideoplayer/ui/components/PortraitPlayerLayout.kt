@@ -18,7 +18,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.ExoPlayer
+import android.net.Uri
 import com.zhaoshuo.localvideoplayer.model.VideoItem
+import com.zhaoshuo.localvideoplayer.player.PlayerProgressState
+import com.zhaoshuo.localvideoplayer.ui.PlayerUiState
 
 @Composable
 fun PortraitPlayerLayout(
@@ -29,17 +32,16 @@ fun PortraitPlayerLayout(
     episodes: List<VideoItem>,
     currentIndex: Int,
     isPlaying: Boolean,
-    currentPositionMs: Long,
-    seekPositionMs: Long,
-    bufferedPositionMs: Long,
+    progress: PlayerProgressState,
+    ui: PlayerUiState,
+    isCasting: Boolean,
+    videoUri: Uri?,
     durationMs: Long,
     getDurationMs: () -> Long = { durationMs },
-    getCurrentPositionMs: () -> Long = { seekPositionMs },
+    getCurrentPositionMs: () -> Long = { 0L },
     getBufferedPositionMs: () -> Long = { Long.MAX_VALUE },
     isSeekable: () -> Boolean = { true },
     isSeeking: Boolean,
-    previewPositionMs: Long,
-    seekStartPositionMs: Long,
     controlsVisible: Boolean,
     hasPrevious: Boolean,
     hasNext: Boolean,
@@ -76,8 +78,6 @@ fun PortraitPlayerLayout(
     onSpeedClick: () -> Unit,
     onLoopClick: () -> Unit,
     onMoreClick: () -> Unit,
-    showSkipIntro: Boolean,
-    showSkipOutro: Boolean,
     onSkipIntro: () -> Unit,
     onSkipOutro: () -> Unit,
     onFullscreenClick: () -> Unit,
@@ -177,12 +177,6 @@ fun PortraitPlayerLayout(
                             ),
                     )
                 }
-                SeekPreviewOverlay(
-                    visible = isSeeking,
-                    previewPositionMs = previewPositionMs,
-                    durationMs = durationMs,
-                    seekStartPositionMs = seekStartPositionMs,
-                )
                 BrightnessFeedbackOverlay(
                     visible = isAdjustingBrightness,
                     brightnessFraction = brightnessFraction,
@@ -192,9 +186,13 @@ fun PortraitPlayerLayout(
                     volumeFraction = volumeFraction,
                 )
                 SpeedBoostOverlay(visible = isSpeedBoosted)
-                SkipIntroOutroOverlay(
-                    showSkipIntro = showSkipIntro,
-                    showSkipOutro = showSkipOutro,
+                LiveSkipIntroOutro(
+                    progress = progress,
+                    ui = ui,
+                    isCasting = isCasting,
+                    introEndMs = introEndMs,
+                    outroStartMs = outroStartMs,
+                    durationMs = durationMs,
                     onSkipIntro = onSkipIntro,
                     onSkipOutro = onSkipOutro,
                 )
@@ -226,9 +224,10 @@ fun PortraitPlayerLayout(
                                 onNextClick = onNextClick,
                             )
                         }
-                        PlayerProgressBar(
-                            currentPositionMs = currentPositionMs,
-                            bufferedPositionMs = bufferedPositionMs,
+                        LivePlayerProgressBar(
+                            progress = progress,
+                            ui = ui,
+                            isCasting = isCasting,
                             durationMs = durationMs,
                             onSeek = onSeek,
                             onScrubStart = onScrubStart,
@@ -253,6 +252,11 @@ fun PortraitPlayerLayout(
                         )
                     }
                 }
+                LiveSeekPreview(
+                    ui = ui,
+                    durationMs = durationMs,
+                    videoUri = videoUri,
+                )
             }
         }
         PlayerMetadataPanel(

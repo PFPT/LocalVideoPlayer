@@ -18,9 +18,14 @@ internal enum class HlsSegmentFormat {
 
 internal fun HlsVodPlaylist.segmentFormat(): HlsSegmentFormat = when {
     initSegmentUrl != null -> HlsSegmentFormat.FMP4
-    segments.any { it.url.endsWith(".m4s", ignoreCase = true) } -> HlsSegmentFormat.FMP4
+    segments.any { segment ->
+        val path = segment.url.substringBefore('?').substringBefore('#')
+        FMP4_EXTENSIONS.any { path.endsWith(it, ignoreCase = true) }
+    } -> HlsSegmentFormat.FMP4
     else -> HlsSegmentFormat.TS
 }
+
+private val FMP4_EXTENSIONS = listOf(".m4s", ".mp4", ".m4v", ".cmfv", ".cmfa")
 
 internal fun HlsSegmentFormat.segmentExtension(): String = when (this) {
     HlsSegmentFormat.TS -> "ts"
@@ -259,20 +264,8 @@ internal object HlsVodPlaylistParser {
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
-    private fun isSegmentUri(line: String): Boolean {
-        val uri = line.substringBefore('#').trim()
-        if (uri.contains(".ts", ignoreCase = true) || uri.contains(".m4s", ignoreCase = true)) return true
-        return isLocalProxySegment(uri)
-    }
-
-    private fun isLocalProxySegment(uri: String): Boolean {
-        val parsed = runCatching { URI(uri) }.getOrNull() ?: return false
-        val host = parsed.host?.lowercase() ?: return false
-        if (host != "127.0.0.1" && host != "localhost" && host != "::1") return false
-        val path = parsed.path.orEmpty()
-        if (!path.endsWith("/proxy", ignoreCase = true) && !path.contains("/proxy/", ignoreCase = true)) return false
-        return parsed.query?.contains("url=", ignoreCase = true) == true
-    }
+    private fun isSegmentUri(line: String): Boolean =
+        line.substringBefore('#').trim().isNotEmpty()
 
     private fun deriveIv(sequence: Long): ByteArray = ByteArray(16).also { iv ->
         for (index in 0 until 8) {

@@ -8,6 +8,7 @@ object PlayerSession {
     private var player: ExoPlayer? = null
     var hasNextProvider: () -> Boolean = { false }
     var onStateChanged: (() -> Unit)? = null
+    var onPlayNext: (() -> Unit)? = null
 
     fun current(): ExoPlayer? = player
 
@@ -31,6 +32,12 @@ object PlayerSession {
     }
 
     fun seekToNext(): Boolean {
+        val callback = onPlayNext
+        if (callback != null) {
+            callback()
+            onStateChanged?.invoke()
+            return true
+        }
         val current = player ?: return false
         if (!current.hasNextMediaItem()) return false
         current.seekToNextMediaItem()

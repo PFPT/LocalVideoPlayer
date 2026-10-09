@@ -12,14 +12,16 @@ import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zhaoshuo.localvideoplayer.R
+import com.zhaoshuo.localvideoplayer.data.PlaybackStore
 import com.zhaoshuo.localvideoplayer.model.SeriesGroupKind
-import com.zhaoshuo.localvideoplayer.model.PlaybackRecord
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 import com.zhaoshuo.localvideoplayer.model.VideoSeries
 import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
@@ -41,28 +43,30 @@ data class SeriesPlaybackStats(
 @Composable
 fun rememberPlaybackProgress(
     uriKey: String,
-    playbackRecords: Map<String, PlaybackRecord>,
+    playbackStore: PlaybackStore,
 ): Float? {
-    val record = playbackRecords[uriKey]
-    return remember(uriKey, record?.positionMs, record?.durationMs) {
-        record?.progress
-    }
+    val progress by remember(uriKey, playbackStore) {
+        playbackStore.progressOf(uriKey)
+    }.collectAsStateWithLifecycle(
+        initialValue = playbackStore.snapshot.value.records[uriKey]?.progress,
+    )
+    return progress
 }
 
 @Composable
 fun rememberEpisodeProgressList(
     series: VideoSeries,
-    playbackRecords: Map<String, PlaybackRecord>,
+    playbackStore: PlaybackStore,
 ): List<Float> {
-    val signature = series.episodes.joinToString(";") { episode ->
-        val record = playbackRecords[episode.uri.toString()]
-        "${record?.positionMs ?: 0L}:${record?.durationMs ?: 0L}"
+    val uriKeys = remember(series.id, series.episodes) {
+        series.episodes.map { it.uri.toString() }
     }
-    return remember(series.id, signature) {
-        series.episodes.map { episode ->
-            playbackRecords[episode.uri.toString()]?.progress ?: 0f
-        }
-    }
+    val progress by remember(uriKeys, playbackStore) {
+        playbackStore.episodeProgress(uriKeys)
+    }.collectAsStateWithLifecycle(
+        initialValue = uriKeys.map { key -> playbackStore.snapshot.value.records[key]?.progress ?: 0f },
+    )
+    return progress
 }
 
 @Composable
@@ -70,12 +74,7 @@ fun rememberSeriesPlaybackStats(
     series: VideoSeries,
     episodeProgress: List<Float>,
 ): SeriesPlaybackStats {
-    val watchedSignature = remember(series.id, episodeProgress) {
-        episodeProgress.joinToString(";") { progress ->
-            if (progress > 0.05f) "1" else "0"
-        }
-    }
-    return remember(series.id, watchedSignature) {
+    return remember(series.id, series.episodes, episodeProgress) {
         val totalDuration = series.episodes.sumOf { it.durationMs }
         val watchedCount = episodeProgress.count { it > 0.05f }
         val seriesProgress = if (series.episodes.isNotEmpty()) {
@@ -125,7 +124,8 @@ fun VideoListItem(
             LumenMediaCard(
                 title = video.title,
                 subtitle = subtitle,
-                videoId = video.id,
+                thumbnailUri = video.uri,
+                thumbnailDateModified = video.dateModified,
                 onClick = onClick,
                 progress = progress,
                 clickable = false,
@@ -192,7 +192,7 @@ fun SeriesFolderItem(
             LumenMediaCard(
                 title = series.title,
                 subtitle = subtitle,
-                videoId = firstEpisode?.id,
+                thumbnailUri = firstEpisode?.uri,
                 onClick = onClick,
                 progress = seriesProgress,
                 clickable = false,
@@ -203,7 +203,8 @@ fun SeriesFolderItem(
                     Box(modifier = Modifier.fillMaxSize()) {
                         if (firstEpisode != null) {
                             MediaThumbnail(
-                                videoId = firstEpisode.id,
+                                thumbnailUri = firstEpisode.uri,
+                                dateModifiedSeconds = firstEpisode.dateModified,
                                 modifier = Modifier.fillMaxSize(),
                                 deferLoad = deferThumbnailLoad,
                             )
@@ -258,7 +259,8 @@ fun EpisodeListItem(
             LumenMediaCard(
                 title = title,
                 subtitle = subtitle,
-                videoId = episode.id,
+                thumbnailUri = episode.uri,
+                thumbnailDateModified = episode.dateModified,
                 onClick = onClick,
                 progress = progress,
                 clickable = false,

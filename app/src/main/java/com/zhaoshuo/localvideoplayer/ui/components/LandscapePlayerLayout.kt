@@ -29,6 +29,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
+import com.zhaoshuo.localvideoplayer.player.PlayerProgressState
+import com.zhaoshuo.localvideoplayer.ui.PlayerUiState
 
 @Composable
 fun LandscapePlayerLayout(
@@ -40,9 +42,10 @@ fun LandscapePlayerLayout(
     isFullscreen: Boolean = false,
     pipSupported: Boolean = false,
     showEpisodePicker: Boolean = false,
-    currentPositionMs: Long,
+    progress: PlayerProgressState,
+    ui: PlayerUiState,
+    isCasting: Boolean,
     durationMs: Long,
-    bufferedPositionMs: Long,
     playbackSpeed: Float,
     repeatOne: Boolean,
     hasPrevious: Boolean,
@@ -80,9 +83,10 @@ fun LandscapePlayerLayout(
             controlsLocked = controlsLocked,
             pipSupported = pipSupported,
             showEpisodePicker = showEpisodePicker,
-            currentPositionMs = currentPositionMs,
+            progress = progress,
+            ui = ui,
+            isCasting = isCasting,
             durationMs = durationMs,
-            bufferedPositionMs = bufferedPositionMs,
             playbackSpeed = playbackSpeed,
             repeatOne = repeatOne,
             hasPrevious = hasPrevious,
@@ -129,9 +133,10 @@ fun LandscapePlayerLayout(
             controlsLocked = controlsLocked,
             pipSupported = pipSupported,
             showEpisodePicker = showEpisodePicker,
-            currentPositionMs = currentPositionMs,
+            progress = progress,
+            ui = ui,
+            isCasting = isCasting,
             durationMs = durationMs,
-            bufferedPositionMs = bufferedPositionMs,
             playbackSpeed = playbackSpeed,
             repeatOne = repeatOne,
             hasPrevious = hasPrevious,
@@ -172,9 +177,10 @@ private fun LandscapePlayerLayoutContent(
     controlsLocked: Boolean,
     pipSupported: Boolean,
     showEpisodePicker: Boolean,
-    currentPositionMs: Long,
+    progress: PlayerProgressState,
+    ui: PlayerUiState,
+    isCasting: Boolean,
     durationMs: Long,
-    bufferedPositionMs: Long,
     playbackSpeed: Float,
     repeatOne: Boolean,
     hasPrevious: Boolean,
@@ -269,9 +275,10 @@ private fun LandscapePlayerLayoutContent(
                     )
                     .padding(horizontal = 16.dp, vertical = 10.dp),
             ) {
-                PlayerProgressBar(
-                    currentPositionMs = currentPositionMs,
-                    bufferedPositionMs = bufferedPositionMs,
+                LivePlayerProgressBar(
+                    progress = progress,
+                    ui = ui,
+                    isCasting = isCasting,
                     durationMs = durationMs,
                     onSeek = onSeek,
                     onScrubStart = onScrubStart,

@@ -30,6 +30,7 @@ fun rememberVideoDeleter(
     playbackStore: PlaybackStore,
     hiddenVideosStore: HiddenVideosStore,
     playCountStore: PlayCountStore,
+    titleForUri: (Uri) -> String = { "" },
     onVideosRemoved: (List<Uri>) -> Unit,
     onDeleteStarted: () -> Unit = {},
     onDeleteFinished: () -> Unit = {},
@@ -44,7 +45,10 @@ fun rememberVideoDeleter(
     suspend fun applyHidden(uris: List<Uri>) {
         if (uris.isEmpty()) return
         withContext(Dispatchers.IO) {
-            hiddenVideosStore.hideAll(uris)
+            hiddenVideosStore.hideAll(
+                uris,
+                uris.associate { it.toString() to titleForUri(it) },
+            )
             playbackStore.removeRecords(uris)
             playCountStore.removeForUris(uris)
         }

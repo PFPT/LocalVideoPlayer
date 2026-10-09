@@ -11,7 +11,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 
-private const val POSITION_POLL_INTERVAL_MS = 1000L
+private const val CONTROLS_VISIBLE_POLL_INTERVAL_MS = 250L
 private const val POSITION_UPDATE_THRESHOLD_MS = 250L
 
 @Stable
@@ -42,12 +42,25 @@ class PlayerProgressState {
 fun rememberPlayerProgressState(
     player: ExoPlayer,
     isSeeking: Boolean,
+    controlsVisible: Boolean,
 ): PlayerProgressState {
-    val state = remember { PlayerProgressState() }
-    LaunchedEffect(player) {
-        state.syncFromPlayer(player)
+    val state = remember(player) { PlayerProgressState() }
+    LaunchedEffect(player, controlsVisible) {
+        if (controlsVisible) {
+            state.syncFromPlayer(player)
+        }
     }
-    LaunchedEffect(player, isSeeking) {
+    LaunchedEffect(player) {
+        while (true) {
+            val duration = player.duration
+            if (duration > 0 && duration != state.durationMs) {
+                state.durationMs = duration
+            }
+            delay(CONTROLS_VISIBLE_POLL_INTERVAL_MS)
+        }
+    }
+    LaunchedEffect(player, isSeeking, controlsVisible) {
+        if (!controlsVisible) return@LaunchedEffect
         while (true) {
             if (!isSeeking) {
                 val position = player.currentPosition.coerceAtLeast(0L)
@@ -58,12 +71,8 @@ fun rememberPlayerProgressState(
                 if (buffered != state.bufferedPositionMs) {
                     state.bufferedPositionMs = buffered
                 }
-                val duration = player.duration
-                if (duration > 0 && duration != state.durationMs) {
-                    state.durationMs = duration
-                }
             }
-            delay(POSITION_POLL_INTERVAL_MS)
+            delay(CONTROLS_VISIBLE_POLL_INTERVAL_MS)
         }
     }
     return state

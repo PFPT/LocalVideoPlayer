@@ -178,17 +178,24 @@ fun AddDownloadBottomSheet(
             )
             OutlinedTextField(
                 value = url,
-                onValueChange = {
-                    url = it
+                onValueChange = { raw ->
+                    val change = DownloadNameResolver.applyDownloadFieldChange(url, raw)
                     inputError = null
-                    if (it.isBlank()) {
+                    if (change.pasted) {
+                        pendingShareTitle = change.title
+                            ?.let { trustedShareTitle(it, change.text) }
+                            ?.ifBlank { null }
+                    }
+                    url = change.text
+                    if (change.text.isBlank()) {
                         fileNameEdited = false
                         autoFilledFileName = false
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text(stringResource(R.string.download_url_label)) },
-                singleLine = true,
+                minLines = 2,
+                maxLines = 4,
                 isError = inputError != null,
                 supportingText = inputError?.let { { Text(it) } },
                 trailingIcon = {
@@ -256,10 +263,12 @@ fun AddDownloadBottomSheet(
                 Button(
                     onClick = {
                         scope.launch {
-                            val parsedUrl = url.trim().let { raw ->
-                                DownloadUrlClassifier.extractFirstMagnet(raw) ?: raw
-                            }
-                            val isHttp = parsedUrl.startsWith("http://") || parsedUrl.startsWith("https://")
+                            val parsedUrl = DownloadNameResolver.parseSharedText(url).url
+                                ?: url.trim().let { raw ->
+                                    DownloadUrlClassifier.extractFirstMagnet(raw) ?: raw
+                                }
+                            val isHttp = parsedUrl.startsWith("http://", ignoreCase = true) ||
+                                parsedUrl.startsWith("https://", ignoreCase = true)
                             val isMagnet = DownloadUrlClassifier.isMagnetUrl(parsedUrl)
                             if (!isHttp && !isMagnet) {
                                 inputError = invalidUrl

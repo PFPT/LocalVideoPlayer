@@ -13,11 +13,24 @@ fun findSidecarSubtitle(context: Context, video: VideoItem): Uri? {
     return findMediaStoreSidecar(context, video)
 }
 
-private fun findTreeSidecar(context: Context, video: VideoItem): Uri? {
-    val treeUri = video.relativePath
+private fun folderTreeUri(video: VideoItem): Uri? {
+    val stored = video.relativePath
         ?.takeIf { it.startsWith("content://") }
         ?.let { runCatching { Uri.parse(it) }.getOrNull() }
-        ?: return null
+    if (stored != null && DocumentsContract.isTreeUri(stored)) {
+        val segments = stored.pathSegments
+        if (segments.size >= 2 && segments[0] == "tree" && !segments.contains("document")) {
+            return stored
+        }
+    }
+    if (!DocumentsContract.isTreeUri(video.uri)) return null
+    val authority = video.uri.authority ?: return null
+    val treeId = runCatching { DocumentsContract.getTreeDocumentId(video.uri) }.getOrNull() ?: return null
+    return DocumentsContract.buildTreeDocumentUri(authority, treeId)
+}
+
+private fun findTreeSidecar(context: Context, video: VideoItem): Uri? {
+    val treeUri = folderTreeUri(video) ?: return null
     if (!DocumentsContract.isTreeUri(treeUri)) return null
     val candidates = sidecarSubtitleCandidates(video.title)
     if (candidates.isEmpty()) return null

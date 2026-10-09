@@ -39,6 +39,50 @@ class DownloadNameResolverTest {
     }
 
     @Test
+    fun parsesUppercaseHttpM3u8() {
+        val parsed = DownloadNameResolver.parseSharedText("HTTP://cdn.example.com/video/index.m3u8")
+        assertEquals("http://cdn.example.com/video/index.m3u8", parsed.url)
+    }
+
+    @Test
+    fun parsesM3u8WithInvisiblePrefix() {
+        val parsed = DownloadNameResolver.parseSharedText("\uFEFF\u200Bhttps://cdn.example.com/index.m3u8")
+        assertEquals("https://cdn.example.com/index.m3u8", parsed.url)
+    }
+
+    @Test
+    fun pasteMultilineShareExtractsUrl() {
+        val change = DownloadNameResolver.applyDownloadFieldChange(
+            current = "",
+            incoming = "剧名\nhttps://cdn.example.com/index.m3u8\n",
+        )
+        assertEquals(true, change.pasted)
+        assertEquals("剧名", change.title)
+        assertEquals("https://cdn.example.com/index.m3u8", change.text)
+    }
+
+    @Test
+    fun pasteWithoutUrlKeepsFlattenedText() {
+        val change = DownloadNameResolver.applyDownloadFieldChange(
+            current = "",
+            incoming = "没有链接\n只有说明",
+        )
+        assertEquals(true, change.pasted)
+        assertNull(change.title)
+        assertEquals("没有链接只有说明", change.text)
+    }
+
+    @Test
+    fun typingOneCharacterIsNotTreatedAsPaste() {
+        val change = DownloadNameResolver.applyDownloadFieldChange(
+            current = "https://cdn.example.com/index.m3u8",
+            incoming = "https://cdn.example.com/index.m3u8x",
+        )
+        assertEquals(false, change.pasted)
+        assertEquals("https://cdn.example.com/index.m3u8x", change.text)
+    }
+
+    @Test
     fun parsesMagnetFromClipboard() {
         val magnet = "magnet:?xt=urn:btih:aaabb331189c1bb1f198797dc208d14afa824429&dn=Show"
         val parsed = DownloadNameResolver.parseSharedText(magnet)

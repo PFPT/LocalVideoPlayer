@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -20,24 +21,65 @@ fun buildExoPlayer(
     startIndex: Int,
     softDecode: Boolean,
     subtitleUri: Uri? = null,
+    startPositionMs: Long = 0L,
 ): ExoPlayer {
     val renderersFactory = DefaultRenderersFactory(context).apply {
+        setEnableDecoderFallback(true)
         if (softDecode) {
             setMediaCodecSelector(MediaCodecSelector.PREFER_SOFTWARE)
-            setEnableDecoderFallback(true)
         }
     }
+    val safeIndex = startIndex.coerceIn(0, (playlist.size - 1).coerceAtLeast(0))
     return ExoPlayer.Builder(context, renderersFactory).build().apply {
+        setWakeMode(C.WAKE_MODE_LOCAL)
+        setAudioAttributes(
+            androidx.media3.common.AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA)
+                .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                .build(),
+            true,
+        )
         val items = playlist.map { video ->
-            if (subtitleUri != null && playlist.getOrNull(startIndex)?.id == video.id) {
+            if (subtitleUri != null && playlist.getOrNull(safeIndex)?.id == video.id) {
                 video.toMediaItemWithSubtitle(subtitleUri)
             } else {
                 video.toMediaItem()
             }
         }
-        setMediaItems(items, startIndex.coerceIn(0, (playlist.size - 1).coerceAtLeast(0)), 0L)
+        setMediaItems(items, safeIndex, startPositionMs.coerceAtLeast(0L))
         prepare()
         playWhenReady = true
+    }
+}
+
+fun PlaybackException.isSoftwareDecodeRetryable(): Boolean {
+    return when (errorCode) {
+        PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+        PlaybackException.ERROR_CODE_DECODING_FAILED,
+        PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
+        PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+        -> true
+        else -> false
+    }
+}
+
+fun PlaybackException.isSourceReadFailure(): Boolean {
+    return when (errorCode) {
+        PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+        PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE,
+        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+        PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
+        PlaybackException.ERROR_CODE_IO_NO_PERMISSION,
+        PlaybackException.ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED,
+        PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE,
+        PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+        PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
+        PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
+        PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED,
+        -> true
+        else -> false
     }
 }
 

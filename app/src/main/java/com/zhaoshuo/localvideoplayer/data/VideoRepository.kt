@@ -18,6 +18,28 @@ class VideoRepository(private val context: Context) {
         return queryVideos(selection = null, selectionArgs = null)
     }
 
+    fun loadVideoIds(): Set<Long>? {
+        return try {
+            val ids = mutableSetOf<Long>()
+            val cursor = context.contentResolver.query(
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                arrayOf(MediaStore.Video.Media._ID),
+                null,
+                null,
+                null,
+            ) ?: return null
+            cursor.use {
+                val idColumn = it.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+                while (it.moveToNext()) {
+                    ids.add(it.getLong(idColumn))
+                }
+            }
+            ids
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     fun loadVideosAddedAfter(minDateAdded: Long, minId: Long): List<VideoItem> {
         val selection = "(${MediaStore.Video.Media.DATE_ADDED} > ?) OR " +
             "(${MediaStore.Video.Media.DATE_ADDED} = ? AND ${MediaStore.Video.Media._ID} > ?)"
@@ -37,6 +59,7 @@ class VideoRepository(private val context: Context) {
             add(MediaStore.Video.Media.DISPLAY_NAME)
             add(MediaStore.Video.Media.DURATION)
             add(MediaStore.Video.Media.DATE_ADDED)
+            add(MediaStore.Video.Media.DATE_MODIFIED)
             add(MediaStore.Video.Media.BUCKET_DISPLAY_NAME)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 add(MediaStore.Video.Media.RELATIVE_PATH)
@@ -54,6 +77,7 @@ class VideoRepository(private val context: Context) {
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
             val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
             val dateAddedColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
+            val dateModifiedColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_MODIFIED)
             val bucketColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.BUCKET_DISPLAY_NAME)
             val relativePathColumn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 cursor.getColumnIndexOrThrow(MediaStore.Video.Media.RELATIVE_PATH)
@@ -66,6 +90,7 @@ class VideoRepository(private val context: Context) {
                 val name = cursor.getString(nameColumn) ?: "Unknown"
                 val duration = cursor.getLong(durationColumn)
                 val dateAdded = cursor.getLong(dateAddedColumn)
+                val dateModified = cursor.getLong(dateModifiedColumn)
                 val bucketName = cursor.getString(bucketColumn)
                 val relativePath = if (relativePathColumn >= 0) {
                     cursor.getString(relativePathColumn)
@@ -85,6 +110,7 @@ class VideoRepository(private val context: Context) {
                         title = name,
                         durationMs = duration,
                         dateAdded = dateAdded,
+                        dateModified = dateModified,
                         thumbnailUri = null,
                         relativePath = relativePath,
                         bucketName = bucketName,
@@ -184,6 +210,7 @@ class VideoRepository(private val context: Context) {
             add(MediaStore.Files.FileColumns._ID)
             add(MediaStore.Files.FileColumns.DISPLAY_NAME)
             add(MediaStore.Files.FileColumns.DATE_ADDED)
+            add(MediaStore.Files.FileColumns.DATE_MODIFIED)
             add(MediaStore.Files.FileColumns.RELATIVE_PATH)
         }.toTypedArray()
 
@@ -210,6 +237,7 @@ class VideoRepository(private val context: Context) {
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
             val dateAddedColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_ADDED)
+            val dateModifiedColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_MODIFIED)
             val relativePathColumn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.RELATIVE_PATH)
             } else {
@@ -221,6 +249,7 @@ class VideoRepository(private val context: Context) {
                 val name = cursor.getString(nameColumn) ?: continue
                 if (!isM3u8Title(name)) continue
                 val dateAdded = cursor.getLong(dateAddedColumn)
+                val dateModified = cursor.getLong(dateModifiedColumn)
                 val relativePath = if (relativePathColumn >= 0) {
                     cursor.getString(relativePathColumn)
                 } else {
@@ -239,6 +268,7 @@ class VideoRepository(private val context: Context) {
                         title = name,
                         durationMs = 0L,
                         dateAdded = dateAdded,
+                        dateModified = dateModified,
                         thumbnailUri = null,
                         relativePath = relativePath,
                         bucketName = relativePath?.substringBefore('/')?.ifBlank { null },

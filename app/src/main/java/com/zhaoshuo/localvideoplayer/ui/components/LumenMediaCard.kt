@@ -1,5 +1,6 @@
 package com.zhaoshuo.localvideoplayer.ui.components
 
+import android.net.Uri
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -34,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.delay
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
@@ -44,7 +46,8 @@ import com.zhaoshuo.localvideoplayer.util.VideoThumbnailCache
 fun LumenMediaCard(
     title: String,
     subtitle: String,
-    videoId: Long?,
+    thumbnailUri: Uri?,
+    thumbnailDateModified: Long = 0L,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     progress: Float? = null,
@@ -87,9 +90,10 @@ fun LumenMediaCard(
         ) {
             if (thumbnailContent != null) {
                 thumbnailContent()
-            } else if (videoId != null) {
+            } else if (thumbnailUri != null) {
                 MediaThumbnail(
-                    videoId = videoId,
+                    thumbnailUri = thumbnailUri,
+                    dateModifiedSeconds = thumbnailDateModified,
                     modifier = Modifier.fillMaxSize(),
                     deferLoad = deferThumbnailLoad,
                 )
@@ -141,18 +145,37 @@ fun LumenMediaCard(
 
 @Composable
 fun MediaThumbnail(
-    videoId: Long,
+    thumbnailUri: Uri,
     modifier: Modifier = Modifier,
+    dateModifiedSeconds: Long = 0L,
     deferLoad: Boolean = false,
 ) {
     val context = LocalContext.current
-    var thumbnail by remember(videoId) { mutableStateOf(VideoThumbnailCache.peek(videoId)) }
+    var thumbnail by remember(thumbnailUri, dateModifiedSeconds) {
+        mutableStateOf(VideoThumbnailCache.peek(thumbnailUri, dateModifiedSeconds))
+    }
 
-    LaunchedEffect(videoId, deferLoad) {
+    LaunchedEffect(thumbnailUri, dateModifiedSeconds, deferLoad) {
         if (deferLoad) return@LaunchedEffect
-        val loaded = VideoThumbnailCache.load(context, videoId)
-        if (loaded != null) {
-            thumbnail = loaded
+        val platform = VideoThumbnailCache.load(
+            context = context,
+            uri = thumbnailUri,
+            dateModifiedSeconds = dateModifiedSeconds,
+            allowFrameFallback = false,
+        )
+        if (platform != null) {
+            thumbnail = platform
+            return@LaunchedEffect
+        }
+        delay(VideoThumbnailCache.FRAME_FALLBACK_DELAY_MS)
+        val framed = VideoThumbnailCache.load(
+            context = context,
+            uri = thumbnailUri,
+            dateModifiedSeconds = dateModifiedSeconds,
+            allowFrameFallback = true,
+        )
+        if (framed != null) {
+            thumbnail = framed
         }
     }
 

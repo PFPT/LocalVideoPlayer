@@ -23,7 +23,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,7 +38,6 @@ import com.zhaoshuo.localvideoplayer.data.HiddenVideosStore
 import com.zhaoshuo.localvideoplayer.data.PlayCountStore
 import com.zhaoshuo.localvideoplayer.data.PlaybackStore
 import com.zhaoshuo.localvideoplayer.data.VideoRepository
-import com.zhaoshuo.localvideoplayer.model.PlaybackRecord
 import com.zhaoshuo.localvideoplayer.model.VideoSeries
 import com.zhaoshuo.localvideoplayer.player.PlaylistState
 import com.zhaoshuo.localvideoplayer.ui.components.DeleteVideoDialog
@@ -54,7 +53,6 @@ import kotlinx.coroutines.withContext
 @Composable
 fun SeriesDetailScreen(
     series: VideoSeries,
-    playbackRecords: Map<String, PlaybackRecord>,
     repository: VideoRepository,
     hiddenVideosStore: HiddenVideosStore,
     playbackStore: PlaybackStore,
@@ -72,7 +70,7 @@ fun SeriesDetailScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
 
-    val hiddenUris by hiddenVideosStore.hiddenUris.collectAsState(initial = emptySet())
+    val hiddenUris by hiddenVideosStore.hiddenUris.collectAsStateWithLifecycle(initialValue = emptySet())
     val visibleEpisodes = remember(series.episodes, hiddenUris) {
         series.episodes.filter { it.uri.toString() !in hiddenUris }
     }
@@ -112,10 +110,15 @@ fun SeriesDetailScreen(
         showDeleteDialog = true
     }
 
+    fun titleForUri(uri: Uri): String {
+        return series.episodes.firstOrNull { it.uri.toString() == uri.toString() }?.title.orEmpty()
+    }
+
     val deleteFromDevice = rememberVideoDeleter(
         playbackStore = playbackStore,
         hiddenVideosStore = hiddenVideosStore,
         playCountStore = playCountStore,
+        titleForUri = ::titleForUri,
         onVideosRemoved = onVideosRemoved,
         onDeleteStarted = { isDeleting = true },
         onDeleteFinished = {
@@ -128,7 +131,10 @@ fun SeriesDetailScreen(
     fun hideVideos(uris: List<Uri>) {
         scope.launch {
             withContext(Dispatchers.IO) {
-                hiddenVideosStore.hideAll(uris)
+                hiddenVideosStore.hideAll(
+                    uris,
+                    uris.associate { it.toString() to titleForUri(it) },
+                )
                 playbackStore.removeRecords(uris)
                 playCountStore.removeForUris(uris)
             }
@@ -230,7 +236,7 @@ fun SeriesDetailScreen(
                 ) { index, episode ->
                     val uriKey = episode.uri.toString()
                     val isSelected = uriKey in selectedUris
-                    val progress = rememberPlaybackProgress(uriKey, playbackRecords)
+                    val progress = rememberPlaybackProgress(uriKey, playbackStore)
 
                     Box(modifier = Modifier.animateItem()) {
                         EpisodeListItem(

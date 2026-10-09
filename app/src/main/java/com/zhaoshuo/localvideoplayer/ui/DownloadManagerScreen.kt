@@ -1,5 +1,7 @@
 package com.zhaoshuo.localvideoplayer.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -38,12 +40,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,15 +62,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
 import com.zhaoshuo.localvideoplayer.download.DownloadFormat
+import com.zhaoshuo.localvideoplayer.download.DownloadListStatusFilter
 import com.zhaoshuo.localvideoplayer.download.DownloadManager
 import com.zhaoshuo.localvideoplayer.download.DownloadStatus
 import com.zhaoshuo.localvideoplayer.download.DownloadTask
+import com.zhaoshuo.localvideoplayer.download.filterDownloadTasks
 import com.zhaoshuo.localvideoplayer.ui.components.AddDownloadBottomSheet
 import com.zhaoshuo.localvideoplayer.ui.components.GlassSurface
 import com.zhaoshuo.localvideoplayer.ui.components.LumenEmptyState
 import com.zhaoshuo.localvideoplayer.ui.components.LumenListHeader
 import com.zhaoshuo.localvideoplayer.ui.components.LumenModalBottomSheet
 import com.zhaoshuo.localvideoplayer.ui.components.RenameDownloadDialog
+import com.zhaoshuo.localvideoplayer.ui.components.SwipeableListItem
 import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenThumbCorner
 import kotlinx.coroutines.launch
@@ -82,26 +88,38 @@ fun DownloadManagerScreen(
     onBack: () -> Unit,
 ) {
     val theme = LocalLumenTheme.current
-    val tasks by manager.tasks.collectAsState()
-    val maxConcurrent by manager.maxConcurrentDownloadsFlow.collectAsState()
-    val connectionsPerDownload by manager.connectionsPerDownloadFlow.collectAsState()
+    val tasks by manager.tasks.collectAsStateWithLifecycle()
+    val maxConcurrent by manager.maxConcurrentDownloadsFlow.collectAsStateWithLifecycle()
+    val connectionsPerDownload by manager.connectionsPerDownloadFlow.collectAsStateWithLifecycle()
     var showAddSheet by remember { mutableStateOf(false) }
     var showSettingsSheet by remember { mutableStateOf(false) }
     var sheetShareText by remember { mutableStateOf<String?>(null) }
     var renameTask by remember { mutableStateOf<DownloadTask?>(null) }
+    var query by remember { mutableStateOf("") }
+    var statusFilter by remember { mutableStateOf(DownloadListStatusFilter.All) }
 
-    val grouped = remember(tasks) {
+    val visibleTasks = remember(tasks, query, statusFilter) {
+        filterDownloadTasks(tasks, query, statusFilter)
+    }
+    val grouped = remember(visibleTasks) {
         DownloadTaskGroups(
-            active = tasks.filter { task ->
+            active = visibleTasks.filter { task ->
                 task.isMerging ||
                     task.status == DownloadStatus.QUEUED ||
                     task.status == DownloadStatus.RUNNING ||
                     task.status == DownloadStatus.PAUSED
             },
-            completed = tasks.filter { it.status == DownloadStatus.COMPLETED },
-            failed = tasks.filter { it.status == DownloadStatus.FAILED || it.status == DownloadStatus.CANCELED },
+            completed = visibleTasks.filter { it.status == DownloadStatus.COMPLETED },
+            failed = visibleTasks.filter { it.status == DownloadStatus.FAILED || it.status == DownloadStatus.CANCELED },
         )
     }
+    val canPauseAll = tasks.any { task ->
+        !task.isMerging &&
+            (task.status == DownloadStatus.QUEUED || task.status == DownloadStatus.RUNNING)
+    }
+    val canResumeAll = tasks.any { it.status == DownloadStatus.PAUSED || it.status == DownloadStatus.FAILED }
+    val canClearCompleted = tasks.any { it.status == DownloadStatus.COMPLETED }
+    val canClearFailed = tasks.any { it.status == DownloadStatus.FAILED || it.status == DownloadStatus.CANCELED }
 
     fun openAddSheet(shareText: String? = null) {
         sheetShareText = shareText
@@ -154,42 +172,71 @@ fun DownloadManagerScreen(
                     .padding(horizontal = 24.dp),
             )
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                if (grouped.active.isNotEmpty()) {
-                    item { DownloadSectionHeader(stringResource(R.string.download_section_active)) }
-                    items(grouped.active, key = { it.id }) { task ->
-                        DownloadTaskCard(
-                            task = task,
-                            manager = manager,
-                            onOpenCompleted = onOpenCompleted,
-                            onRename = { renameTask = task },
-                        )
-                    }
+            DownloadListControls(
+                query = query,
+                onQueryChange = { query = it },
+                statusFilter = statusFilter,
+                onStatusFilter = { statusFilter = it },
+                canPauseAll = canPauseAll,
+                canResumeAll = canResumeAll,
+                canClearCompleted = canClearCompleted,
+                canClearFailed = canClearFailed,
+                onPauseAll = manager::pauseAll,
+                onResumeAll = manager::resumeAll,
+                onClearCompleted = manager::clearCompleted,
+                onClearFailed = manager::clearFailed,
+            )
+            if (visibleTasks.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(R.string.download_filter_empty),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = theme.onSurfaceMuted,
+                    )
                 }
-                if (grouped.completed.isNotEmpty()) {
-                    item { DownloadSectionHeader(stringResource(R.string.download_section_completed)) }
-                    items(grouped.completed, key = { it.id }) { task ->
-                        DownloadTaskCard(
-                            task = task,
-                            manager = manager,
-                            onOpenCompleted = onOpenCompleted,
-                            onRename = { renameTask = task },
-                        )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    if (grouped.active.isNotEmpty()) {
+                        item { DownloadSectionHeader(stringResource(R.string.download_section_active)) }
+                        items(grouped.active, key = { it.id }) { task ->
+                            DownloadTaskRow(
+                                task = task,
+                                manager = manager,
+                                onOpenCompleted = onOpenCompleted,
+                                onRename = { renameTask = task },
+                            )
+                        }
                     }
-                }
-                if (grouped.failed.isNotEmpty()) {
-                    item { DownloadSectionHeader(stringResource(R.string.download_section_failed)) }
-                    items(grouped.failed, key = { it.id }) { task ->
-                        DownloadTaskCard(
-                            task = task,
-                            manager = manager,
-                            onOpenCompleted = onOpenCompleted,
-                            onRename = { renameTask = task },
-                        )
+                    if (grouped.completed.isNotEmpty()) {
+                        item { DownloadSectionHeader(stringResource(R.string.download_section_completed)) }
+                        items(grouped.completed, key = { it.id }) { task ->
+                            DownloadTaskRow(
+                                task = task,
+                                manager = manager,
+                                onOpenCompleted = onOpenCompleted,
+                                onRename = { renameTask = task },
+                            )
+                        }
+                    }
+                    if (grouped.failed.isNotEmpty()) {
+                        item { DownloadSectionHeader(stringResource(R.string.download_section_failed)) }
+                        items(grouped.failed, key = { it.id }) { task ->
+                            DownloadTaskRow(
+                                task = task,
+                                manager = manager,
+                                onOpenCompleted = onOpenCompleted,
+                                onRename = { renameTask = task },
+                            )
+                        }
                     }
                 }
             }
@@ -245,6 +292,94 @@ private data class DownloadTaskGroups(
     val completed: List<DownloadTask>,
     val failed: List<DownloadTask>,
 )
+
+@Composable
+private fun DownloadListControls(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    statusFilter: DownloadListStatusFilter,
+    onStatusFilter: (DownloadListStatusFilter) -> Unit,
+    canPauseAll: Boolean,
+    canResumeAll: Boolean,
+    canClearCompleted: Boolean,
+    canClearFailed: Boolean,
+    onPauseAll: () -> Unit,
+    onResumeAll: () -> Unit,
+    onClearCompleted: () -> Unit,
+    onClearFailed: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            placeholder = { Text(stringResource(R.string.download_search_hint)) },
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FilterChip(
+                selected = statusFilter == DownloadListStatusFilter.All,
+                onClick = { onStatusFilter(DownloadListStatusFilter.All) },
+                label = { Text(stringResource(R.string.download_filter_all)) },
+            )
+            FilterChip(
+                selected = statusFilter == DownloadListStatusFilter.Active,
+                onClick = { onStatusFilter(DownloadListStatusFilter.Active) },
+                label = { Text(stringResource(R.string.download_filter_active)) },
+            )
+            FilterChip(
+                selected = statusFilter == DownloadListStatusFilter.Completed,
+                onClick = { onStatusFilter(DownloadListStatusFilter.Completed) },
+                label = { Text(stringResource(R.string.download_filter_completed)) },
+            )
+            FilterChip(
+                selected = statusFilter == DownloadListStatusFilter.Failed,
+                onClick = { onStatusFilter(DownloadListStatusFilter.Failed) },
+                label = { Text(stringResource(R.string.download_filter_failed)) },
+            )
+        }
+        if (canPauseAll || canResumeAll || canClearCompleted || canClearFailed) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (canPauseAll) {
+                    TextButton(onClick = onPauseAll) {
+                        Text(stringResource(R.string.download_pause_all))
+                    }
+                }
+                if (canResumeAll) {
+                    TextButton(onClick = onResumeAll) {
+                        Text(stringResource(R.string.download_resume_all))
+                    }
+                }
+                if (canClearCompleted) {
+                    TextButton(onClick = onClearCompleted) {
+                        Text(stringResource(R.string.download_clear_completed))
+                    }
+                }
+                if (canClearFailed) {
+                    TextButton(onClick = onClearFailed) {
+                        Text(stringResource(R.string.download_clear_failed))
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun DownloadSectionHeader(title: String) {
@@ -365,12 +500,34 @@ private fun ConcurrentDownloadSettings(
 }
 
 @Composable
+private fun DownloadTaskRow(
+    task: DownloadTask,
+    manager: DownloadManager,
+    onOpenCompleted: (DownloadTask) -> Unit,
+    onRename: () -> Unit,
+) {
+    SwipeableListItem(
+        enabled = true,
+        onSwipeDelete = { manager.remove(task.id) },
+    ) {
+        DownloadTaskCard(
+            task = task,
+            manager = manager,
+            onOpenCompleted = onOpenCompleted,
+            onRename = onRename,
+        )
+    }
+}
+
+@Composable
 private fun DownloadTaskCard(
     task: DownloadTask,
     manager: DownloadManager,
     onOpenCompleted: (DownloadTask) -> Unit,
     onRename: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val linkCopied = stringResource(R.string.download_link_copied)
     val canPlay = task.status == DownloadStatus.COMPLETED && !task.outputUri.isNullOrBlank()
     val showProgress = task.isMerging ||
         task.status == DownloadStatus.RUNNING ||
@@ -411,6 +568,13 @@ private fun DownloadTaskCard(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    Text(
+                        task.url,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LocalLumenTheme.current.onSurfaceMuted,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     DownloadStatusBadge(task)
                 }
                 Box {
@@ -423,6 +587,12 @@ private fun DownloadTaskCard(
                         canPlay = canPlay,
                         onDismiss = { menuExpanded = false },
                         onRename = onRename,
+                        onCopyLink = {
+                            context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(
+                                ClipData.newPlainText("download", task.url),
+                            )
+                            Toast.makeText(context, linkCopied, Toast.LENGTH_SHORT).show()
+                        },
                         onRemove = { manager.remove(task.id) },
                     )
                 }
@@ -667,9 +837,14 @@ private fun DownloadTaskMenu(
     canPlay: Boolean,
     onDismiss: () -> Unit,
     onRename: () -> Unit,
+    onCopyLink: () -> Unit,
     onRemove: () -> Unit,
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.download_copy_link)) },
+            onClick = { onDismiss(); onCopyLink() },
+        )
         if (task.status == DownloadStatus.COMPLETED && canPlay) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.download_rename)) },
@@ -682,3 +857,4 @@ private fun DownloadTaskMenu(
         )
     }
 }
+

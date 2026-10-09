@@ -179,12 +179,42 @@ class DownloadManager private constructor(private val context: Context) {
             ready.await()
             val task = repository.get(id) ?: return@launch
             if (task.status == DownloadStatus.RUNNING) {
-                cancel(id)
-            } else {
-                if (task.status != DownloadStatus.COMPLETED) cleanupTaskFiles(task)
-                repository.delete(id)
+                context.startService(
+                    Intent(context, DownloadService::class.java)
+                        .setAction(DownloadService.ACTION_CANCEL_CURRENT)
+                        .putExtra(DownloadService.EXTRA_TASK_ID, id),
+                )
             }
+            if (task.status != DownloadStatus.COMPLETED) cleanupTaskFiles(task)
+            repository.delete(id)
         }
+    }
+
+    fun pauseAll() {
+        _tasks.value
+            .filter { task ->
+                !task.isMerging &&
+                    (task.status == DownloadStatus.QUEUED || task.status == DownloadStatus.RUNNING)
+            }
+            .forEach { pause(it.id) }
+    }
+
+    fun resumeAll() {
+        _tasks.value
+            .filter { it.status == DownloadStatus.PAUSED || it.status == DownloadStatus.FAILED }
+            .forEach { resume(it.id) }
+    }
+
+    fun clearCompleted() {
+        _tasks.value
+            .filter { it.status == DownloadStatus.COMPLETED }
+            .forEach { remove(it.id) }
+    }
+
+    fun clearFailed() {
+        _tasks.value
+            .filter { it.status == DownloadStatus.FAILED || it.status == DownloadStatus.CANCELED }
+            .forEach { remove(it.id) }
     }
 
     fun rename(id: String, newName: String, callback: (Boolean) -> Unit) {

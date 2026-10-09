@@ -116,4 +116,67 @@ class HlsVodPlaylistParserTest {
         assertEquals(1, playlist.segments.size)
         assertTrue(playlist.segments.single().url.endsWith(".m4s"))
     }
+
+    @Test
+    fun parsesExtensionlessRelativeSegment() {
+        val playlist = HlsVodPlaylistParser.parseMediaPlaylist(
+            "https://example.com/hls/media.m3u8",
+            """
+                #EXTM3U
+                #EXTINF:6,
+                seg0001
+                #EXT-X-ENDLIST
+            """.trimIndent(),
+        )
+
+        assertEquals("https://example.com/hls/seg0001", playlist.segments.single().url)
+        assertEquals(HlsSegmentFormat.TS, playlist.segmentFormat())
+    }
+
+    @Test
+    fun parsesMp4SegmentUrlAsFmp4() {
+        val playlist = HlsVodPlaylistParser.parseMediaPlaylist(
+            "https://example.com/media.m3u8",
+            """
+                #EXTM3U
+                #EXTINF:4,
+                https://cdn.example.com/video/segment.mp4?token=1
+                #EXT-X-ENDLIST
+            """.trimIndent(),
+        )
+
+        assertEquals("https://cdn.example.com/video/segment.mp4?token=1", playlist.segments.single().url)
+        assertEquals(HlsSegmentFormat.FMP4, playlist.segmentFormat())
+    }
+
+    @Test
+    fun parsesDisguisedJpgSegmentUrl() {
+        val playlist = HlsVodPlaylistParser.parseMediaPlaylist(
+            "https://example.com/media.m3u8",
+            """
+                #EXTM3U
+                #EXTINF:3,
+                https://cdn.example.com/camo/0.jpg
+                #EXT-X-ENDLIST
+            """.trimIndent(),
+        )
+
+        assertEquals("https://cdn.example.com/camo/0.jpg", playlist.segments.single().url)
+    }
+
+    @Test
+    fun rejectsSegmentLineWithoutExtinf() {
+        val error = assertThrows(HlsVodException::class.java) {
+            HlsVodPlaylistParser.parseMediaPlaylist(
+                "https://example.com/media.m3u8",
+                """
+                    #EXTM3U
+                    https://cdn.example.com/camo/0.jpg
+                    #EXT-X-ENDLIST
+                """.trimIndent(),
+            )
+        }
+
+        assertEquals(HlsVodFailure.UNSUPPORTED_SEGMENT, error.failure)
+    }
 }

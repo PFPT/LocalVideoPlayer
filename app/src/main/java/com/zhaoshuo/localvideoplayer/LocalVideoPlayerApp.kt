@@ -11,7 +11,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -23,17 +25,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.zhaoshuo.localvideoplayer.cast.CastManager
+import com.zhaoshuo.localvideoplayer.cast.CastUiState
 import com.zhaoshuo.localvideoplayer.cast.LocalCastManager
+import com.zhaoshuo.localvideoplayer.data.BookmarkStore
 import com.zhaoshuo.localvideoplayer.data.LibraryPreferencesStore
 import com.zhaoshuo.localvideoplayer.data.LibraryViewModel
 import com.zhaoshuo.localvideoplayer.data.PlaybackStore
@@ -47,21 +54,20 @@ import com.zhaoshuo.localvideoplayer.data.ThemePreferencesStore
 import com.zhaoshuo.localvideoplayer.data.VideoRepository
 import com.zhaoshuo.localvideoplayer.download.DownloadManager
 import com.zhaoshuo.localvideoplayer.download.DownloadTask
-import com.zhaoshuo.localvideoplayer.model.PlaybackRecord
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
+import com.zhaoshuo.localvideoplayer.player.PlaybackSessionViewModel
 import com.zhaoshuo.localvideoplayer.player.PlaylistState
 import com.zhaoshuo.localvideoplayer.ui.PlayerScreen
 import com.zhaoshuo.localvideoplayer.ui.DownloadManagerScreen
 import com.zhaoshuo.localvideoplayer.ui.SeriesDetailScreen
 import com.zhaoshuo.localvideoplayer.ui.SettingsScreen
 import com.zhaoshuo.localvideoplayer.ui.VideoListScreen
+import com.zhaoshuo.localvideoplayer.ui.components.PlaybackMiniBar
 import com.zhaoshuo.localvideoplayer.ui.theme.LocalVideoPlayerTheme
 import com.zhaoshuo.localvideoplayer.ui.theme.ThemeState
 import com.zhaoshuo.localvideoplayer.util.LauncherIconSwitcher
 import com.zhaoshuo.localvideoplayer.util.Permissions
-import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.debounce
 
 private const val ROUTE_VIDEO_LIST = "video_list"
 private const val ROUTE_SERIES = "series/{seriesId}"
@@ -74,12 +80,14 @@ fun LocalVideoPlayerApp(
     sharedDownloadText: String? = null,
     onSharedDownloadConsumed: () -> Unit = {},
     downloadsNavigationTick: Int = 0,
+    openPlayerTick: Int = 0,
 ) {
     val context = LocalContext.current
     val navController = rememberNavController()
     val repository = remember { VideoRepository(context) }
     val downloadManager = remember { DownloadManager.get(context) }
     val playbackStore = remember { PlaybackStore(context) }
+    val bookmarkStore = remember { BookmarkStore(context) }
     val playerPreferencesStore = remember { PlayerPreferencesStore(context) }
     val seriesSkipStore = remember { SeriesSkipStore(context) }
     val hiddenVideosStore = remember { HiddenVideosStore(context) }
@@ -89,6 +97,7 @@ fun LocalVideoPlayerApp(
     val libraryPreferencesStore = remember { LibraryPreferencesStore(context) }
     val folderSourceStore = remember { FolderSourceStore(context) }
     val libraryViewModel = remember { LibraryViewModel(context) }
+    val playbackSession = viewModel<PlaybackSessionViewModel>().session
     val castManager = remember { CastManager(context, playbackStore) }
     val themeState by themeStore.themeState.collectAsState(initial = ThemeState())
     val libraryEntries by libraryViewModel.libraryEntries.collectAsState()
@@ -127,9 +136,6 @@ fun LocalVideoPlayerApp(
             ) == PackageManager.PERMISSION_GRANTED,
         )
     }
-    var recentRecords by remember { mutableStateOf<List<PlaybackRecord>>(emptyList()) }
-    var playbackRecords by remember { mutableStateOf<Map<String, PlaybackRecord>>(emptyMap()) }
-
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -139,6 +145,16 @@ fun LocalVideoPlayerApp(
     LaunchedEffect(downloadsNavigationTick) {
         if (downloadsNavigationTick > 0) {
             navController.navigate(ROUTE_DOWNLOADS)
+        }
+    }
+
+    LaunchedEffect(openPlayerTick) {
+        if (openPlayerTick == 0) return@LaunchedEffect
+        if (navController.currentDestination?.route == ROUTE_PLAYER) return@LaunchedEffect
+        if (!playbackSession.state.value.active && playlistState == null) return@LaunchedEffect
+        playbackSession.markReturnToExisting()
+        navController.navigate(ROUTE_PLAYER) {
+            launchSingleTop = true
         }
     }
 
@@ -201,27 +217,20 @@ fun LocalVideoPlayerApp(
         }
     }
 
-    LaunchedEffect(playbackStore) {
-        playbackStore.recentRecords.collect { records ->
-            recentRecords = records
-        }
-    }
-
-    @OptIn(FlowPreview::class)
-    LaunchedEffect(playbackStore) {
-        playbackStore.recentRecords
-            .debounce(400)
-            .collect { records ->
-                playbackRecords = records.associateBy { it.uri.toString() }
-            }
-    }
-
     LocalVideoPlayerTheme(
         mode = themeState.mode,
         colors = themeState.colors,
     ) {
+        val navBackStack by navController.currentBackStackEntryAsState()
+        val sessionState by playbackSession.state.collectAsState()
+        val castUi by castManager.uiState.collectAsState()
+        val showPlaybackBar = sessionState.active &&
+            !sessionState.onPlayerScreen &&
+            navBackStack?.destination?.route != ROUTE_PLAYER &&
+            castUi !is CastUiState.Connected
         CompositionLocalProvider(LocalCastManager provides castManager) {
             Surface(modifier = Modifier.fillMaxSize()) {
+                Box(modifier = Modifier.fillMaxSize()) {
                 NavHost(
                     navController = navController,
                     startDestination = ROUTE_VIDEO_LIST,
@@ -232,8 +241,6 @@ fun LocalVideoPlayerApp(
                             isLibraryLoading = isLibraryLoading && libraryEntries.isEmpty(),
                             isRefreshing = isRefreshing,
                             hasPermission = hasPermission,
-                            recentRecords = recentRecords,
-                            playbackRecords = playbackRecords,
                             repository = repository,
                             hiddenVideosStore = hiddenVideosStore,
                             playbackStore = playbackStore,
@@ -277,7 +284,6 @@ fun LocalVideoPlayerApp(
                         } else {
                             SeriesDetailScreen(
                                 series = series,
-                                playbackRecords = playbackRecords,
                                 repository = repository,
                                 hiddenVideosStore = hiddenVideosStore,
                                 playbackStore = playbackStore,
@@ -298,7 +304,7 @@ fun LocalVideoPlayerApp(
                         }
                     }
                     composable(ROUTE_PLAYER) {
-                        val state = playlistState
+                        val state = playlistState ?: playbackSession.playlistState()
                         if (state == null) {
                             LaunchedEffect(Unit) {
                                 navController.popBackStack()
@@ -310,6 +316,8 @@ fun LocalVideoPlayerApp(
                                 playerPreferencesStore = playerPreferencesStore,
                                 pinnedItemsStore = pinnedItemsStore,
                                 seriesSkipStore = seriesSkipStore,
+                                bookmarkStore = bookmarkStore,
+                                playbackSession = playbackSession,
                                 onBack = { navController.popBackStack() },
                             )
                         }
@@ -321,6 +329,8 @@ fun LocalVideoPlayerApp(
                             libraryPreferencesStore = libraryPreferencesStore,
                             playerPreferencesStore = playerPreferencesStore,
                             folderSourceStore = folderSourceStore,
+                            hiddenVideosStore = hiddenVideosStore,
+                            onRestoreHidden = { libraryViewModel.refresh(fromPull = true) },
                             onBack = { navController.popBackStack() },
                         )
                     }
@@ -335,6 +345,25 @@ fun LocalVideoPlayerApp(
                             onBack = { navController.popBackStack() },
                         )
                     }
+                }
+                PlaybackMiniBar(
+                    visible = showPlaybackBar,
+                    title = sessionState.title,
+                    sleepChoice = sessionState.sleepChoice,
+                    sleepRemaining = playbackSession.sleepRemainingMs,
+                    isPlaying = sessionState.isPlaying,
+                    onOpen = {
+                        playbackSession.markReturnToExisting()
+                        navController.navigate(ROUTE_PLAYER) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onPlayPause = { playbackSession.togglePlayPause() },
+                    onClose = { playbackSession.stop() },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding(),
+                )
                 }
             }
         }

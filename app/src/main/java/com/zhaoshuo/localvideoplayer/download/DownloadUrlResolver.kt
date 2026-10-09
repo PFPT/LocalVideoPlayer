@@ -4,6 +4,9 @@ import java.net.URI
 import java.net.URLDecoder
 
 object DownloadUrlResolver {
+    const val DEFAULT_USER_AGENT =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+
     fun unwrapProxyUrl(url: String): String {
         var current = url.trim()
         if (current.isEmpty()) return current
@@ -35,6 +38,26 @@ object DownloadUrlResolver {
         val directUrl = resolveDownloadUrl(url)
         if (!merged.keys.any { it.equals("Referer", ignoreCase = true) }) {
             originReferer(directUrl)?.let { merged["Referer"] = it }
+        }
+        if (!merged.keys.any { it.equals("User-Agent", ignoreCase = true) }) {
+            merged["User-Agent"] = DEFAULT_USER_AGENT
+        }
+        return merged
+    }
+
+    fun ensureDownloadHeaders(headers: Map<String, String>): Map<String, String> {
+        if (headers.keys.any { it.equals("User-Agent", ignoreCase = true) }) return headers
+        return LinkedHashMap(headers).apply { put("User-Agent", DEFAULT_USER_AGENT) }
+    }
+
+    fun hlsChildHeaders(playlistUrl: String, headers: Map<String, String>): Map<String, String> {
+        val merged = LinkedHashMap(ensureDownloadHeaders(headers))
+        val refererKey = merged.keys.firstOrNull { it.equals("Referer", ignoreCase = true) }
+        val current = refererKey?.let { merged[it] }
+        val origin = originReferer(playlistUrl)
+        if (current.isNullOrBlank() || current == origin) {
+            if (refererKey != null) merged.remove(refererKey)
+            merged["Referer"] = playlistUrl
         }
         return merged
     }

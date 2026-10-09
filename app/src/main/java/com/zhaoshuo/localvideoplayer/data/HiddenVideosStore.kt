@@ -15,25 +15,60 @@ private val Context.hiddenVideosDataStore: DataStore<Preferences> by preferences
     name = "hidden_videos",
 )
 
+data class HiddenVideoEntry(
+    val uri: String,
+    val title: String,
+)
+
+private const val HIDDEN_FIELD_SEPARATOR = "\u0001"
+
+fun encodeHiddenEntry(uri: String, title: String): String {
+    val safeTitle = title.replace(HIDDEN_FIELD_SEPARATOR, " ").replace("\n", " ").trim()
+    return uri + HIDDEN_FIELD_SEPARATOR + safeTitle
+}
+
+fun decodeHiddenEntry(raw: String): HiddenVideoEntry {
+    val separator = raw.indexOf(HIDDEN_FIELD_SEPARATOR)
+    if (separator < 0) return HiddenVideoEntry(raw, "")
+    return HiddenVideoEntry(raw.substring(0, separator), raw.substring(separator + 1))
+}
+
+fun hiddenDisplayLabel(entry: HiddenVideoEntry): String {
+    val title = entry.title.trim()
+    if (title.isNotEmpty()) return title
+    val tail = entry.uri.substringAfterLast('/').substringAfterLast(':')
+    return tail.ifBlank { entry.uri }
+}
+
 class HiddenVideosStore(private val context: Context) {
 
-    val hiddenUris: Flow<Set<String>> = context.hiddenVideosDataStore.data.map { prefs ->
-        prefs[HIDDEN_URIS_KEY] ?: emptySet()
+    val hiddenEntries: Flow<List<HiddenVideoEntry>> = context.hiddenVideosDataStore.data.map { prefs ->
+        (prefs[HIDDEN_URIS_KEY] ?: emptySet())
+            .map(::decodeHiddenEntry)
+            .sortedBy { hiddenDisplayLabel(it).lowercase() }
+    }
+
+    val hiddenUris: Flow<Set<String>> = hiddenEntries.map { entries ->
+        entries.map { it.uri }.toSet()
     }
 
     suspend fun getHiddenUris(): Set<String> {
         return hiddenUris.first()
     }
 
-    suspend fun hide(uri: Uri) {
-        hideAll(listOf(uri))
+    suspend fun hide(uri: Uri, title: String = "") {
+        hideAll(listOf(uri), mapOf(uri.toString() to title))
     }
 
-    suspend fun hideAll(uris: Collection<Uri>) {
+    suspend fun hideAll(uris: Collection<Uri>, titles: Map<String, String> = emptyMap()) {
         if (uris.isEmpty()) return
         context.hiddenVideosDataStore.edit { prefs ->
             val current = prefs[HIDDEN_URIS_KEY]?.toMutableSet() ?: mutableSetOf()
-            uris.forEach { current.add(it.toString()) }
+            uris.forEach { uri ->
+                val key = uri.toString()
+                current.removeAll { decodeHiddenEntry(it).uri == key }
+                current.add(encodeHiddenEntry(key, titles[key].orEmpty()))
+            }
             prefs[HIDDEN_URIS_KEY] = current
         }
     }
@@ -44,10 +79,10 @@ class HiddenVideosStore(private val context: Context) {
 
     suspend fun unhideAll(uris: Collection<Uri>) {
         if (uris.isEmpty()) return
+        val remove = uris.map { it.toString() }.toSet()
         context.hiddenVideosDataStore.edit { prefs ->
-            val current = prefs[HIDDEN_URIS_KEY]?.toMutableSet() ?: return@edit
-            uris.forEach { current.remove(it.toString()) }
-            prefs[HIDDEN_URIS_KEY] = current
+            val current = prefs[HIDDEN_URIS_KEY] ?: return@edit
+            prefs[HIDDEN_URIS_KEY] = current.filterNot { decodeHiddenEntry(it).uri in remove }.toSet()
         }
     }
 

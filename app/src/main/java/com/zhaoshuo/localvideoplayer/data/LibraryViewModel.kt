@@ -12,6 +12,7 @@ import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
 import com.zhaoshuo.localvideoplayer.model.withoutUris
 import com.zhaoshuo.localvideoplayer.util.SeriesGrouper
 import com.zhaoshuo.localvideoplayer.util.isM3u8Title
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -58,6 +59,10 @@ class LibraryViewModel(
     private var debounceJob: Job? = null
     private var lastKnownMaxId = 0L
     private var lastKnownMaxDateAdded = 0L
+    private var lastInputSignature: String? = null
+    private var lastFolderSignature: String? = null
+    private var cachedFolderSourceKey: String? = null
+    private var cachedFolderVideos: List<VideoItem> = emptyList()
 
     private val contentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean) {
@@ -68,7 +73,7 @@ class LibraryViewModel(
             debounceJob?.cancel()
             debounceJob = scope.launch {
                 delay(MEDIA_DEBOUNCE_MS)
-                refresh(showLoading = false, fromPull = false, incrementalPreferred = false)
+                refresh(showLoading = false, fromPull = false, incrementalPreferred = true)
             }
         }
     }
@@ -89,7 +94,7 @@ class LibraryViewModel(
             folderWatchStarted = true
             scope.launch {
                 folderSourceStore.sources.collect {
-                    refresh(showLoading = false, fromPull = false, incrementalPreferred = false)
+                    refresh(showLoading = false, fromPull = false, incrementalPreferred = true)
                 }
             }
         }
@@ -115,7 +120,7 @@ class LibraryViewModel(
         val cachedEntries = withContext(Dispatchers.IO) { libraryCacheStore.loadLibraryEntries() }
         if (cachedEntries.isNotEmpty()) {
             _libraryEntries.value = cachedEntries.filterNotHidden(hiddenUris)
-            updateWatermarks(flattenVideos(_libraryEntries.value))
+            rememberSignatures(flattenVideos(_libraryEntries.value))
             return
         }
         val videos = withContext(Dispatchers.IO) { libraryCacheStore.loadVideos() }
@@ -123,6 +128,7 @@ class LibraryViewModel(
         if (videos.isEmpty()) return
         _libraryEntries.value = videos.map { VideoLibraryEntry.Single(it) }
         applyVideos(videos, emptySet())
+        rememberSignatures(flattenVideos(_libraryEntries.value))
     }
 
     fun refresh(showLoading: Boolean = false, fromPull: Boolean = false, incrementalPreferred: Boolean = false) {
@@ -145,6 +151,7 @@ class LibraryViewModel(
             }
         }
         _libraryEntries.value = _libraryEntries.value.withoutUris(uris)
+        cachedFolderVideos = cachedFolderVideos.filter { it.uri.toString() !in uriSet }
         scope.launch(Dispatchers.IO) {
             libraryCacheStore.removeVideos(uris)
             libraryCacheStore.saveLibraryEntries(_libraryEntries.value)
@@ -168,18 +175,15 @@ class LibraryViewModel(
         else if (showLoading) _isLibraryLoading.value = true
         try {
             val hiddenUris = withContext(Dispatchers.IO) { hiddenVideosStore.getHiddenUris() }
+            val folderVideos = loadFolderSourceVideos(force = fromPull)
+            val folderSignature = withContext(Dispatchers.Default) { videoSetSignature(folderVideos) }
+            val useIncremental = incrementalPreferred && !fromPull && lastKnownMaxId > 0
             val scanned = withContext(Dispatchers.IO) {
-                if (incrementalPreferred && lastKnownMaxId > 0) {
+                if (useIncremental) {
                     val delta = repository.loadVideosAddedAfter(lastKnownMaxDateAdded, lastKnownMaxId)
-                    if (delta.isEmpty()) {
-                        null
-                    } else {
-                        val existing = flattenVideos(_libraryEntries.value)
-                            .associateBy { it.uri.toString() }
-                            .toMutableMap()
-                        delta.forEach { existing[it.uri.toString()] = it }
-                        existing.values.toList()
-                    }
+                    val mediaExisting = flattenVideos(_libraryEntries.value).filterNot(::isFolderSourceVideo)
+                    val liveIds = repository.loadVideoIds()
+                    resolveIncrementalMedia(mediaExisting, delta, liveIds)
                 } else {
                     var list = repository.loadVideos()
                     if (list.isEmpty()) {
@@ -189,33 +193,45 @@ class LibraryViewModel(
                     list
                 }
             }
-            if (scanned == null) {
+            if (scanned == null && folderSignature == lastFolderSignature) {
+                if (fromPull && librarySignature(_libraryEntries.value) == previousSignature) {
+                    _refreshError.emit(REFRESH_UP_TO_DATE)
+                }
                 return
             }
-            val folderVideos = withContext(Dispatchers.IO) { loadFolderSourceVideos() }
-            val scannedWithFolders = mergeVideos(scanned, folderVideos)
+            val mediaVideos = scanned ?: flattenVideos(_libraryEntries.value).filterNot(::isFolderSourceVideo)
+            val scannedWithFolders = mergeVideos(mediaVideos, folderVideos)
             if (scannedWithFolders.isEmpty() && _libraryEntries.value.isNotEmpty() && !fromPull) {
                 return
             }
-            if (_libraryEntries.value.isEmpty()) {
+            val pendingSignature = withContext(Dispatchers.Default) { videoSetSignature(scannedWithFolders) }
+            if (!fromPull && pendingSignature == lastInputSignature && _libraryEntries.value.isNotEmpty()) {
+                rememberSignatures(flattenVideos(_libraryEntries.value))
+                return
+            }
+            val existingEntries = _libraryEntries.value
+            val hadEntries = existingEntries.isNotEmpty()
+            if (!hadEntries) {
                 _libraryEntries.value = scannedWithFolders
                     .filter { it.uri.toString() !in hiddenUris }
                     .map { VideoLibraryEntry.Single(it) }
                 _isLibraryLoading.value = false
             }
-            applyVideos(scannedWithFolders, hiddenUris)
-            saveCaches(scannedWithFolders)
-
             val m3u8Items = withContext(Dispatchers.IO) {
                 repository.loadM3u8Playlists(scannedWithFolders)
             }
-            if (m3u8Items.isNotEmpty()) {
-                val merged = scannedWithFolders + m3u8Items
+            val merged = if (m3u8Items.isEmpty()) scannedWithFolders else scannedWithFolders + m3u8Items
+            val visible = merged.filter { it.uri.toString() !in hiddenUris }
+            val changeCount = libraryChangeCount(flattenVideos(existingEntries), visible)
+            if (shouldFullyRegroup(fromPull, !hadEntries, changeCount)) {
                 applyVideos(merged, hiddenUris)
-                saveCaches(merged)
+            } else {
+                _libraryEntries.value = withContext(Dispatchers.Default) {
+                    patchLibraryEntries(existingEntries, visible)
+                }
             }
-
-            updateWatermarks(flattenVideos(_libraryEntries.value))
+            saveCaches(merged)
+            rememberSignatures(flattenVideos(_libraryEntries.value))
 
             if (fromPull && librarySignature(_libraryEntries.value) == previousSignature) {
                 _refreshError.emit(REFRESH_UP_TO_DATE)
@@ -247,6 +263,20 @@ class LibraryViewModel(
         }
     }
 
+    private suspend fun rememberSignatures(videos: List<VideoItem>) {
+        val signatures = withContext(Dispatchers.Default) {
+            val input = videos.filterNot { isM3u8Title(it.title) }
+            Triple(
+                input.filterNot(::isFolderSourceVideo),
+                videoSetSignature(input.filter(::isFolderSourceVideo)),
+                videoSetSignature(input),
+            )
+        }
+        updateWatermarks(signatures.first)
+        lastFolderSignature = signatures.second
+        lastInputSignature = signatures.third
+    }
+
     private fun updateWatermarks(videos: List<VideoItem>) {
         lastKnownMaxId = videos.maxOfOrNull { it.id } ?: 0L
         lastKnownMaxDateAdded = videos.maxOfOrNull { it.dateAdded } ?: 0L
@@ -275,19 +305,32 @@ class LibraryViewModel(
         return withoutUris(hiddenUris.map(Uri::parse))
     }
 
-    private suspend fun loadFolderSourceVideos(): List<VideoItem> {
+    private suspend fun loadFolderSourceVideos(force: Boolean): List<VideoItem> {
         val sources = folderSourceStore.getSources()
-        if (sources.isEmpty()) return emptyList()
-        return sources.flatMap { source ->
-            val uri = runCatching { Uri.parse(source.treeUri) }.getOrNull() ?: return@flatMap emptyList()
-            runCatching { folderVideoScanner.loadVideos(uri) }.getOrDefault(emptyList())
+        if (sources.isEmpty()) {
+            cachedFolderSourceKey = ""
+            cachedFolderVideos = emptyList()
+            return emptyList()
         }
-    }
-
-    private fun mergeVideos(primary: List<VideoItem>, extra: List<VideoItem>): List<VideoItem> {
-        if (extra.isEmpty()) return primary
-        val seen = primary.mapTo(mutableSetOf()) { it.uri.toString() }
-        return primary + extra.filter { seen.add(it.uri.toString()) }
+        val key = sources.joinToString("\n") { it.treeUri }
+        if (!force && key == cachedFolderSourceKey) {
+            return cachedFolderVideos
+        }
+        val videos = withContext(Dispatchers.IO) {
+            sources.flatMap { source ->
+                val uri = runCatching { Uri.parse(source.treeUri) }.getOrNull() ?: return@flatMap emptyList()
+                try {
+                    folderVideoScanner.loadVideos(uri)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
+        }
+        cachedFolderSourceKey = key
+        cachedFolderVideos = videos
+        return videos
     }
 
     private suspend fun backfillMissingDurations() {
@@ -313,6 +356,13 @@ class LibraryViewModel(
             patchLibraryEntries(latest, updated)
         }
         saveCaches(updated)
+        rememberSignatures(flattenVideos(_libraryEntries.value))
+    }
+
+    private fun mergeVideos(primary: List<VideoItem>, extra: List<VideoItem>): List<VideoItem> {
+        if (extra.isEmpty()) return primary
+        val seen = primary.mapTo(mutableSetOf()) { it.uri.toString() }
+        return primary + extra.filter { seen.add(it.uri.toString()) }
     }
 
     companion object {

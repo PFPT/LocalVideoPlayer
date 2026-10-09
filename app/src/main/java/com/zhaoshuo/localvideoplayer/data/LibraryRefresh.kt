@@ -6,6 +6,7 @@ import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
 import com.zhaoshuo.localvideoplayer.model.VideoSeries
 import com.zhaoshuo.localvideoplayer.util.SeriesGrouper
 import com.zhaoshuo.localvideoplayer.util.TitleParser
+import com.zhaoshuo.localvideoplayer.util.isM3u8Title
 
 fun withResolvedDurations(videos: List<VideoItem>, resolved: Map<String, Long>): List<VideoItem> {
     if (resolved.isEmpty()) return videos
@@ -18,6 +19,66 @@ fun withResolvedDurations(videos: List<VideoItem>, resolved: Map<String, Long>):
         video.copy(durationMs = duration)
     }
     return if (changed) next else videos
+}
+
+fun mergeIncrementalVideos(existing: List<VideoItem>, delta: List<VideoItem>): List<VideoItem>? {
+    if (delta.isEmpty()) return null
+    val merged = existing.associateBy { it.uri.toString() }.toMutableMap()
+    delta.forEach { video -> merged[video.uri.toString()] = video }
+    return merged.values.toList()
+}
+
+fun resolveIncrementalMedia(
+    existing: List<VideoItem>,
+    delta: List<VideoItem>,
+    liveIds: Set<Long>?,
+): List<VideoItem>? {
+    val merged = mergeIncrementalVideos(existing, delta) ?: existing
+    val pruned = dropMissingMediaStoreVideos(merged, liveIds)
+    if (pruned != null) return pruned
+    if (delta.isEmpty()) return null
+    return merged
+}
+
+fun videoSetSignature(videos: List<VideoItem>): String {
+    if (videos.isEmpty()) return ""
+    var hash = videos.size.toLong()
+    for (video in videos) {
+        hash += videoFingerprint(video)
+    }
+    return hash.toString()
+}
+
+private fun videoFingerprint(video: VideoItem): Long {
+    var hash = video.uri.hashCode().toLong()
+    hash = 31 * hash + video.id
+    hash = 31 * hash + video.durationMs
+    hash = 31 * hash + video.dateAdded
+    hash = 31 * hash + video.dateModified
+    hash = 31 * hash + (video.relativePath?.hashCode()?.toLong() ?: 0L)
+    return hash
+}
+
+fun isFolderSourceVideo(video: VideoItem): Boolean {
+    if (video.relativePath?.startsWith("content://") == true) return true
+    val segments = video.uri.pathSegments
+    return segments.size >= 4 && segments[0] == "tree" && segments.contains("document")
+}
+
+fun isTrackedMediaStoreVideo(video: VideoItem): Boolean {
+    return !isFolderSourceVideo(video) && !isM3u8Title(video.title)
+}
+
+const val SMALL_LIBRARY_CHANGE_LIMIT = 24
+
+fun libraryChangeCount(previous: List<VideoItem>, next: List<VideoItem>): Int {
+    val previousUris = previous.mapTo(mutableSetOf()) { it.uri.toString() }
+    val nextUris = next.mapTo(mutableSetOf()) { it.uri.toString() }
+    return (nextUris - previousUris).size + (previousUris - nextUris).size
+}
+
+fun shouldFullyRegroup(fromPull: Boolean, existingEmpty: Boolean, changeCount: Int): Boolean {
+    return fromPull || existingEmpty || changeCount > SMALL_LIBRARY_CHANGE_LIMIT
 }
 
 fun patchLibraryEntries(
@@ -102,4 +163,15 @@ private fun entrySeriesNameKey(series: VideoSeries): String? {
         ?.key
     if (fromEpisodes != null) return fromEpisodes
     return TitleParser.normalizeForGrouping(series.title).takeIf { it.length >= 3 }
+}
+
+fun dropMissingMediaStoreVideos(existing: List<VideoItem>, liveIds: Set<Long>?): List<VideoItem>? {
+    if (liveIds == null || liveIds.isEmpty()) return null
+    val removed = existing.any { video ->
+        isTrackedMediaStoreVideo(video) && video.id !in liveIds
+    }
+    if (!removed) return null
+    return existing.filterNot { video ->
+        isTrackedMediaStoreVideo(video) && video.id !in liveIds
+    }
 }

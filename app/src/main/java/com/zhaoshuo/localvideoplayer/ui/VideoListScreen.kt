@@ -34,9 +34,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -63,10 +62,7 @@ import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -76,7 +72,7 @@ import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -91,6 +87,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -140,6 +138,8 @@ import com.zhaoshuo.localvideoplayer.ui.components.rememberEpisodeProgressList
 import com.zhaoshuo.localvideoplayer.ui.components.rememberPlaybackProgress
 import com.zhaoshuo.localvideoplayer.ui.components.rememberSeriesPlaybackStats
 import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import com.zhaoshuo.localvideoplayer.ui.theme.ThemeMode
 import com.zhaoshuo.localvideoplayer.ui.theme.ThemeState
 import com.zhaoshuo.localvideoplayer.util.M3uPlaylistParser
@@ -205,8 +205,6 @@ fun VideoListScreen(
     isLibraryLoading: Boolean,
     isRefreshing: Boolean,
     hasPermission: Boolean,
-    recentRecords: List<PlaybackRecord>,
-    playbackRecords: Map<String, PlaybackRecord>,
     repository: VideoRepository,
     hiddenVideosStore: HiddenVideosStore,
     playbackStore: PlaybackStore,
@@ -230,11 +228,16 @@ fun VideoListScreen(
     val castManager = LocalCastManager.current
     val idleCastState = remember { kotlinx.coroutines.flow.MutableStateFlow<CastUiState>(CastUiState.Idle) }
     val idlePlaying = remember { kotlinx.coroutines.flow.MutableStateFlow(false) }
-    val castState by (castManager?.uiState ?: idleCastState).collectAsState()
-    val castPlaying by (castManager?.playback?.isPlaying ?: idlePlaying).collectAsState()
+    val castState by (castManager?.uiState ?: idleCastState).collectAsStateWithLifecycle()
+    val castPlaying by (castManager?.playback?.isPlaying ?: idlePlaying).collectAsStateWithLifecycle()
     val castSheet = rememberCastSheetActions(castManager)
+    val hasRecentPlayback by remember(playbackStore) {
+        playbackStore.snapshot
+            .map { it.recent.isNotEmpty() }
+            .distinctUntilChanged()
+    }.collectAsStateWithLifecycle(initialValue = playbackStore.snapshot.value.recent.isNotEmpty())
     var castTarget by remember { mutableStateOf<VideoItem?>(null) }
-    val libraryPrefs by libraryPreferencesStore.preferences.collectAsState(initial = LibraryPreferences())
+    val libraryPrefs by libraryPreferencesStore.preferences.collectAsStateWithLifecycle(initialValue = LibraryPreferences())
     val sortOrder = libraryPrefs.sortOrder
     val collapseSingles = libraryPrefs.collapseSingles
     val viewLayout = libraryPrefs.viewLayout
@@ -250,8 +253,8 @@ fun VideoListScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
 
-    val pinnedKeys by pinnedItemsStore.pinnedKeys.collectAsState(initial = emptySet())
-    val playCounts by playCountStore.playCounts.collectAsState(initial = emptyMap())
+    val pinnedKeys by pinnedItemsStore.pinnedKeys.collectAsStateWithLifecycle(initialValue = emptySet())
+    val playCounts by playCountStore.playCounts.collectAsStateWithLifecycle(initialValue = emptyMap())
 
     val processSignature = remember(
         libraryEntries,
@@ -302,8 +305,14 @@ fun VideoListScreen(
         isUnfilteredAllTab -> allTabSourceEntries
         else -> emptyList()
     }
-    val visibleLibrary = remember(displayLibrary, searchQuery) {
-        searchLibrary(displayLibrary, searchQuery)
+    val visibleLibrary by produceState(
+        initialValue = displayLibrary,
+        displayLibrary,
+        searchQuery,
+    ) {
+        value = withContext(Dispatchers.Default) {
+            searchLibrary(displayLibrary, searchQuery)
+        }
     }
     val pinnedSections = remember(visibleLibrary, pinnedKeys, viewLayout) {
         if (viewLayout == LibraryViewLayout.SECTIONED) {
@@ -360,7 +369,7 @@ fun VideoListScreen(
         !selectionMode &&
             !isLibraryLoading &&
             hasPermission &&
-            (displayLibrary.isNotEmpty() || recentRecords.isNotEmpty()) &&
+            (displayLibrary.isNotEmpty() || hasRecentPlayback) &&
             isListScrolled
 
     var previousScrollIndex by remember { mutableIntStateOf(0) }
@@ -488,10 +497,26 @@ fun VideoListScreen(
         searchQuery = ""
     }
 
+    fun titleForUri(uri: Uri): String {
+        val key = uri.toString()
+        libraryEntries.forEach { entry ->
+            when (entry) {
+                is VideoLibraryEntry.Single -> {
+                    if (entry.video.uri.toString() == key) return entry.video.title
+                }
+                is VideoLibraryEntry.Series -> {
+                    entry.series.episodes.firstOrNull { it.uri.toString() == key }?.let { return it.title }
+                }
+            }
+        }
+        return ""
+    }
+
     val deleteFromDevice = rememberVideoDeleter(
         playbackStore = playbackStore,
         hiddenVideosStore = hiddenVideosStore,
         playCountStore = playCountStore,
+        titleForUri = ::titleForUri,
         onVideosRemoved = onVideosRemoved,
         onDeleteStarted = { isDeleting = true },
         onDeleteFinished = {
@@ -586,7 +611,7 @@ fun VideoListScreen(
         val isSelected = key in selectedKeys
         val episodeProgress = rememberEpisodeProgressList(
             series = entry.series,
-            playbackRecords = playbackRecords,
+            playbackStore = playbackStore,
         )
         val playbackStats = rememberSeriesPlaybackStats(
             series = entry.series,
@@ -619,7 +644,7 @@ fun VideoListScreen(
         val isSelected = key in selectedKeys
         val progress = rememberPlaybackProgress(
             uriKey = entry.video.uri.toString(),
-            playbackRecords = playbackRecords,
+            playbackStore = playbackStore,
         )
         VideoListItem(
             video = entry.video,
@@ -672,7 +697,10 @@ fun VideoListScreen(
     fun hideVideos(uris: List<Uri>) {
         scope.launch {
             withContext(Dispatchers.IO) {
-                hiddenVideosStore.hideAll(uris)
+                hiddenVideosStore.hideAll(
+                    uris,
+                    uris.associate { it.toString() to titleForUri(it) },
+                )
                 playbackStore.removeRecords(uris)
                 playCountStore.removeForUris(uris)
             }
@@ -716,7 +744,7 @@ fun VideoListScreen(
                     }
                     else -> null
                 }
-                val recent = recentRecords.firstOrNull()
+                val recent = playbackStore.snapshot.value.recent.firstOrNull()
                 val title: String
                 val uri: android.net.Uri
                 val position: Long
@@ -724,7 +752,7 @@ fun VideoListScreen(
                     selectedVideo != null -> {
                         title = selectedVideo.title
                         uri = selectedVideo.uri
-                        position = playbackRecords[selectedVideo.uri.toString()]?.positionMs ?: 0L
+                        position = playbackStore.snapshot.value.records[selectedVideo.uri.toString()]?.positionMs ?: 0L
                     }
                     recent != null -> {
                         title = recent.title
@@ -804,29 +832,36 @@ fun VideoListScreen(
                         },
                         applyStatusBarPadding = false,
                         titleContent = {
-                            OutlinedTextField(
+                            BasicTextField(
                                 value = searchQuery,
                                 onValueChange = { searchQuery = it },
-                                placeholder = { Text(stringResource(R.string.search_hint)) },
                                 singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = theme.accent,
-                                    cursorColor = theme.accent,
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                    color = MaterialTheme.colorScheme.onBackground,
                                 ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = 52.dp),
+                                cursorBrush = SolidColor(theme.accent),
+                                modifier = Modifier.fillMaxWidth(),
+                                decorationBox = { innerTextField ->
+                                    Box(modifier = Modifier.fillMaxWidth()) {
+                                        if (searchQuery.isEmpty()) {
+                                            Text(
+                                                text = stringResource(R.string.search_hint),
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                color = theme.onSurfaceMuted,
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                },
                             )
                         },
                         actions = {
                             if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { searchQuery = "" }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = stringResource(R.string.search_clear),
-                                        tint = MaterialTheme.colorScheme.onBackground,
-                                    )
-                                }
+                                HeaderIconButton(
+                                    onClick = { searchQuery = "" },
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.search_clear),
+                                )
                             }
                         },
                     )
@@ -846,23 +881,20 @@ fun VideoListScreen(
                                 CastButton(
                                     state = castState,
                                     onClick = { castSheet.open() },
+                                    modifier = Modifier.size(40.dp),
                                 )
                             }
-                            IconButton(onClick = { isSearching = true }) {
-                                Icon(
-                                    imageVector = Icons.Filled.Search,
-                                    contentDescription = stringResource(R.string.search),
-                                    tint = MaterialTheme.colorScheme.onBackground,
-                                )
-                            }
-                            IconButton(onClick = onOpenDownloads) {
-                                Icon(
-                                    imageVector = Icons.Filled.Download,
-                                    contentDescription = stringResource(R.string.downloads_title),
-                                    tint = MaterialTheme.colorScheme.onBackground,
-                                )
-                            }
-                            IconButton(
+                            HeaderIconButton(
+                                onClick = { isSearching = true },
+                                imageVector = Icons.Filled.Search,
+                                contentDescription = stringResource(R.string.search),
+                            )
+                            HeaderIconButton(
+                                onClick = onOpenDownloads,
+                                imageVector = Icons.Filled.Download,
+                                contentDescription = stringResource(R.string.downloads_title),
+                            )
+                            HeaderIconButton(
                                 onClick = {
                                     val next = if (isMarkedTabActive) {
                                         LibraryTypeTab.ALL
@@ -871,22 +903,19 @@ fun VideoListScreen(
                                     }
                                     scope.launch { libraryPreferencesStore.setTypeTab(next) }
                                 },
-                            ) {
-                                Icon(
-                                    imageVector = if (isMarkedTabActive) {
-                                        Icons.Filled.Star
-                                    } else {
-                                        Icons.Outlined.StarOutline
-                                    },
-                                    contentDescription = stringResource(R.string.tab_marked),
-                                    tint = if (isMarkedTabActive) {
-                                        theme.accent
-                                    } else {
-                                        MaterialTheme.colorScheme.onBackground
-                                    },
-                                )
-                            }
-                            IconButton(
+                                imageVector = if (isMarkedTabActive) {
+                                    Icons.Filled.Star
+                                } else {
+                                    Icons.Outlined.StarOutline
+                                },
+                                contentDescription = stringResource(R.string.tab_marked),
+                                tint = if (isMarkedTabActive) {
+                                    theme.accent
+                                } else {
+                                    MaterialTheme.colorScheme.onBackground
+                                },
+                            )
+                            HeaderIconButton(
                                 onClick = {
                                     val nextMode = when (themeState.mode) {
                                         ThemeMode.System -> ThemeMode.Light
@@ -897,44 +926,37 @@ fun VideoListScreen(
                                         themeStore.setThemeMode(nextMode)
                                     }
                                 },
-                            ) {
-                                Icon(
-                                    imageVector = when (themeState.mode) {
-                                        ThemeMode.System -> Icons.Default.BrightnessAuto
-                                        ThemeMode.Dark -> Icons.Default.LightMode
-                                        ThemeMode.Light -> Icons.Default.DarkMode
-                                    },
-                                    contentDescription = when (themeState.mode) {
-                                        ThemeMode.System -> stringResource(R.string.theme_mode_system)
-                                        ThemeMode.Dark -> stringResource(R.string.theme_mode_light)
-                                        ThemeMode.Light -> stringResource(R.string.theme_mode_dark)
-                                    },
-                                    tint = MaterialTheme.colorScheme.onBackground,
+                                imageVector = when (themeState.mode) {
+                                    ThemeMode.System -> Icons.Default.BrightnessAuto
+                                    ThemeMode.Dark -> Icons.Default.LightMode
+                                    ThemeMode.Light -> Icons.Default.DarkMode
+                                },
+                                contentDescription = when (themeState.mode) {
+                                    ThemeMode.System -> stringResource(R.string.theme_mode_system)
+                                    ThemeMode.Dark -> stringResource(R.string.theme_mode_light)
+                                    ThemeMode.Light -> stringResource(R.string.theme_mode_dark)
+                                },
+                            )
+                            HeaderIconButton(
+                                onClick = onOpenSettings,
+                                imageVector = Icons.Filled.Settings,
+                                contentDescription = stringResource(R.string.settings),
+                            )
+                            Box {
+                                HeaderIconButton(
+                                    onClick = { showOptionsSheet = true },
+                                    imageVector = Icons.AutoMirrored.Filled.Sort,
+                                    contentDescription = stringResource(R.string.library_options),
                                 )
-                            }
-                            IconButton(onClick = onOpenSettings) {
-                                Icon(
-                                    imageVector = Icons.Filled.Settings,
-                                    contentDescription = stringResource(R.string.settings),
-                                    tint = MaterialTheme.colorScheme.onBackground,
-                                )
-                            }
-                            IconButton(onClick = { showOptionsSheet = true }) {
-                                Box {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.Sort,
-                                        contentDescription = stringResource(R.string.library_options),
-                                        tint = MaterialTheme.colorScheme.onBackground,
+                                if (hasActiveOptions) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(end = 6.dp, top = 6.dp)
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(theme.accent),
                                     )
-                                    if (hasActiveOptions) {
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.TopEnd)
-                                                .size(8.dp)
-                                                .clip(CircleShape)
-                                                .background(theme.accent),
-                                        )
-                                    }
                                 }
                             }
                         },
@@ -1052,10 +1074,10 @@ fun VideoListScreen(
                             ),
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            if (!selectionMode && !isSearching && recentRecords.isNotEmpty()) {
+                            if (!selectionMode && !isSearching && hasRecentPlayback) {
                                 item(key = "recent-playback") {
                                     RecentPlaybackSection(
-                                        records = recentRecords,
+                                        playbackStore = playbackStore,
                                         onRecordClick = ::playRecentRecord,
                                         modifier = Modifier.animateItem(placementSpec = null),
                                     )
@@ -1093,7 +1115,7 @@ fun VideoListScreen(
                                 }
                             }
 
-                            if (!isLibraryLoading && !isSortingLibrary && libraryEntries.isEmpty() && recentRecords.isEmpty()) {
+                            if (!isLibraryLoading && !isSortingLibrary && libraryEntries.isEmpty() && !hasRecentPlayback) {
                                 item(key = "empty") {
                                     LumenEmptyState(
                                         title = stringResource(R.string.empty_video_list),
@@ -1350,6 +1372,29 @@ private fun VideoListFab(
             contentDescription = contentDescription,
             tint = theme.accent,
             modifier = Modifier.size(24.dp),
+        )
+    }
+}
+
+@Composable
+private fun HeaderIconButton(
+    onClick: () -> Unit,
+    imageVector: ImageVector,
+    contentDescription: String,
+    tint: Color = MaterialTheme.colorScheme.onBackground,
+) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = imageVector,
+            contentDescription = contentDescription,
+            tint = tint,
+            modifier = Modifier.size(22.dp),
         )
     }
 }

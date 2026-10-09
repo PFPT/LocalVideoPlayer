@@ -15,6 +15,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.zhaoshuo.localvideoplayer.player.PlaybackMediaService
 import com.zhaoshuo.localvideoplayer.util.PictureInPictureHelper
 import com.zhaoshuo.localvideoplayer.download.DownloadService
 
@@ -27,6 +28,7 @@ class MainActivity : ComponentActivity() {
     var onPipAction: (() -> Unit)? = null
     private var sharedDownloadText by mutableStateOf<String?>(null)
     private var downloadsNavigationTick by mutableStateOf(0)
+    private var openPlayerTick by mutableStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,6 +39,9 @@ class MainActivity : ComponentActivity() {
         sharedDownloadText = extractSharedDownloadText(intent)
         if (intent?.getBooleanExtra(DownloadService.EXTRA_OPEN_DOWNLOADS, false) == true) {
             downloadsNavigationTick++
+        }
+        if (intent?.getBooleanExtra(PlaybackMediaService.EXTRA_OPEN_PLAYER, false) == true) {
+            openPlayerTick++
         }
         if (
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -49,6 +54,7 @@ class MainActivity : ComponentActivity() {
                 sharedDownloadText = sharedDownloadText,
                 onSharedDownloadConsumed = { sharedDownloadText = null },
                 downloadsNavigationTick = downloadsNavigationTick,
+                openPlayerTick = openPlayerTick,
             )
         }
     }
@@ -59,6 +65,9 @@ class MainActivity : ComponentActivity() {
         sharedDownloadText = extractSharedDownloadText(intent)
         if (intent.getBooleanExtra(DownloadService.EXTRA_OPEN_DOWNLOADS, false)) {
             downloadsNavigationTick++
+        }
+        if (intent.getBooleanExtra(PlaybackMediaService.EXTRA_OPEN_PLAYER, false)) {
+            openPlayerTick++
         }
     }
 

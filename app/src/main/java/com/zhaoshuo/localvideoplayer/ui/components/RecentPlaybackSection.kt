@@ -39,6 +39,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zhaoshuo.localvideoplayer.data.PlaybackStore
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -55,20 +57,23 @@ import com.zhaoshuo.localvideoplayer.ui.theme.LumenThumbCorner
 
 @Composable
 fun RecentPlaybackSection(
-    records: List<PlaybackRecord>,
+    playbackStore: PlaybackStore,
     onRecordClick: (PlaybackRecord) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val records by playbackStore.recentRecords.collectAsStateWithLifecycle(
+        initialValue = playbackStore.snapshot.value.recent,
+    )
     if (records.isEmpty()) return
 
     Column(modifier = modifier.padding(bottom = 8.dp)) {
         Text(
             text = stringResource(R.string.recent_playback),
             style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.padding(vertical = 8.dp),
         )
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
+            contentPadding = PaddingValues(0.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(records, key = { it.uri.toString() }) { record ->
@@ -115,19 +120,10 @@ private fun RecentPlaybackCard(
                 .height(72.dp)
                 .clip(RoundedCornerShape(LumenThumbCorner)),
         ) {
-            val videoId = record.uri.lastPathSegment?.toLongOrNull()
-            if (videoId != null) {
-                MediaThumbnail(
-                    videoId = videoId,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(theme.surface),
-                )
-            }
+            MediaThumbnail(
+                thumbnailUri = record.uri,
+                modifier = Modifier.fillMaxSize(),
+            )
             if (progress != null && progress > 0.01f) {
                 Box(
                     modifier = Modifier

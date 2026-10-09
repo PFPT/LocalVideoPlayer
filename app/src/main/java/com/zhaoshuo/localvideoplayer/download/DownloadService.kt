@@ -592,12 +592,19 @@ class DownloadService : Service() {
             val initFile = hlsInitFile(hlsPackage)
             if (!initFile.exists()) {
                 if (control.stopped) throw IOException(getString(R.string.download_paused))
-                downloadHlsSegmentAtomic(initUrl, initFile, task.headers, control, encryption = null)
+                downloadHlsSegmentAtomic(
+                    initUrl,
+                    initFile,
+                    task.headers,
+                    control,
+                    encryption = null,
+                    playlistUrl = playlist.url,
+                )
                 addHlsBytes(task.id, initFile.length())
             }
         }
         val keys = ConcurrentHashMap<String, ByteArray>()
-        prefetchHlsKeys(playlist, task.headers, control, keys)
+        prefetchHlsKeys(playlist, task.headers, control, keys, playlist.url)
         val pendingSegments = playlist.segments.drop(completedSegments)
         val completedCounter = AtomicInteger(completedSegments)
         val concurrency = DownloadManager.get(this).connectionsPerDownload()
@@ -653,7 +660,7 @@ class DownloadService : Service() {
                         val encryption = segment.encryption
                         val keyIv = encryption?.let { enc ->
                             val key = keys[enc.keyUrl]
-                                ?: requestHlsBytes(enc.keyUrl, task.headers, control).also {
+                                ?: requestHlsBytes(enc.keyUrl, task.headers, control, playlist.url).also {
                                     if (it.size != AES_128_KEY_BYTES) throw IOException(getString(R.string.download_hls_key_invalid))
                                     keys[enc.keyUrl] = it
                                 }
@@ -665,6 +672,7 @@ class DownloadService : Service() {
                             headers = task.headers,
                             control = control,
                             encryption = keyIv,
+                            playlistUrl = playlist.url,
                         )
                         addHlsBytes(task.id, segmentFile.length())
                         completedCounter.incrementAndGet()
@@ -694,11 +702,12 @@ class DownloadService : Service() {
         headers: Map<String, String>,
         control: TaskControl,
         keys: ConcurrentHashMap<String, ByteArray>,
+        playlistUrl: String,
     ) {
         playlist.segments.mapNotNull { it.encryption?.keyUrl }.toSet().forEach { keyUrl ->
             if (control.stopped) throw IOException(getString(R.string.download_paused))
             keys.getOrPut(keyUrl) {
-                requestHlsBytes(keyUrl, headers, control).also {
+                requestHlsBytes(keyUrl, headers, control, playlistUrl).also {
                     if (it.size != AES_128_KEY_BYTES) throw IOException(getString(R.string.download_hls_key_invalid))
                 }
             }
@@ -750,16 +759,25 @@ class DownloadService : Service() {
         return average * totalSegments
     }
 
-    private fun requestHlsText(address: String, headers: Map<String, String>, control: TaskControl): String =
-        String(requestHlsBytes(address, headers, control), Charsets.UTF_8)
+    private fun requestHlsText(
+        address: String,
+        headers: Map<String, String>,
+        control: TaskControl,
+        playlistUrl: String? = null,
+    ): String = String(requestHlsBytes(address, headers, control, playlistUrl), Charsets.UTF_8)
 
-    private fun requestHlsBytes(address: String, headers: Map<String, String>, control: TaskControl): ByteArray {
+    private fun requestHlsBytes(
+        address: String,
+        headers: Map<String, String>,
+        control: TaskControl,
+        playlistUrl: String? = null,
+    ): ByteArray {
         var attempt = 0
         var lastError: IOException? = null
         while (attempt < SEGMENT_MAX_RETRIES) {
             if (control.stopped) throw IOException(getString(R.string.download_paused))
             try {
-                executeRequest(address, headers).use { response ->
+                executeHlsRequest(address, headers, playlistUrl).use { response ->
                     if (response.code !in 200..299) {
                         throw IOException(getString(R.string.download_hls_request_failed, response.code))
                     }
@@ -783,6 +801,7 @@ class DownloadService : Service() {
         headers: Map<String, String>,
         control: TaskControl,
         encryption: Pair<ByteArray, ByteArray>?,
+        playlistUrl: String? = null,
     ) {
         var attempt = 0
         var lastError: IOException? = null
@@ -792,7 +811,7 @@ class DownloadService : Service() {
             finalFile.parentFile?.mkdirs()
             if (partFile.exists()) partFile.delete()
             try {
-                executeRequest(address, headers).use { response ->
+                executeHlsRequest(address, headers, playlistUrl).use { response ->
                     if (response.code !in 200..299) {
                         throw IOException(getString(R.string.download_hls_request_failed, response.code))
                     }
@@ -1039,6 +1058,23 @@ class DownloadService : Service() {
             manager.update(task.id) { it.copy(outputUri = null) }
             throw error
         }
+    }
+
+    private fun executeHlsRequest(
+        address: String,
+        headers: Map<String, String>,
+        playlistUrl: String?,
+    ): Response {
+        val prepared = if (playlistUrl.isNullOrBlank()) {
+            DownloadUrlResolver.ensureDownloadHeaders(headers)
+        } else {
+            DownloadUrlResolver.hlsChildHeaders(playlistUrl, headers)
+        }
+        val response = executeRequest(address, prepared)
+        if (response.code != 403) return response
+        val refererKey = prepared.keys.firstOrNull { it.equals("Referer", ignoreCase = true) } ?: return response
+        response.close()
+        return executeRequest(address, prepared.filterKeys { !it.equals(refererKey, ignoreCase = true) })
     }
 
     private fun executeRequest(

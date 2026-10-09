@@ -48,4 +48,30 @@ class DownloadUrlResolverTest {
     val headers = DownloadUrlResolver.inferHeaders(url, emptyMap())
     assertTrue(headers["Referer"] == "https://site.example/" || headers["Referer"] == "https://cdn.example.com/")
   }
+
+  @Test
+  fun inferHeadersAddsBrowserUserAgent() {
+    val headers = DownloadUrlResolver.inferHeaders("https://cdn.example.com/index.m3u8", emptyMap())
+    assertEquals(DownloadUrlResolver.DEFAULT_USER_AGENT, headers["User-Agent"])
+  }
+
+  @Test
+  fun hlsChildHeadersUsesPlaylistUrlWhenRefererIsOnlyOrigin() {
+    val headers = DownloadUrlResolver.hlsChildHeaders(
+      "https://cdn.example.com/video/index.m3u8",
+      mapOf("Referer" to "https://cdn.example.com/", "User-Agent" to "custom"),
+    )
+    assertEquals("https://cdn.example.com/video/index.m3u8", headers["Referer"])
+    assertEquals("custom", headers["User-Agent"])
+  }
+
+  @Test
+  fun hlsChildHeadersKeepsExplicitReferer() {
+    val headers = DownloadUrlResolver.hlsChildHeaders(
+      "https://cdn.example.com/video/index.m3u8",
+      mapOf("Referer" to "https://player.example/watch"),
+    )
+    assertEquals("https://player.example/watch", headers["Referer"])
+    assertEquals(DownloadUrlResolver.DEFAULT_USER_AGENT, headers["User-Agent"])
+  }
 }

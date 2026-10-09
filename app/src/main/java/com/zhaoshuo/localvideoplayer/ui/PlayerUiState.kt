@@ -11,6 +11,11 @@ import androidx.compose.runtime.setValue
 import com.zhaoshuo.localvideoplayer.model.AspectRatioMode
 import kotlinx.coroutines.Job
 
+enum class PlaybackFailure {
+    Decode,
+    Read,
+}
+
 @Stable
 class PlayerUiState(
     initialIndex: Int,
@@ -42,7 +47,7 @@ class PlayerUiState(
     var isSeeking by mutableStateOf(false)
     var previewPositionMs by mutableLongStateOf(0L)
     var seekStartPositionMs by mutableLongStateOf(0L)
-    var lastPreviewSeekAt by mutableLongStateOf(0L)
+    var hiddenPlaybackPositionMs by mutableLongStateOf(0L)
     var repeatOne by mutableStateOf(initialRepeatOne)
     var aspectRatioMode by mutableStateOf(initialAspect)
     var showAspectSheet by mutableStateOf(false)
@@ -58,6 +63,12 @@ class PlayerUiState(
     var volumeHideJob by mutableStateOf<Job?>(null)
     var softDecodeGeneration by mutableIntStateOf(0)
     var appliedSoftDecode by mutableStateOf(initialSoftDecode)
+    var softDecodeRetried by mutableStateOf(false)
+    var softDecodeRetryPending by mutableStateOf(false)
+    var replayPositionMs by mutableStateOf<Long?>(null)
+    var playbackFailure by mutableStateOf<PlaybackFailure?>(null)
+    var abPointA by mutableStateOf<Long?>(null)
+    var abPointB by mutableStateOf<Long?>(null)
 
     fun resetSpeedBoost() {
         if (isSpeedBoosted) {

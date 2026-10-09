@@ -18,6 +18,26 @@ private val Context.playerPreferencesDataStore: DataStore<Preferences> by prefer
     name = "player_preferences",
 )
 
+enum class SubtitleTextSize {
+    SMALL,
+    STANDARD,
+    LARGE,
+    ;
+
+    val scale: Float
+        get() = when (this) {
+            SMALL -> 0.75f
+            STANDARD -> 1f
+            LARGE -> 1.45f
+        }
+
+    companion object {
+        fun fromStorage(value: String?): SubtitleTextSize {
+            return entries.firstOrNull { it.name == value } ?: STANDARD
+        }
+    }
+}
+
 data class PlayerPreferences(
     val softDecode: Boolean = false,
     val skipIntroSeconds: Int = 0,
@@ -31,6 +51,9 @@ data class PlayerPreferences(
     val gestureSeek: Boolean = true,
     val gestureDoubleTapSeek: Boolean = true,
     val gesturePinchZoom: Boolean = true,
+    val subtitleTextSize: SubtitleTextSize = SubtitleTextSize.STANDARD,
+    val subtitleYellow: Boolean = false,
+    val subtitleDelayMs: Int = 0,
 )
 
 class PlayerPreferencesStore(private val context: Context) {
@@ -49,6 +72,9 @@ class PlayerPreferencesStore(private val context: Context) {
             gestureSeek = prefs[GESTURE_SEEK] ?: true,
             gestureDoubleTapSeek = prefs[GESTURE_DOUBLE_TAP_SEEK] ?: true,
             gesturePinchZoom = prefs[GESTURE_PINCH_ZOOM] ?: true,
+            subtitleTextSize = SubtitleTextSize.fromStorage(prefs[SUBTITLE_TEXT_SIZE]),
+            subtitleYellow = prefs[SUBTITLE_YELLOW] ?: false,
+            subtitleDelayMs = normalizeSubtitleDelay(prefs[SUBTITLE_DELAY_MS] ?: 0),
         )
     }
 
@@ -106,6 +132,20 @@ class PlayerPreferencesStore(private val context: Context) {
         context.playerPreferencesDataStore.edit { it[GESTURE_PINCH_ZOOM] = enabled }
     }
 
+    suspend fun setSubtitleTextSize(size: SubtitleTextSize) {
+        context.playerPreferencesDataStore.edit { it[SUBTITLE_TEXT_SIZE] = size.name }
+    }
+
+    suspend fun setSubtitleYellow(enabled: Boolean) {
+        context.playerPreferencesDataStore.edit { it[SUBTITLE_YELLOW] = enabled }
+    }
+
+    suspend fun setSubtitleDelayMs(delayMs: Int) {
+        context.playerPreferencesDataStore.edit {
+            it[SUBTITLE_DELAY_MS] = normalizeSubtitleDelay(delayMs)
+        }
+    }
+
     companion object {
         private val SOFT_DECODE = booleanPreferencesKey("soft_decode")
         private val SKIP_INTRO_SECONDS = intPreferencesKey("skip_intro_seconds")
@@ -119,5 +159,13 @@ class PlayerPreferencesStore(private val context: Context) {
         private val GESTURE_SEEK = booleanPreferencesKey("gesture_seek")
         private val GESTURE_DOUBLE_TAP_SEEK = booleanPreferencesKey("gesture_double_tap_seek")
         private val GESTURE_PINCH_ZOOM = booleanPreferencesKey("gesture_pinch_zoom")
+        private val SUBTITLE_TEXT_SIZE = stringPreferencesKey("subtitle_text_size")
+        private val SUBTITLE_YELLOW = booleanPreferencesKey("subtitle_yellow")
+        private val SUBTITLE_DELAY_MS = intPreferencesKey("subtitle_delay_ms")
     }
+}
+
+fun normalizeSubtitleDelay(delayMs: Int): Int {
+    val snapped = (delayMs / 500) * 500
+    return snapped.coerceIn(-5_000, 5_000)
 }

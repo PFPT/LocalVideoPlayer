@@ -32,6 +32,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
+import com.zhaoshuo.localvideoplayer.player.PlayerProgressState
+import com.zhaoshuo.localvideoplayer.ui.PlayerUiState
 import com.zhaoshuo.localvideoplayer.util.formatSystemTime
 import kotlinx.coroutines.delay
 
@@ -42,9 +44,10 @@ internal fun FullscreenPlayerLayout(
     controlsLocked: Boolean,
     pipSupported: Boolean,
     showEpisodePicker: Boolean,
-    currentPositionMs: Long,
+    progress: PlayerProgressState,
+    ui: PlayerUiState,
+    isCasting: Boolean,
     durationMs: Long,
-    bufferedPositionMs: Long,
     playbackSpeed: Float,
     repeatOne: Boolean,
     hasPrevious: Boolean,
@@ -167,9 +170,10 @@ internal fun FullscreenPlayerLayout(
                             compact = true,
                         )
                     }
-                    PlayerProgressBar(
-                        currentPositionMs = currentPositionMs,
-                        bufferedPositionMs = bufferedPositionMs,
+                    LivePlayerProgressBar(
+                        progress = progress,
+                        ui = ui,
+                        isCasting = isCasting,
                         durationMs = durationMs,
                         onSeek = onSeek,
                         onScrubStart = onScrubStart,

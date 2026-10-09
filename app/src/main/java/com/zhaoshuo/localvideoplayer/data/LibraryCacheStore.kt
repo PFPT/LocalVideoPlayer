@@ -121,6 +121,7 @@ class LibraryCacheStore(private val context: Context) {
             title = objectJson.optString(KEY_TITLE, "Unknown"),
             durationMs = objectJson.optLong(KEY_DURATION_MS),
             dateAdded = objectJson.optLong(KEY_DATE_ADDED),
+            dateModified = objectJson.optLong(KEY_DATE_MODIFIED),
             thumbnailUri = objectJson.optString(KEY_THUMBNAIL_URI)
                 .takeIf { it.isNotBlank() }
                 ?.let(Uri::parse),
@@ -139,6 +140,7 @@ class LibraryCacheStore(private val context: Context) {
             put(KEY_TITLE, video.title)
             put(KEY_DURATION_MS, video.durationMs)
             put(KEY_DATE_ADDED, video.dateAdded)
+            put(KEY_DATE_MODIFIED, video.dateModified)
             video.thumbnailUri?.let { put(KEY_THUMBNAIL_URI, it.toString()) }
             video.relativePath?.let { put(KEY_RELATIVE_PATH, it) }
             video.bucketName?.let { put(KEY_BUCKET_NAME, it) }
@@ -223,6 +225,7 @@ class LibraryCacheStore(private val context: Context) {
         private const val KEY_TITLE = "title"
         private const val KEY_DURATION_MS = "durationMs"
         private const val KEY_DATE_ADDED = "dateAdded"
+        private const val KEY_DATE_MODIFIED = "dateModified"
         private const val KEY_THUMBNAIL_URI = "thumbnailUri"
         private const val KEY_RELATIVE_PATH = "relativePath"
         private const val KEY_BUCKET_NAME = "bucketName"

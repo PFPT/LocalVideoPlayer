@@ -4,12 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fullscreen
@@ -26,6 +28,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +39,14 @@ import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
 import com.zhaoshuo.localvideoplayer.ui.theme.LumenBuffered
 import com.zhaoshuo.localvideoplayer.util.formatDuration
+
+data class TimelineMarks(
+    val bookmarkPositionsMs: List<Long> = emptyList(),
+    val abPointA: Long? = null,
+    val abPointB: Long? = null,
+)
+
+val LocalTimelineMarks = staticCompositionLocalOf { TimelineMarks() }
 
 @Composable
 fun PlayerProgressBar(
@@ -180,6 +191,27 @@ fun PlayerProgressBar(
                         .clip(RoundedCornerShape(2.dp))
                         .background(Color.White),
                 )
+                val timelineMarks = LocalTimelineMarks.current
+                if (durationMs > 0L) {
+                    timelineMarks.bookmarkPositionsMs.forEach { positionMs ->
+                        TimelineDot(
+                            fraction = positionMs.toFloat() / durationMs.toFloat(),
+                            color = Color(0xFFFFB74D),
+                        )
+                    }
+                    timelineMarks.abPointA?.let { positionMs ->
+                        TimelineDot(
+                            fraction = positionMs.toFloat() / durationMs.toFloat(),
+                            color = Color(0xFF81C784),
+                        )
+                    }
+                    timelineMarks.abPointB?.let { positionMs ->
+                        TimelineDot(
+                            fraction = positionMs.toFloat() / durationMs.toFloat(),
+                            color = Color(0xFFEF5350),
+                        )
+                    }
+                }
                 Slider(
                     value = sliderPosition,
                     onValueChange = { fraction ->
@@ -240,6 +272,32 @@ fun PlayerProgressBar(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun BoxScope.TimelineDot(fraction: Float, color: Color) {
+    val clamped = fraction.coerceIn(0f, 1f)
+    if (clamped <= 0f) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .size(8.dp)
+                .background(color, CircleShape),
+        )
+        return
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth(clamped)
+            .align(Alignment.CenterStart),
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(color, CircleShape),
+        )
     }
 }
 

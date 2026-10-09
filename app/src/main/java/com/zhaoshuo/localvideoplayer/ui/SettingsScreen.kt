@@ -30,7 +30,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +43,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.zhaoshuo.localvideoplayer.R
 import com.zhaoshuo.localvideoplayer.data.FolderSourceStore
+import com.zhaoshuo.localvideoplayer.data.HiddenVideosStore
+import com.zhaoshuo.localvideoplayer.data.hiddenDisplayLabel
 import com.zhaoshuo.localvideoplayer.data.LibraryPreferencesStore
 import com.zhaoshuo.localvideoplayer.data.PlayerPreferencesStore
 import com.zhaoshuo.localvideoplayer.data.ThemePreferencesStore
@@ -67,20 +69,23 @@ fun SettingsScreen(
     libraryPreferencesStore: LibraryPreferencesStore,
     playerPreferencesStore: PlayerPreferencesStore,
     folderSourceStore: FolderSourceStore,
+    hiddenVideosStore: HiddenVideosStore,
+    onRestoreHidden: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val theme = LocalLumenTheme.current
-    val libraryPrefs by libraryPreferencesStore.preferences.collectAsState(
-        initial = com.zhaoshuo.localvideoplayer.data.LibraryPreferences(),
+    val libraryPrefs by libraryPreferencesStore.preferences.collectAsStateWithLifecycle(
+        initialValue = com.zhaoshuo.localvideoplayer.data.LibraryPreferences(),
     )
-    val playerPrefs by playerPreferencesStore.preferences.collectAsState(
-        initial = com.zhaoshuo.localvideoplayer.data.PlayerPreferences(),
+    val playerPrefs by playerPreferencesStore.preferences.collectAsStateWithLifecycle(
+        initialValue = com.zhaoshuo.localvideoplayer.data.PlayerPreferences(),
     )
-    val folderSources by folderSourceStore.sources.collectAsState(initial = emptyList())
-    val selectedLauncherIcon by themeStore.launcherIcon.collectAsState(initial = LauncherIcon.Default)
+    val folderSources by folderSourceStore.sources.collectAsStateWithLifecycle(initialValue = emptyList())
+    val hiddenEntries by hiddenVideosStore.hiddenEntries.collectAsStateWithLifecycle(initialValue = emptyList())
+    val selectedLauncherIcon by themeStore.launcherIcon.collectAsStateWithLifecycle(initialValue = LauncherIcon.Default)
     var showThemeSheet by remember { mutableStateOf(false) }
     var showSpeedSheet by remember { mutableStateOf(false) }
     var showAspectSheet by remember { mutableStateOf(false) }
@@ -263,6 +268,30 @@ fun SettingsScreen(
                     text = stringResource(R.string.settings_add_folder),
                     modifier = Modifier.padding(start = 8.dp),
                 )
+            }
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), color = theme.surface.copy(alpha = 0.4f))
+
+            SettingsSectionTitle(stringResource(R.string.settings_hidden_videos))
+            if (hiddenEntries.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.settings_no_hidden_videos),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = theme.onSurfaceMuted,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                )
+            } else {
+                hiddenEntries.forEach { entry ->
+                    SettingsClickRow(
+                        title = hiddenDisplayLabel(entry),
+                        subtitle = stringResource(R.string.settings_restore_hidden),
+                        onClick = {
+                            scope.launch {
+                                hiddenVideosStore.unhide(Uri.parse(entry.uri))
+                                onRestoreHidden()
+                            }
+                        },
+                    )
+                }
             }
             HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), color = theme.surface.copy(alpha = 0.4f))
 
