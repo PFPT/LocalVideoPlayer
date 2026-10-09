@@ -96,6 +96,18 @@ class PlaybackStore(private val context: Context) {
         uris.forEach { removeRecord(it) }
     }
 
+    suspend fun durationMsByUri(): Map<String, Long> {
+        val prefs = context.playbackDataStore.data.first()
+        return prefs.asMap().keys.mapNotNull { key ->
+            val name = key.name
+            if (!name.startsWith(PREFIX_URI)) return@mapNotNull null
+            val uriString = name.removePrefix(PREFIX_URI)
+            val durationMs = prefs[longPreferencesKey(PREFIX_DURATION + uriString)] ?: 0L
+            if (durationMs <= 0L) return@mapNotNull null
+            uriString to durationMs
+        }.toMap()
+    }
+
     companion object {
         private const val PREFIX_URI = "uri_"
         private const val PREFIX_TITLE = "title_"

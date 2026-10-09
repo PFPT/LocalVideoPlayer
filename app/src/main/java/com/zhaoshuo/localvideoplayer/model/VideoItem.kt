@@ -10,6 +10,7 @@ data class VideoItem(
     val title: String,
     val durationMs: Long,
     val dateAdded: Long,
+    val dateModified: Long = 0L,
     val thumbnailUri: Uri?,
     val relativePath: String? = null,
     val bucketName: String? = null,

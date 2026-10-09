@@ -659,6 +659,12 @@ object SeriesGrouper {
         return trimmed.substring(0, lastSlash)
     }
 
+    fun libraryFolderKey(video: VideoItem): String? {
+        val key = parentFolderKey(video) ?: return null
+        if (isGenericFolderName(folderLeafName(key))) return null
+        return key
+    }
+
     fun sortEpisodes(videos: List<VideoItem>): List<VideoItem> {
         return videos.sortedWith(
             compareBy<VideoItem> { it.season ?: Int.MAX_VALUE }

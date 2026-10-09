@@ -11,6 +11,7 @@ import com.zhaoshuo.localvideoplayer.model.VideoItem
 import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
 import com.zhaoshuo.localvideoplayer.model.withoutUris
 import com.zhaoshuo.localvideoplayer.util.SeriesGrouper
+import com.zhaoshuo.localvideoplayer.util.isM3u8Title
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -34,6 +35,8 @@ class LibraryViewModel(
     private val playCountStore: PlayCountStore = PlayCountStore(context),
     private val folderSourceStore: FolderSourceStore = FolderSourceStore(context),
     private val folderVideoScanner: FolderVideoScanner = FolderVideoScanner(context),
+    private val durationResolver: VideoDurationResolver = VideoDurationResolver(context),
+    private val playbackStore: PlaybackStore = PlaybackStore(context),
 ) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -125,6 +128,7 @@ class LibraryViewModel(
     fun refresh(showLoading: Boolean = false, fromPull: Boolean = false, incrementalPreferred: Boolean = false) {
         scope.launch {
             performRefresh(showLoading, fromPull, incrementalPreferred)
+            backfillMissingDurations()
         }
     }
 
@@ -284,6 +288,31 @@ class LibraryViewModel(
         if (extra.isEmpty()) return primary
         val seen = primary.mapTo(mutableSetOf()) { it.uri.toString() }
         return primary + extra.filter { seen.add(it.uri.toString()) }
+    }
+
+    private suspend fun backfillMissingDurations() {
+        val missing = flattenVideos(_libraryEntries.value)
+            .filter { it.durationMs <= 0L && !isM3u8Title(it.title) }
+        if (missing.isEmpty()) return
+        val fromPlayback = playbackStore.durationMsByUri()
+        applyResolvedDurations(fromPlayback)
+        val stillMissing = flattenVideos(_libraryEntries.value)
+            .filter { it.durationMs <= 0L && !isM3u8Title(it.title) }
+        if (stillMissing.isEmpty()) return
+        val resolved = durationResolver.resolveAll(stillMissing)
+        applyResolvedDurations(resolved)
+    }
+
+    private suspend fun applyResolvedDurations(resolved: Map<String, Long>) {
+        if (resolved.isEmpty()) return
+        val latest = _libraryEntries.value
+        val latestVideos = flattenVideos(latest)
+        val updated = withResolvedDurations(latestVideos, resolved)
+        if (updated === latestVideos) return
+        _libraryEntries.value = withContext(Dispatchers.Default) {
+            patchLibraryEntries(latest, updated)
+        }
+        saveCaches(updated)
     }
 
     companion object {

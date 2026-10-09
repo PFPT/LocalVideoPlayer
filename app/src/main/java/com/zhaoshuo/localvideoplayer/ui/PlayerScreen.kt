@@ -49,6 +49,7 @@ import com.zhaoshuo.localvideoplayer.data.PlayerPreferences
 import com.zhaoshuo.localvideoplayer.data.PlayerPreferencesStore
 import com.zhaoshuo.localvideoplayer.data.SeriesSkipSettings
 import com.zhaoshuo.localvideoplayer.data.SeriesSkipStore
+import com.zhaoshuo.localvideoplayer.data.VideoDurationResolver
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 import com.zhaoshuo.localvideoplayer.player.PlaybackMediaService
 import com.zhaoshuo.localvideoplayer.player.PlayerViewModel
@@ -95,6 +96,8 @@ import com.zhaoshuo.localvideoplayer.ui.components.CastMiniController
 import com.zhaoshuo.localvideoplayer.ui.components.rememberCastSheetActions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 private const val SPEED_BOOST = 2.0f
@@ -688,6 +691,17 @@ fun PlayerScreen(
     val hasPrevious = ui.currentIndex > 0
     val hasNext = ui.currentIndex < playlist.lastIndex
     val currentVideo = playlist.getOrNull(ui.currentIndex)
+    val durationResolver = remember(context) { VideoDurationResolver(context) }
+    LaunchedEffect(currentVideo?.uri) {
+        val video = currentVideo ?: return@LaunchedEffect
+        if (video.durationMs > 0L || progress.durationMs > 0L) return@LaunchedEffect
+        val duration = withContext(Dispatchers.IO) {
+            durationResolver.resolveAll(listOf(video))[video.uri.toString()] ?: 0L
+        }
+        if (duration > 0L && progress.durationMs <= 0L) {
+            progress.durationMs = duration
+        }
+    }
     val seriesKey = currentVideo?.seriesKey
     val seriesSkip by seriesSkipStore.observe(seriesKey).collectAsState(initial = SeriesSkipSettings())
     val effectiveIntroSeconds = seriesSkip.introSeconds ?: preferences.skipIntroSeconds
