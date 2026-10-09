@@ -13,6 +13,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalViewConfiguration
+import com.zhaoshuo.localvideoplayer.player.seekTargetMs
+import com.zhaoshuo.localvideoplayer.player.swipeSeekRangeMs
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -25,7 +27,6 @@ private const val DOUBLE_TAP_TIMEOUT_MS = 300L
 private const val MIN_SCALE = 1f
 private const val MAX_SCALE = 3f
 private const val PREVIEW_FRAME_THROTTLE_MS = 100L
-private const val SEEK_FULL_SWIPE_MS = 10 * 60_000L
 private const val VERTICAL_SENSITIVITY = 1f
 
 private enum class DragMode {
@@ -211,7 +212,6 @@ fun VideoPlayerGesture(
                                                     deltaFromStart = deltaFromStart,
                                                     downX = down.position.x,
                                                     width = size.width.toFloat(),
-                                                    durationMs = getDurationMs(),
                                                     seekEnabled = seekEnabled,
                                                     onBrightnessAvailable = onBrightnessGestureStart != null &&
                                                         onBrightnessChange != null,
@@ -344,13 +344,12 @@ private fun resolveDragMode(
     deltaFromStart: Offset,
     downX: Float,
     width: Float,
-    durationMs: Long,
     seekEnabled: Boolean,
     onBrightnessAvailable: Boolean,
     onVolumeAvailable: Boolean,
 ): DragMode? {
     return when {
-        abs(deltaFromStart.x) >= abs(deltaFromStart.y) && durationMs > 0 && seekEnabled -> DragMode.Seek
+        abs(deltaFromStart.x) >= abs(deltaFromStart.y) && seekEnabled -> DragMode.Seek
         downX <= width / 2f && onBrightnessAvailable -> DragMode.Brightness
         downX > width / 2f && onVolumeAvailable -> DragMode.Volume
         else -> null
@@ -379,9 +378,9 @@ private fun applyDragDelta(
 ): DragApplyResult {
     return when (dragMode) {
         DragMode.Seek -> {
-            val seekRangeMs = minOf(durationMs, SEEK_FULL_SWIPE_MS)
+            val seekRangeMs = swipeSeekRangeMs(durationMs)
             val deltaMs = (delta.x / width) * seekRangeMs
-            val previewMs = (startPositionMs + deltaMs.toLong()).coerceIn(0L, durationMs)
+            val previewMs = seekTargetMs(startPositionMs, deltaMs.toLong(), durationMs)
             onSeekPreview(previewMs)
             var frameAt = lastPreviewFrameAt
             val now = System.currentTimeMillis()

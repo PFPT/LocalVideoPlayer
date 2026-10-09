@@ -133,7 +133,7 @@ fun PortraitPlayerLayout(
                     onVolumeGestureEnd = onVolumeGestureEnd.takeIf { volumeEnabled },
                     getCurrentBrightness = getCurrentBrightness,
                     getCurrentVolume = getCurrentVolume,
-                    enabled = durationMs > 0,
+                    enabled = true,
                     seekEnabled = seekEnabled,
                     pinchEnabled = pinchEnabled,
                     modifier = Modifier

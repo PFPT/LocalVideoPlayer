@@ -61,6 +61,7 @@ import com.zhaoshuo.localvideoplayer.player.rememberPlayerProgressState
 import com.zhaoshuo.localvideoplayer.player.findSidecarSubtitle
 import com.zhaoshuo.localvideoplayer.player.toMediaItemWithSubtitle
 import com.zhaoshuo.localvideoplayer.player.trackOptions
+import com.zhaoshuo.localvideoplayer.player.seekTargetMs
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -465,12 +466,12 @@ fun PlayerScreen(
 
     fun seekBy(deltaMs: Long) {
         val duration = resolvedDurationMs()
-        if (duration <= 0) return
-        val target = (exoPlayer.currentPosition + deltaMs).coerceIn(0L, duration)
+        val position = exoPlayer.currentPosition.coerceAtLeast(0L)
+        val target = seekTargetMs(position, deltaMs, duration)
         exoPlayer.seekTo(target)
         progress.currentPositionMs = target
         ui.previewPositionMs = target
-        ui.seekStartPositionMs = (target - deltaMs).coerceIn(0L, duration)
+        ui.seekStartPositionMs = position
         ui.doubleTapSeekDeltaMs = deltaMs
         ui.showDoubleTapSeek = true
     }
@@ -1376,7 +1377,7 @@ private fun LandscapePlayerContent(
         onVolumeGestureEnd = onVolumeGestureEnd,
         getCurrentBrightness = getCurrentBrightness,
         getCurrentVolume = getCurrentVolume,
-        enabled = durationMs > 0,
+        enabled = true,
         speedBoostOnly = controlsLocked,
         seekEnabled = seekEnabled,
         pinchEnabled = pinchEnabled,
