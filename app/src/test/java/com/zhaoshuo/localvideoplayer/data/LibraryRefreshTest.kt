@@ -17,6 +17,18 @@ import org.robolectric.annotation.Config
 @Config(sdk = [28])
 class LibraryRefreshTest {
     @Test
+    fun zeroScanKeepsKnownDuration() {
+        val known = video(1, "a.mp4").copy(durationMs = 42_000L)
+        val scanned = known.copy(durationMs = 0L)
+        val unknown = video(2, "b.mp4").copy(durationMs = 0L)
+        val kept = keepKnownDurations(listOf(known), listOf(scanned, unknown))
+        assertEquals(42_000L, kept[0].durationMs)
+        assertEquals(0L, kept[1].durationMs)
+        val fresh = known.copy(durationMs = 9_000L)
+        assertEquals(9_000L, keepKnownDurations(listOf(known), listOf(fresh)).single().durationMs)
+    }
+
+    @Test
     fun resolvedDurationFillsOnlyMissingVideos() {
         val known = video(1, "a.mp4")
         val missing = video(2, "b.mp4").copy(durationMs = 0L)
@@ -91,11 +103,29 @@ class LibraryRefreshTest {
     fun documentTreeUriCountsAsFolderSource() {
         val folder = video(9, "ep.mp4").copy(
             uri = Uri.parse("content://com.android.externalstorage.documents/tree/primary%3AMovies/document/primary%3AMovies%2FShow%2Fep.mp4"),
-            relativePath = "Show/ep.mp4",
+            relativePath = "Show/",
         )
         assertEquals(true, isFolderSourceVideo(folder))
-        assertEquals("Show/ep.mp4", FolderVideoScanner.folderDocumentRelativePath("Show", "ep.mp4"))
-        assertEquals("ep.mp4", FolderVideoScanner.folderDocumentRelativePath("", "ep.mp4"))
+        assertEquals("Show/", FolderVideoScanner.folderDocumentRelativePath("Show"))
+        assertEquals("", FolderVideoScanner.folderDocumentRelativePath(""))
+    }
+
+    @Test
+    fun fileUriCountsAsFolderSource() {
+        val fileVideo = video(10, "ep.mp4").copy(
+            uri = Uri.parse("file:///storage/emulated/0/Download/ep.mp4"),
+            relativePath = "Download/",
+        )
+        assertEquals(true, isFolderSourceVideo(fileVideo))
+        assertEquals(false, isTrackedMediaStoreVideo(fileVideo))
+    }
+
+    @Test
+    fun orphanBucketUsesLeafFolder() {
+        assertEquals("Show", VideoRepository.leafBucketName("Download/Show/"))
+        assertEquals("Download", VideoRepository.leafBucketName("Download/"))
+        assertEquals(null, VideoRepository.leafBucketName(null))
+        assertEquals(null, VideoRepository.leafBucketName(""))
     }
 
     @Test

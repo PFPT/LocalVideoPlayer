@@ -3,6 +3,8 @@ package com.zhaoshuo.localvideoplayer.data
 import android.content.Context
 import android.database.ContentObserver
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 class LibraryViewModel(
     context: Context,
@@ -35,8 +38,11 @@ class LibraryViewModel(
     private val pinnedItemsStore: PinnedItemsStore = PinnedItemsStore(context),
     private val playCountStore: PlayCountStore = PlayCountStore(context),
     private val folderSourceStore: FolderSourceStore = FolderSourceStore(context),
-    private val folderVideoScanner: FolderVideoScanner = FolderVideoScanner(context),
-    private val durationResolver: VideoDurationResolver = VideoDurationResolver(context),
+    private val durationResolver: VideoDurationResolver =
+        (context.applicationContext as? com.zhaoshuo.localvideoplayer.LocalVideoPlayerApplication)
+            ?.durationResolver
+            ?: VideoDurationResolver(context),
+    private val folderVideoScanner: FolderVideoScanner = FolderVideoScanner(context, durationResolver),
     private val playbackStore: PlaybackStore = PlaybackStore(context),
 ) {
     private val appContext = context.applicationContext
@@ -57,6 +63,9 @@ class LibraryViewModel(
     private var observerRegistered = false
     private var folderWatchStarted = false
     private var debounceJob: Job? = null
+    private var refreshJob: Job? = null
+    private var backfillJob: Job? = null
+    private var refreshGeneration = 0
     private var lastKnownMaxId = 0L
     private var lastKnownMaxDateAdded = 0L
     private var lastInputSignature: String? = null
@@ -112,6 +121,10 @@ class LibraryViewModel(
 
     fun clear() {
         stopObserving()
+        refreshJob?.cancel()
+        refreshJob = null
+        backfillJob?.cancel()
+        backfillJob = null
         scope.coroutineContext[Job]?.cancel()
     }
 
@@ -132,9 +145,40 @@ class LibraryViewModel(
     }
 
     fun refresh(showLoading: Boolean = false, fromPull: Boolean = false, incrementalPreferred: Boolean = false) {
-        scope.launch {
-            performRefresh(showLoading, fromPull, incrementalPreferred)
-            backfillMissingDurations()
+        val generation = ++refreshGeneration
+        refreshJob?.cancel()
+        if (_isRefreshing.value) {
+            _isRefreshing.value = false
+        }
+        if (fromPull) {
+            durationResolver.clearProbeFailures()
+        }
+        refreshJob = scope.launch {
+            val previousSignature = if (fromPull) librarySignature(_libraryEntries.value) else emptyList()
+            if (fromPull) _isRefreshing.value = true
+            try {
+                val refreshed = performRefresh(showLoading, fromPull, incrementalPreferred)
+                if (refreshed && fromPull && librarySignature(_libraryEntries.value) == previousSignature) {
+                    _refreshError.emit(REFRESH_UP_TO_DATE)
+                }
+            } finally {
+                if (fromPull && generation == refreshGeneration) {
+                    _isRefreshing.value = false
+                }
+            }
+            if (generation == refreshGeneration) {
+                startBackfill()
+            }
+        }
+    }
+
+    private fun startBackfill() {
+        backfillJob?.cancel()
+        backfillJob = scope.launch {
+            try {
+                backfillMissingDurations()
+            } catch (_: CancellationException) {
+            }
         }
     }
 
@@ -169,10 +213,8 @@ class LibraryViewModel(
         showLoading: Boolean,
         fromPull: Boolean,
         incrementalPreferred: Boolean,
-    ) {
-        val previousSignature = if (fromPull) librarySignature(_libraryEntries.value) else emptyList()
-        if (fromPull) _isRefreshing.value = true
-        else if (showLoading) _isLibraryLoading.value = true
+    ): Boolean {
+        if (!fromPull && showLoading) _isLibraryLoading.value = true
         try {
             val hiddenUris = withContext(Dispatchers.IO) { hiddenVideosStore.getHiddenUris() }
             val folderVideos = loadFolderSourceVideos(force = fromPull)
@@ -194,20 +236,17 @@ class LibraryViewModel(
                 }
             }
             if (scanned == null && folderSignature == lastFolderSignature) {
-                if (fromPull && librarySignature(_libraryEntries.value) == previousSignature) {
-                    _refreshError.emit(REFRESH_UP_TO_DATE)
-                }
-                return
+                return true
             }
             val mediaVideos = scanned ?: flattenVideos(_libraryEntries.value).filterNot(::isFolderSourceVideo)
             val scannedWithFolders = mergeVideos(mediaVideos, folderVideos)
             if (scannedWithFolders.isEmpty() && _libraryEntries.value.isNotEmpty() && !fromPull) {
-                return
+                return true
             }
             val pendingSignature = withContext(Dispatchers.Default) { videoSetSignature(scannedWithFolders) }
             if (!fromPull && pendingSignature == lastInputSignature && _libraryEntries.value.isNotEmpty()) {
                 rememberSignatures(flattenVideos(_libraryEntries.value))
-                return
+                return true
             }
             val existingEntries = _libraryEntries.value
             val hadEntries = existingEntries.isNotEmpty()
@@ -221,26 +260,26 @@ class LibraryViewModel(
                 repository.loadM3u8Playlists(scannedWithFolders)
             }
             val merged = if (m3u8Items.isEmpty()) scannedWithFolders else scannedWithFolders + m3u8Items
-            val visible = merged.filter { it.uri.toString() !in hiddenUris }
+            val preserved = keepKnownDurations(flattenVideos(existingEntries), merged)
+            val visible = preserved.filter { it.uri.toString() !in hiddenUris }
             val changeCount = libraryChangeCount(flattenVideos(existingEntries), visible)
             if (shouldFullyRegroup(fromPull, !hadEntries, changeCount)) {
-                applyVideos(merged, hiddenUris)
+                applyVideos(preserved, hiddenUris)
             } else {
                 _libraryEntries.value = withContext(Dispatchers.Default) {
                     patchLibraryEntries(existingEntries, visible)
                 }
             }
-            saveCaches(merged)
+            saveCaches(preserved)
             rememberSignatures(flattenVideos(_libraryEntries.value))
-
-            if (fromPull && librarySignature(_libraryEntries.value) == previousSignature) {
-                _refreshError.emit(REFRESH_UP_TO_DATE)
-            }
+            return true
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Log.e(TAG, "Library refresh failed", e)
             _refreshError.emit(e.message ?: "refresh_failed")
+            return false
         } finally {
-            _isRefreshing.value = false
             _isLibraryLoading.value = false
         }
     }
@@ -285,8 +324,13 @@ class LibraryViewModel(
     private fun librarySignature(entries: List<VideoLibraryEntry>): List<String> {
         return entries.map { entry ->
             when (entry) {
-                is VideoLibraryEntry.Series -> "series:${entry.series.id}:${entry.series.episodes.size}"
-                is VideoLibraryEntry.Single -> "single:${entry.video.uri}"
+                is VideoLibraryEntry.Series -> {
+                    val durations = entry.series.episodes
+                        .sortedBy { it.uri.toString() }
+                        .joinToString(",") { "${it.uri}:${it.durationMs}" }
+                    "series:${entry.series.id}:${entry.series.episodes.size}:$durations"
+                }
+                is VideoLibraryEntry.Single -> "single:${entry.video.uri}:${entry.video.durationMs}"
             }
         }
     }
@@ -307,17 +351,18 @@ class LibraryViewModel(
 
     private suspend fun loadFolderSourceVideos(force: Boolean): List<VideoItem> {
         val sources = folderSourceStore.getSources()
-        if (sources.isEmpty()) {
-            cachedFolderSourceKey = ""
-            cachedFolderVideos = emptyList()
-            return emptyList()
+        val canScanExternalDirs = canScanExternalAppDirs()
+        val key = buildString {
+            append(sources.joinToString("\n") { it.treeUri })
+            append('\n')
+            append("manage=")
+            append(canScanExternalDirs)
         }
-        val key = sources.joinToString("\n") { it.treeUri }
         if (!force && key == cachedFolderSourceKey) {
             return cachedFolderVideos
         }
         val videos = withContext(Dispatchers.IO) {
-            sources.flatMap { source ->
+            val fromTrees = sources.flatMap { source ->
                 val uri = runCatching { Uri.parse(source.treeUri) }.getOrNull() ?: return@flatMap emptyList()
                 try {
                     folderVideoScanner.loadVideos(uri)
@@ -327,10 +372,44 @@ class LibraryViewModel(
                     emptyList()
                 }
             }
+            val fromPaths = if (canScanExternalDirs) {
+                try {
+                    folderVideoScanner.loadVideosFromDirectories(externalDownloadRoots())
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            } else {
+                emptyList()
+            }
+            mergeVideos(fromTrees, fromPaths)
         }
         cachedFolderSourceKey = key
         cachedFolderVideos = videos
         return videos
+    }
+
+    private fun canScanExternalAppDirs(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            true
+        }
+    }
+
+    private fun externalDownloadRoots(): List<File> {
+        val primary = Environment.getExternalStorageDirectory()
+        return EXTERNAL_DOWNLOAD_ROOTS.map { relative ->
+            File(primary, relative)
+        }.filter { it.isDirectory && it.canRead() }
+    }
+
+    fun applyKnownDurations(resolved: Map<String, Long>) {
+        if (resolved.isEmpty()) return
+        scope.launch {
+            applyResolvedDurations(resolved)
+        }
     }
 
     private suspend fun backfillMissingDurations() {
@@ -361,13 +440,33 @@ class LibraryViewModel(
 
     private fun mergeVideos(primary: List<VideoItem>, extra: List<VideoItem>): List<VideoItem> {
         if (extra.isEmpty()) return primary
-        val seen = primary.mapTo(mutableSetOf()) { it.uri.toString() }
-        return primary + extra.filter { seen.add(it.uri.toString()) }
+        val seenUris = primary.mapTo(mutableSetOf()) { it.uri.toString() }
+        val seenKeys = primary.mapTo(mutableSetOf()) { videoIdentityKey(it) }
+        return primary + extra.filter { video ->
+            seenUris.add(video.uri.toString()) && seenKeys.add(videoIdentityKey(video))
+        }
+    }
+
+    private fun videoIdentityKey(video: VideoItem): String {
+        val path = video.relativePath?.trim('/')?.lowercase().orEmpty()
+        val title = video.title.trim().lowercase()
+        return when {
+            path.isEmpty() -> title
+            path == title || path.endsWith("/$title") -> path
+            else -> "$path/$title"
+        }
     }
 
     companion object {
         private const val TAG = "LibraryViewModel"
         private const val MEDIA_DEBOUNCE_MS = 1_200L
         const val REFRESH_UP_TO_DATE = "up_to_date"
+        private val EXTERNAL_DOWNLOAD_ROOTS = listOf(
+            "Android/data/com.xunlei.downloadprovider/files/ThunderDownload",
+            "Android/data/com.xunlei.downloadprovider.oversea/files/ThunderDownload",
+            "Download",
+            "Movies",
+            "DCIM/Camera",
+        )
     }
 }

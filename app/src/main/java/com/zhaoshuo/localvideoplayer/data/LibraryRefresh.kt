@@ -8,6 +8,20 @@ import com.zhaoshuo.localvideoplayer.util.SeriesGrouper
 import com.zhaoshuo.localvideoplayer.util.TitleParser
 import com.zhaoshuo.localvideoplayer.util.isM3u8Title
 
+fun keepKnownDurations(existing: List<VideoItem>, incoming: List<VideoItem>): List<VideoItem> {
+    if (existing.isEmpty() || incoming.isEmpty()) return incoming
+    val known = HashMap<String, Long>(existing.size)
+    for (video in existing) {
+        if (video.durationMs > 0L) known[video.uri.toString()] = video.durationMs
+    }
+    if (known.isEmpty()) return incoming
+    return incoming.map { video ->
+        if (video.durationMs > 0L) return@map video
+        val previous = known[video.uri.toString()] ?: return@map video
+        video.copy(durationMs = previous)
+    }
+}
+
 fun withResolvedDurations(videos: List<VideoItem>, resolved: Map<String, Long>): List<VideoItem> {
     if (resolved.isEmpty()) return videos
     var changed = false
@@ -60,6 +74,7 @@ private fun videoFingerprint(video: VideoItem): Long {
 }
 
 fun isFolderSourceVideo(video: VideoItem): Boolean {
+    if (video.uri.scheme.equals("file", ignoreCase = true)) return true
     if (video.relativePath?.startsWith("content://") == true) return true
     val segments = video.uri.pathSegments
     return segments.size >= 4 && segments[0] == "tree" && segments.contains("document")

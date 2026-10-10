@@ -113,7 +113,6 @@ import com.zhaoshuo.localvideoplayer.model.VideoSortOrder
 import com.zhaoshuo.localvideoplayer.model.applyTypeTab
 import com.zhaoshuo.localvideoplayer.model.entryKey
 import com.zhaoshuo.localvideoplayer.model.filterLibrary
-import com.zhaoshuo.localvideoplayer.model.isAppDownloadFolder
 import com.zhaoshuo.localvideoplayer.model.partitionWithPinned
 import com.zhaoshuo.localvideoplayer.model.searchLibrary
 import com.zhaoshuo.localvideoplayer.model.sortLibrary
@@ -295,14 +294,11 @@ fun VideoListScreen(
     }
     val isUnfilteredAllTab =
         selectedTypeTab == LibraryTypeTab.ALL && libraryFilter == LibraryFilter()
-    val allTabSourceEntries = remember(libraryEntries) {
-        libraryEntries.filterNot(::isAppDownloadFolder)
-    }
     val displayLibrary = when {
         libraryEntries.isEmpty() -> emptyList()
         processedLibrary.isNotEmpty() -> processedLibrary
         cachedProcessed.isNotEmpty() -> cachedProcessed
-        isUnfilteredAllTab -> allTabSourceEntries
+        isUnfilteredAllTab -> libraryEntries
         else -> emptyList()
     }
     val visibleLibrary by produceState(

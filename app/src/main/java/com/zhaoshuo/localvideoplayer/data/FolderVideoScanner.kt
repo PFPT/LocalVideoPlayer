@@ -1,59 +1,80 @@
 package com.zhaoshuo.localvideoplayer.data
 
 import android.content.Context
-import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.DocumentsContract
 import com.zhaoshuo.localvideoplayer.model.VideoItem
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.coroutines.coroutineContext
 
 class FolderVideoScanner(
     private val context: Context,
-    private val durationCache: FolderDurationCache = FolderDurationCache(
-        File(context.applicationContext.filesDir, "folder_duration_cache.json"),
-    ),
+    private val durationResolver: VideoDurationResolver = VideoDurationResolver(context),
 ) {
-    private var cacheLoaded = false
-
     suspend fun loadVideos(treeUri: Uri): List<VideoItem> = coroutineScope {
-        ensureCacheLoaded()
         val pending = mutableListOf<PendingVideo>()
         val treeId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull()
             ?: return@coroutineScope emptyList()
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, treeId)
         collectDocuments(treeUri, childrenUri, parentPath = "", pending)
-        val semaphore = Semaphore(DURATION_PARALLELISM)
-        val videos = pending.map { item ->
-            async(Dispatchers.IO) {
-                semaphore.withPermit {
-                    item.toVideo(queryDurationMs(item.documentUri, item.modifiedMs))
-                }
+        resolvePending(pending)
+    }
+
+    suspend fun loadVideosFromDirectories(roots: List<File>): List<VideoItem> = coroutineScope {
+        if (roots.isEmpty()) return@coroutineScope emptyList()
+        val pending = mutableListOf<PendingVideo>()
+        roots.forEach { root ->
+            if (!root.isDirectory || !root.canRead()) return@forEach
+            val relativeRoot = relativeToPrimaryStorage(root) ?: root.name
+            collectFiles(root, parentPath = relativeRoot, out = pending)
+        }
+        resolvePending(pending)
+    }
+
+    private suspend fun resolvePending(pending: List<PendingVideo>): List<VideoItem> {
+        if (pending.isEmpty()) return emptyList()
+        val videos = pending.map { it.toVideo(0L) }
+        val resolved = durationResolver.resolveFast(videos)
+        if (resolved.isEmpty()) return videos
+        return videos.map { video ->
+            val duration = resolved[video.uri.toString()] ?: 0L
+            if (duration > 0L) video.copy(durationMs = duration) else video
+        }
+    }
+
+    private suspend fun collectFiles(directory: File, parentPath: String, out: MutableList<PendingVideo>) {
+        coroutineContext.ensureActive()
+        val children = directory.listFiles() ?: return
+        for (child in children) {
+            coroutineContext.ensureActive()
+            if (child.isDirectory) {
+                val childPath = if (parentPath.isEmpty()) child.name else "$parentPath/${child.name}"
+                collectFiles(child, childPath, out)
+                continue
             }
-        }.awaitAll()
-        durationCache.save()
-        videos
+            if (!child.isFile || !isVideoFile(child.name, mime = "")) continue
+            val uri = Uri.fromFile(child)
+            out.add(
+                PendingVideo(
+                    documentUri = uri,
+                    name = child.name,
+                    modifiedMs = child.lastModified(),
+                    relativePath = folderDocumentRelativePath(parentPath),
+                    bucketName = parentPath.substringAfterLast('/').ifBlank { parentPath.ifBlank { null } },
+                ),
+            )
+        }
     }
 
-    private fun ensureCacheLoaded() {
-        if (cacheLoaded) return
-        durationCache.load()
-        cacheLoaded = true
-    }
-
-    private fun collectDocuments(
+    private suspend fun collectDocuments(
         treeUri: Uri,
         childrenUri: Uri,
         parentPath: String,
         out: MutableList<PendingVideo>,
     ) {
+        coroutineContext.ensureActive()
         val projection = arrayOf(
             DocumentsContract.Document.COLUMN_DOCUMENT_ID,
             DocumentsContract.Document.COLUMN_DISPLAY_NAME,
@@ -66,6 +87,7 @@ class FolderVideoScanner(
             val mimeColumn = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
             val modifiedColumn = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
             while (cursor.moveToNext()) {
+                coroutineContext.ensureActive()
                 val documentId = cursor.getString(idColumn) ?: continue
                 val name = cursor.getString(nameColumn) ?: continue
                 val mime = cursor.getString(mimeColumn).orEmpty()
@@ -83,31 +105,12 @@ class FolderVideoScanner(
                         documentUri = documentUri,
                         name = name,
                         modifiedMs = modified,
-                        relativePath = folderDocumentRelativePath(parentPath, name),
+                        relativePath = folderDocumentRelativePath(parentPath),
                         bucketName = parentPath.substringAfterLast('/').ifBlank { parentPath.ifBlank { null } },
                     ),
                 )
             }
         }
-    }
-
-    private suspend fun queryDurationMs(uri: Uri, modifiedMs: Long): Long {
-        val uriKey = uri.toString()
-        durationCache.get(uriKey, modifiedMs)?.let { return it }
-        val duration = withContext(Dispatchers.IO) {
-            try {
-                MediaMetadataRetriever().use { retriever ->
-                    retriever.setDataSource(context, uri)
-                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                0L
-            }
-        }
-        durationCache.put(uriKey, modifiedMs, duration)
-        return duration
     }
 
     private data class PendingVideo(
@@ -133,13 +136,22 @@ class FolderVideoScanner(
     }
 
     companion object {
-        private const val DURATION_PARALLELISM = 4
+        private val PRIMARY_STORAGE = File("/storage/emulated/0")
         private val VIDEO_EXTENSIONS = setOf(
             "mp4", "mkv", "avi", "webm", "mov", "m4v", "ts", "flv", "wmv", "mpeg", "mpg", "m3u8",
         )
 
-        fun folderDocumentRelativePath(parentPath: String, name: String): String {
-            return if (parentPath.isEmpty()) name else "$parentPath/$name"
+        fun folderDocumentRelativePath(parentPath: String): String {
+            val trimmed = parentPath.trim().trim('/')
+            return if (trimmed.isEmpty()) "" else "$trimmed/"
+        }
+
+        fun relativeToPrimaryStorage(file: File, primary: File = PRIMARY_STORAGE): String? {
+            val primaryAbs = primary.absolutePath.trimEnd('/')
+            val fileAbs = file.absolutePath.trimEnd('/')
+            if (!fileAbs.startsWith(primaryAbs)) return null
+            val relative = fileAbs.removePrefix(primaryAbs).trimStart('/')
+            return relative.ifEmpty { null }
         }
 
         fun isVideoFile(name: String, mime: String): Boolean {

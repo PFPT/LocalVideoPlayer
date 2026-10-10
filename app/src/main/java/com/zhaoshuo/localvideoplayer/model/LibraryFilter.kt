@@ -88,7 +88,7 @@ fun applyTypeTab(
     pinnedKeys: Set<String>,
 ): List<VideoLibraryEntry> {
     if (tab == LibraryTypeTab.ALL) {
-        return entries.filterNot(::isAppDownloadFolder)
+        return entries
     }
     return entries.filter { entry -> matchesTypeTab(entry, tab, pinnedKeys) }
 }

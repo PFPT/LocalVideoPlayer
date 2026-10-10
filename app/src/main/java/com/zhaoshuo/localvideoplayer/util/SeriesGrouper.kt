@@ -1,5 +1,6 @@
 package com.zhaoshuo.localvideoplayer.util
 
+import com.zhaoshuo.localvideoplayer.data.FolderVideoScanner
 import com.zhaoshuo.localvideoplayer.model.SeriesGroupKind
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
@@ -203,6 +204,9 @@ object SeriesGrouper {
         folderGroups.values
             .filter { it.size >= 2 }
             .forEach { indices ->
+                if (indices.size > MAX_SIMILAR_NAME_CLUSTER_SIZE) {
+                    return@forEach
+                }
                 val clusters = clusterIndices(indices) { left, right ->
                     shouldGroup(parsed[left].second, parsed[right].second)
                 }
@@ -651,12 +655,27 @@ object SeriesGrouper {
             .map { positions -> positions.map { indices[it] } }
     }
 
-    private fun parentFolderKey(video: VideoItem): String? {
+    internal fun parentFolderKey(video: VideoItem): String? {
         val relativePath = video.relativePath ?: return video.bucketName?.let { "bucket:$it" }
-        val trimmed = relativePath.trimEnd('/')
+        val trimmed = relativePath.trim().trimEnd('/')
+        if (trimmed.isEmpty()) return video.bucketName?.let { "bucket:$it" }
         val lastSlash = trimmed.lastIndexOf('/')
-        if (lastSlash <= 0) return video.bucketName?.let { "bucket:$it" }
-        return trimmed.substring(0, lastSlash)
+        val lastSegment = if (lastSlash >= 0) trimmed.substring(lastSlash + 1) else trimmed
+        return if (looksLikeVideoFileName(lastSegment)) {
+            if (lastSlash <= 0) {
+                video.bucketName?.let { "bucket:$it" }
+            } else {
+                trimmed.substring(0, lastSlash)
+            }
+        } else {
+            trimmed
+        }
+    }
+
+    private fun looksLikeVideoFileName(name: String): Boolean {
+        val ext = name.substringAfterLast('.', missingDelimiterValue = "")
+        if (ext.isEmpty() || ext.length == name.length) return false
+        return FolderVideoScanner.isVideoFile(name, mime = "")
     }
 
     fun libraryFolderKey(video: VideoItem): String? {
