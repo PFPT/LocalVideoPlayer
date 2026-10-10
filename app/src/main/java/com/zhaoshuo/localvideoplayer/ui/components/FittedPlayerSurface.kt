@@ -19,6 +19,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.SubtitleView
 import androidx.media3.ui.compose.PlayerSurface
+import androidx.media3.ui.compose.SURFACE_TYPE_SURFACE_VIEW
 import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
 import androidx.media3.ui.compose.modifiers.resizeWithContentScale
 import androidx.media3.ui.compose.state.rememberPresentationState
@@ -41,6 +42,7 @@ fun FittedPlayerSurface(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Fit,
     frameAspectRatio: Float? = null,
+    useTextureView: Boolean = false,
 ) {
     val presentationState = rememberPresentationState(player)
     val appearance = LocalSubtitleAppearance.current
@@ -67,7 +69,7 @@ fun FittedPlayerSurface(
         }
         PlayerSurface(
             player = player,
-            surfaceType = SURFACE_TYPE_TEXTURE_VIEW,
+            surfaceType = if (useTextureView) SURFACE_TYPE_TEXTURE_VIEW else SURFACE_TYPE_SURFACE_VIEW,
             modifier = surfaceModifier,
         )
         AndroidView(

@@ -356,7 +356,7 @@ class PlaybackSession(
         val video = playlist.getOrNull(index) ?: return
         val textDisabled = current.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)
         val position = if (isCurrent) current.currentPosition.coerceAtLeast(0L) else 0L
-        current.replaceMediaItem(index, video.toMediaItemWithSubtitle(Uri.parse(desired)))
+        current.replaceMediaItem(index, video.toMediaItemWithSubtitle(appContext, Uri.parse(desired)))
         if (isCurrent && position > 0L) {
             current.seekTo(index, position)
         }

@@ -1,12 +1,15 @@
 package com.zhaoshuo.localvideoplayer.util
 
+import android.content.Context
 import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
+import com.zhaoshuo.localvideoplayer.data.isDisguisedMpegTsMedia
+import com.zhaoshuo.localvideoplayer.data.looksLikeTsName
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 
-fun VideoItem.toMediaItem(): MediaItem {
+fun VideoItem.toMediaItem(context: Context? = null): MediaItem {
     val builder = MediaItem.Builder()
         .setUri(uri)
         .setMediaMetadata(
@@ -15,8 +18,18 @@ fun VideoItem.toMediaItem(): MediaItem {
                 .setDisplayTitle(title)
                 .build(),
         )
-    playbackMimeType(uri, title)?.let { builder.setMimeType(it) }
+    resolvePlaybackMimeType(context, this)?.let { builder.setMimeType(it) }
     return builder.build()
+}
+
+fun resolvePlaybackMimeType(context: Context?, video: VideoItem): String? {
+    playbackMimeType(video.uri, video.title)?.let { return it }
+    if (context != null &&
+        isDisguisedMpegTsMedia(context, video.uri, video.relativePath, video.title)
+    ) {
+        return MimeTypes.VIDEO_MP2T
+    }
+    return null
 }
 
 fun isM3u8Uri(uri: Uri): Boolean {
@@ -46,7 +59,7 @@ private fun playbackMimeType(uri: Uri, title: String): String? {
 private fun mimeTypeFromName(name: String): String? {
     val base = name.substringBefore('?').substringBefore('#')
     return when {
-        base.endsWith(".ts", true) -> MimeTypes.VIDEO_MP2T
+        looksLikeTsName(base) -> MimeTypes.VIDEO_MP2T
         base.endsWith(".mkv", true) -> MimeTypes.VIDEO_MATROSKA
         base.endsWith(".webm", true) -> MimeTypes.VIDEO_WEBM
         base.endsWith(".mp4", true) || base.endsWith(".m4v", true) -> MimeTypes.VIDEO_MP4

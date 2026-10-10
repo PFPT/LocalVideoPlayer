@@ -113,6 +113,9 @@
     <string name="settings_folder_sources">文件夹源</string>
     <string name="settings_add_folder">添加文件夹</string>
     <string name="settings_no_folders">尚未添加文件夹源</string>
+    <string name="settings_all_files_access">允许访问所有文件</string>
+    <string name="settings_all_files_access_on">已开启，下拉刷新可导入迅雷下载</string>
+    <string name="settings_all_files_access_off">用于扫描迅雷等下载目录中的视频</string>
     <string name="settings_hidden_videos">已隐藏</string>
     <string name="settings_no_hidden_videos">没有已隐藏的视频</string>
     <string name="settings_restore_hidden">恢复到列表</string>
@@ -124,6 +127,8 @@
     <string name="settings_default_speed">默认倍速</string>
     <string name="settings_aspect_ratio">画面比例</string>
     <string name="settings_repeat_one">默认单集循环</string>
+    <string name="settings_use_texture_view">兼容渲染（TextureView）</string>
+    <string name="settings_use_texture_view_hint">画面异常时可开启；默认使用更稳定的 SurfaceView</string>
     <string name="settings_gesture_brightness">滑动调节亮度</string>
     <string name="settings_gesture_volume">滑动调节音量</string>
     <string name="settings_gesture_seek">滑动调节进度</string>

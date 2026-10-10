@@ -318,6 +318,9 @@ fun LocalVideoPlayerApp(
                                 seriesSkipStore = seriesSkipStore,
                                 bookmarkStore = bookmarkStore,
                                 playbackSession = playbackSession,
+                                onDurationKnown = { uri, durationMs ->
+                                    libraryViewModel.applyKnownDurations(mapOf(uri to durationMs))
+                                },
                                 onBack = { navController.popBackStack() },
                             )
                         }
@@ -331,6 +334,7 @@ fun LocalVideoPlayerApp(
                             folderSourceStore = folderSourceStore,
                             hiddenVideosStore = hiddenVideosStore,
                             onRestoreHidden = { libraryViewModel.refresh(fromPull = true) },
+                            onLibraryRefresh = { libraryViewModel.refresh(fromPull = true) },
                             onBack = { navController.popBackStack() },
                         )
                     }

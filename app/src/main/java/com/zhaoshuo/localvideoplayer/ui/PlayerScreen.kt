@@ -54,12 +54,14 @@ import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import com.zhaoshuo.localvideoplayer.MainActivity
 import com.zhaoshuo.localvideoplayer.R
+import com.zhaoshuo.localvideoplayer.appDurationResolver
 import com.zhaoshuo.localvideoplayer.data.BookmarkStore
 import com.zhaoshuo.localvideoplayer.data.PlaybackStore
-import com.zhaoshuo.localvideoplayer.data.VideoDurationResolver
 import com.zhaoshuo.localvideoplayer.data.PinnedItemsStore
 import com.zhaoshuo.localvideoplayer.data.PlayerPreferences
 import com.zhaoshuo.localvideoplayer.data.PlayerPreferencesStore
+import androidx.media3.common.PlaybackParameters
+import kotlin.math.max
 import com.zhaoshuo.localvideoplayer.data.SeriesSkipSettings
 import com.zhaoshuo.localvideoplayer.data.SeriesSkipStore
 import com.zhaoshuo.localvideoplayer.model.VideoItem
@@ -120,7 +122,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private const val SPEED_BOOST = 2.0f
+private const val MIN_SPEED_BOOST = 2.0f
 private const val DOUBLE_TAP_SEEK_MS = 10_000L
 
 @Composable
@@ -132,6 +134,7 @@ fun PlayerScreen(
     seriesSkipStore: SeriesSkipStore,
     bookmarkStore: BookmarkStore,
     playbackSession: PlaybackSession,
+    onDurationKnown: (uri: String, durationMs: Long) -> Unit = { _, _ -> },
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -210,6 +213,7 @@ fun PlayerScreen(
             seriesSkipStore = seriesSkipStore,
             bookmarkStore = bookmarkStore,
             playbackSession = playbackSession,
+            onDurationKnown = onDurationKnown,
             onBack = onBack,
             modifier = modifier,
             preferences = preferences,
@@ -238,6 +242,7 @@ private fun PlayerScreenContent(
     seriesSkipStore: SeriesSkipStore,
     bookmarkStore: BookmarkStore,
     playbackSession: PlaybackSession,
+    onDurationKnown: (uri: String, durationMs: Long) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier,
     preferences: PlayerPreferences,
@@ -852,7 +857,7 @@ private fun PlayerScreenContent(
     }
 
     LaunchedEffect(ui.playbackSpeed) {
-        exoPlayer.setPlaybackSpeed(ui.playbackSpeed)
+        exoPlayer.playbackParameters = PlaybackParameters(ui.playbackSpeed, 1f)
     }
 
     LaunchedEffect(ui.repeatOne) {
@@ -870,7 +875,7 @@ private fun PlayerScreenContent(
     val hasPrevious = ui.currentIndex > 0
     val hasNext = ui.currentIndex < playlist.lastIndex
     val currentVideo = playlist.getOrNull(ui.currentIndex)
-    val durationResolver = remember(context) { VideoDurationResolver(context) }
+    val durationResolver = remember(context) { context.appDurationResolver() }
     LaunchedEffect(currentVideo?.uri) {
         val video = currentVideo ?: return@LaunchedEffect
         if (video.durationMs > 0L || progress.durationMs > 0L) return@LaunchedEffect
@@ -879,7 +884,13 @@ private fun PlayerScreenContent(
         }
         if (duration > 0L && progress.durationMs <= 0L) {
             progress.durationMs = duration
+            onDurationKnown(video.uri.toString(), duration)
         }
+    }
+    LaunchedEffect(displayDurationMs, currentVideo?.uri) {
+        val video = currentVideo ?: return@LaunchedEffect
+        if (displayDurationMs <= 0L || video.durationMs > 0L) return@LaunchedEffect
+        onDurationKnown(video.uri.toString(), displayDurationMs)
     }
     val seriesKey = currentVideo?.seriesKey
     val seriesSkip by seriesSkipStore.observe(seriesKey).collectAsStateWithLifecycle(initialValue = SeriesSkipSettings())
@@ -1182,6 +1193,7 @@ private fun PlayerScreenContent(
                 FittedPlayerSurface(
                     player = exoPlayer,
                     modifier = Modifier.fillMaxSize(),
+                    useTextureView = preferences.useTextureView,
                 )
             }
             useLandscapeLayout -> {
@@ -1191,6 +1203,7 @@ private fun PlayerScreenContent(
                     durationMs = displayDurationMs,
                     videoUri = currentVideo?.uri,
                     videoScale = ui.videoScale,
+                    useTextureView = preferences.useTextureView,
                     offsetX = ui.offsetX,
                     offsetY = ui.offsetY,
                     ui = ui,
@@ -1233,7 +1246,7 @@ private fun PlayerScreenContent(
                     onSpeedBoostStart = {
                         if (!ui.isSpeedBoosted) {
                             ui.savedPlaybackSpeed = ui.playbackSpeed
-                            ui.playbackSpeed = SPEED_BOOST
+                            ui.playbackSpeed = max(MIN_SPEED_BOOST, ui.savedPlaybackSpeed)
                             ui.isSpeedBoosted = true
                             if (!exoPlayer.isPlaying) {
                                 exoPlayer.play()
@@ -1371,7 +1384,7 @@ private fun PlayerScreenContent(
                         onSpeedBoostStart = {
                             if (!ui.isSpeedBoosted) {
                                 ui.savedPlaybackSpeed = ui.playbackSpeed
-                                ui.playbackSpeed = SPEED_BOOST
+                                ui.playbackSpeed = max(MIN_SPEED_BOOST, ui.savedPlaybackSpeed)
                                 ui.isSpeedBoosted = true
                                 if (!exoPlayer.isPlaying) {
                                     exoPlayer.play()
@@ -1460,6 +1473,7 @@ private fun PlayerScreenContent(
                         onFullscreenClick = ::enterLandscapeFullscreen,
                         contentScale = ui.aspectRatioMode.contentScale,
                         frameAspectRatio = ui.aspectRatioMode.frameAspectRatio,
+                        useTextureView = preferences.useTextureView,
                         seekEnabled = preferences.gestureSeek,
                         pinchEnabled = preferences.gesturePinchZoom,
                         brightnessEnabled = preferences.gestureBrightness,
@@ -1528,6 +1542,7 @@ private fun LandscapePlayerContent(
     durationMs: Long,
     videoUri: Uri?,
     videoScale: Float,
+    useTextureView: Boolean,
     offsetX: Float,
     offsetY: Float,
     ui: PlayerUiState,
@@ -1659,6 +1674,7 @@ private fun LandscapePlayerContent(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = contentScale,
                 frameAspectRatio = frameAspectRatio,
+                useTextureView = useTextureView,
             )
             LiveSkipIntroOutro(
                 progress = progress,
@@ -1801,6 +1817,7 @@ private fun PortraitPlayerContent(
     onFullscreenClick: () -> Unit,
     contentScale: androidx.compose.ui.layout.ContentScale = androidx.compose.ui.layout.ContentScale.Fit,
     frameAspectRatio: Float? = null,
+    useTextureView: Boolean = false,
     seekEnabled: Boolean = true,
     pinchEnabled: Boolean = true,
     brightnessEnabled: Boolean = true,
@@ -1874,6 +1891,7 @@ private fun PortraitPlayerContent(
         onFullscreenClick = onFullscreenClick,
         contentScale = contentScale,
         frameAspectRatio = frameAspectRatio,
+        useTextureView = useTextureView,
         seekEnabled = seekEnabled,
         pinchEnabled = pinchEnabled,
         brightnessEnabled = brightnessEnabled,

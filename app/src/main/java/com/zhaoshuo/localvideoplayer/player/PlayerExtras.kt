@@ -10,7 +10,10 @@ import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.extractor.DefaultExtractorsFactory
 import com.zhaoshuo.localvideoplayer.R
+import com.zhaoshuo.localvideoplayer.data.needsConstantBitrateSeeking
 import com.zhaoshuo.localvideoplayer.model.VideoItem
 import com.zhaoshuo.localvideoplayer.ui.components.TrackOption
 import com.zhaoshuo.localvideoplayer.util.toMediaItem
@@ -30,7 +33,20 @@ fun buildExoPlayer(
         }
     }
     val safeIndex = startIndex.coerceIn(0, (playlist.size - 1).coerceAtLeast(0))
-    return ExoPlayer.Builder(context, renderersFactory).build().apply {
+    val startVideo = playlist.getOrNull(safeIndex)
+    val useCbr = startVideo != null && needsConstantBitrateSeeking(context, startVideo)
+    val mediaSourceFactory = if (useCbr) {
+        DefaultMediaSourceFactory(
+            context,
+            DefaultExtractorsFactory().setConstantBitrateSeekingEnabled(true),
+        )
+    } else {
+        DefaultMediaSourceFactory(context)
+    }
+    return ExoPlayer.Builder(context, renderersFactory)
+        .setMediaSourceFactory(mediaSourceFactory)
+        .build()
+        .apply {
         setWakeMode(C.WAKE_MODE_LOCAL)
         setAudioAttributes(
             androidx.media3.common.AudioAttributes.Builder()
@@ -41,9 +57,9 @@ fun buildExoPlayer(
         )
         val items = playlist.map { video ->
             if (subtitleUri != null && playlist.getOrNull(safeIndex)?.id == video.id) {
-                video.toMediaItemWithSubtitle(subtitleUri)
+                video.toMediaItemWithSubtitle(context, subtitleUri)
             } else {
-                video.toMediaItem()
+                video.toMediaItem(context)
             }
         }
         setMediaItems(items, safeIndex, startPositionMs.coerceAtLeast(0L))
@@ -83,13 +99,13 @@ fun PlaybackException.isSourceReadFailure(): Boolean {
     }
 }
 
-fun VideoItem.toMediaItemWithSubtitle(subtitleUri: Uri): MediaItem {
+fun VideoItem.toMediaItemWithSubtitle(context: Context, subtitleUri: Uri): MediaItem {
     val mime = subtitleMimeType(subtitleUri.toString())
     val subtitle = MediaItem.SubtitleConfiguration.Builder(subtitleUri)
         .setMimeType(mime)
         .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
         .build()
-    return toMediaItem().buildUpon()
+    return toMediaItem(context).buildUpon()
         .setSubtitleConfigurations(listOf(subtitle))
         .build()
 }

@@ -51,6 +51,7 @@ data class PlayerPreferences(
     val gestureSeek: Boolean = true,
     val gestureDoubleTapSeek: Boolean = true,
     val gesturePinchZoom: Boolean = true,
+    val useTextureView: Boolean = false,
     val subtitleTextSize: SubtitleTextSize = SubtitleTextSize.STANDARD,
     val subtitleYellow: Boolean = false,
     val subtitleDelayMs: Int = 0,
@@ -64,7 +65,7 @@ class PlayerPreferencesStore(private val context: Context) {
             skipIntroSeconds = (prefs[SKIP_INTRO_SECONDS] ?: 0).coerceIn(0, 600),
             skipOutroSeconds = (prefs[SKIP_OUTRO_SECONDS] ?: 0).coerceIn(0, 600),
             shuffleEnabled = prefs[SHUFFLE_ENABLED] ?: false,
-            defaultSpeed = (prefs[DEFAULT_SPEED] ?: 1.0f).coerceIn(0.5f, 3.0f),
+            defaultSpeed = (prefs[DEFAULT_SPEED] ?: 1.0f).coerceIn(0.5f, 5.0f),
             aspectRatioMode = AspectRatioMode.fromStorage(prefs[ASPECT_RATIO_MODE]),
             repeatOne = prefs[REPEAT_ONE] ?: false,
             gestureBrightness = prefs[GESTURE_BRIGHTNESS] ?: true,
@@ -72,6 +73,7 @@ class PlayerPreferencesStore(private val context: Context) {
             gestureSeek = prefs[GESTURE_SEEK] ?: true,
             gestureDoubleTapSeek = prefs[GESTURE_DOUBLE_TAP_SEEK] ?: true,
             gesturePinchZoom = prefs[GESTURE_PINCH_ZOOM] ?: true,
+            useTextureView = prefs[USE_TEXTURE_VIEW] ?: false,
             subtitleTextSize = SubtitleTextSize.fromStorage(prefs[SUBTITLE_TEXT_SIZE]),
             subtitleYellow = prefs[SUBTITLE_YELLOW] ?: false,
             subtitleDelayMs = normalizeSubtitleDelay(prefs[SUBTITLE_DELAY_MS] ?: 0),
@@ -101,7 +103,7 @@ class PlayerPreferencesStore(private val context: Context) {
     }
 
     suspend fun setDefaultSpeed(speed: Float) {
-        context.playerPreferencesDataStore.edit { it[DEFAULT_SPEED] = speed.coerceIn(0.5f, 3.0f) }
+        context.playerPreferencesDataStore.edit { it[DEFAULT_SPEED] = speed.coerceIn(0.5f, 5.0f) }
     }
 
     suspend fun setAspectRatioMode(mode: AspectRatioMode) {
@@ -132,6 +134,10 @@ class PlayerPreferencesStore(private val context: Context) {
         context.playerPreferencesDataStore.edit { it[GESTURE_PINCH_ZOOM] = enabled }
     }
 
+    suspend fun setUseTextureView(enabled: Boolean) {
+        context.playerPreferencesDataStore.edit { it[USE_TEXTURE_VIEW] = enabled }
+    }
+
     suspend fun setSubtitleTextSize(size: SubtitleTextSize) {
         context.playerPreferencesDataStore.edit { it[SUBTITLE_TEXT_SIZE] = size.name }
     }
@@ -159,6 +165,7 @@ class PlayerPreferencesStore(private val context: Context) {
         private val GESTURE_SEEK = booleanPreferencesKey("gesture_seek")
         private val GESTURE_DOUBLE_TAP_SEEK = booleanPreferencesKey("gesture_double_tap_seek")
         private val GESTURE_PINCH_ZOOM = booleanPreferencesKey("gesture_pinch_zoom")
+        private val USE_TEXTURE_VIEW = booleanPreferencesKey("use_texture_view")
         private val SUBTITLE_TEXT_SIZE = stringPreferencesKey("subtitle_text_size")
         private val SUBTITLE_YELLOW = booleanPreferencesKey("subtitle_yellow")
         private val SUBTITLE_DELAY_MS = intPreferencesKey("subtitle_delay_ms")

@@ -92,6 +92,7 @@ fun PortraitPlayerLayout(
     onClearOutro: () -> Unit = {},
     contentScale: androidx.compose.ui.layout.ContentScale = androidx.compose.ui.layout.ContentScale.Fit,
     frameAspectRatio: Float? = null,
+    useTextureView: Boolean = false,
     seekEnabled: Boolean = true,
     pinchEnabled: Boolean = true,
     brightnessEnabled: Boolean = true,
@@ -153,6 +154,7 @@ fun PortraitPlayerLayout(
                             modifier = Modifier.fillMaxSize(),
                             contentScale = contentScale,
                             frameAspectRatio = frameAspectRatio,
+                            useTextureView = useTextureView,
                         )
                     }
                 }
