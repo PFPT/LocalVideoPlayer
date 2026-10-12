@@ -13,6 +13,7 @@ import com.zhaoshuo.localvideoplayer.model.VideoItem
 import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
 import com.zhaoshuo.localvideoplayer.model.withoutUris
 import com.zhaoshuo.localvideoplayer.util.SeriesGrouper
+import com.zhaoshuo.localvideoplayer.util.dedupeLibraryVideos
 import com.zhaoshuo.localvideoplayer.util.isM3u8Title
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -72,6 +73,7 @@ class LibraryViewModel(
     private var lastFolderSignature: String? = null
     private var cachedFolderSourceKey: String? = null
     private var cachedFolderVideos: List<VideoItem> = emptyList()
+    private var lastFullPruneAtMs = 0L
 
     private val contentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean) {
@@ -95,6 +97,13 @@ class LibraryViewModel(
                 true,
                 contentObserver,
             )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                appContext.contentResolver.registerContentObserver(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    true,
+                    contentObserver,
+                )
+            }
             observerRegistered = true
         } catch (e: Exception) {
             Log.w(TAG, "Failed to register MediaStore observer", e)
@@ -152,6 +161,7 @@ class LibraryViewModel(
         }
         if (fromPull) {
             durationResolver.clearProbeFailures()
+            invalidateFolderCache()
         }
         refreshJob = scope.launch {
             val previousSignature = if (fromPull) librarySignature(_libraryEntries.value) else emptyList()
@@ -217,16 +227,27 @@ class LibraryViewModel(
         if (!fromPull && showLoading) _isLibraryLoading.value = true
         try {
             val hiddenUris = withContext(Dispatchers.IO) { hiddenVideosStore.getHiddenUris() }
-            val folderVideos = loadFolderSourceVideos(force = fromPull)
-            val folderSignature = withContext(Dispatchers.Default) { videoSetSignature(folderVideos) }
             val useIncremental = incrementalPreferred && !fromPull && lastKnownMaxId > 0
+            var forceFolderRescan = fromPull
             val scanned = withContext(Dispatchers.IO) {
                 if (useIncremental) {
                     val delta = repository.loadVideosAddedAfter(lastKnownMaxDateAdded, lastKnownMaxId)
+                    if (delta.isNotEmpty()) {
+                        forceFolderRescan = true
+                    }
+                    val now = System.currentTimeMillis()
+                    val shouldPrune = lastFullPruneAtMs == 0L ||
+                        now - lastFullPruneAtMs >= FULL_PRUNE_INTERVAL_MS
+                    val liveIds = if (shouldPrune) {
+                        lastFullPruneAtMs = now
+                        repository.loadVideoIds()
+                    } else {
+                        null
+                    }
                     val mediaExisting = flattenVideos(_libraryEntries.value).filterNot(::isFolderSourceVideo)
-                    val liveIds = repository.loadVideoIds()
                     resolveIncrementalMedia(mediaExisting, delta, liveIds)
                 } else {
+                    lastFullPruneAtMs = System.currentTimeMillis()
                     var list = repository.loadVideos()
                     if (list.isEmpty()) {
                         delay(400)
@@ -235,6 +256,11 @@ class LibraryViewModel(
                     list
                 }
             }
+            if (forceFolderRescan) {
+                invalidateFolderCache()
+            }
+            val folderVideos = loadFolderSourceVideos(force = forceFolderRescan)
+            val folderSignature = withContext(Dispatchers.Default) { videoSetSignature(folderVideos) }
             if (scanned == null && folderSignature == lastFolderSignature) {
                 return true
             }
@@ -412,17 +438,25 @@ class LibraryViewModel(
         }
     }
 
+    fun invalidateFolderCache() {
+        cachedFolderSourceKey = null
+        cachedFolderVideos = emptyList()
+    }
+
     private suspend fun backfillMissingDurations() {
         val missing = flattenVideos(_libraryEntries.value)
             .filter { it.durationMs <= 0L && !isM3u8Title(it.title) }
+            .sortedByDescending { it.dateAdded }
         if (missing.isEmpty()) return
         val fromPlayback = playbackStore.durationMsByUri()
         applyResolvedDurations(fromPlayback)
         val stillMissing = flattenVideos(_libraryEntries.value)
             .filter { it.durationMs <= 0L && !isM3u8Title(it.title) }
+            .sortedByDescending { it.dateAdded }
         if (stillMissing.isEmpty()) return
-        val resolved = durationResolver.resolveAll(stillMissing)
-        applyResolvedDurations(resolved)
+        durationResolver.resolveAll(stillMissing) { partial ->
+            applyResolvedDurations(partial)
+        }
     }
 
     private suspend fun applyResolvedDurations(resolved: Map<String, Long>) {
@@ -439,27 +473,14 @@ class LibraryViewModel(
     }
 
     private fun mergeVideos(primary: List<VideoItem>, extra: List<VideoItem>): List<VideoItem> {
-        if (extra.isEmpty()) return primary
-        val seenUris = primary.mapTo(mutableSetOf()) { it.uri.toString() }
-        val seenKeys = primary.mapTo(mutableSetOf()) { videoIdentityKey(it) }
-        return primary + extra.filter { video ->
-            seenUris.add(video.uri.toString()) && seenKeys.add(videoIdentityKey(video))
-        }
-    }
-
-    private fun videoIdentityKey(video: VideoItem): String {
-        val path = video.relativePath?.trim('/')?.lowercase().orEmpty()
-        val title = video.title.trim().lowercase()
-        return when {
-            path.isEmpty() -> title
-            path == title || path.endsWith("/$title") -> path
-            else -> "$path/$title"
-        }
+        if (extra.isEmpty()) return dedupeLibraryVideos(primary)
+        return dedupeLibraryVideos(primary + extra)
     }
 
     companion object {
         private const val TAG = "LibraryViewModel"
         private const val MEDIA_DEBOUNCE_MS = 1_200L
+        private const val FULL_PRUNE_INTERVAL_MS = 5 * 60_000L
         const val REFRESH_UP_TO_DATE = "up_to_date"
         private val EXTERNAL_DOWNLOAD_ROOTS = listOf(
             "Android/data/com.xunlei.downloadprovider/files/ThunderDownload",

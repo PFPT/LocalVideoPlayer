@@ -6,6 +6,7 @@ import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
 import com.zhaoshuo.localvideoplayer.model.VideoSeries
 import com.zhaoshuo.localvideoplayer.util.SeriesGrouper
 import com.zhaoshuo.localvideoplayer.util.TitleParser
+import com.zhaoshuo.localvideoplayer.util.dedupeLibraryVideos
 import com.zhaoshuo.localvideoplayer.util.isM3u8Title
 
 fun keepKnownDurations(existing: List<VideoItem>, incoming: List<VideoItem>): List<VideoItem> {
@@ -39,7 +40,7 @@ fun mergeIncrementalVideos(existing: List<VideoItem>, delta: List<VideoItem>): L
     if (delta.isEmpty()) return null
     val merged = existing.associateBy { it.uri.toString() }.toMutableMap()
     delta.forEach { video -> merged[video.uri.toString()] = video }
-    return merged.values.toList()
+    return dedupeLibraryVideos(merged.values.toList())
 }
 
 fun resolveIncrementalMedia(

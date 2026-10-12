@@ -1,5 +1,6 @@
 package com.zhaoshuo.localvideoplayer.player
 
+import androidx.media3.common.Player
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -139,5 +140,24 @@ class PlaybackSessionLogicTest {
         assertFalse(pausesAtEndOfItem(SleepChoice.Minutes(30)))
         assertFalse(pausesAtEndOfItem(SleepChoice.Off))
         assertEquals("14:05", formatSleepRemaining(845_000L))
+    }
+
+    @Test
+    fun pauseIconFollowsIntentAndClearsWhenPlaybackEnds() {
+        assertTrue(showsPauseIcon(playWhenReady = true, playbackState = Player.STATE_BUFFERING))
+        assertTrue(showsPauseIcon(playWhenReady = true, playbackState = Player.STATE_READY))
+        assertFalse(showsPauseIcon(playWhenReady = true, playbackState = Player.STATE_ENDED))
+        assertFalse(showsPauseIcon(playWhenReady = false, playbackState = Player.STATE_READY))
+        assertFalse(showsPauseIcon(playWhenReady = false, playbackState = Player.STATE_BUFFERING))
+    }
+
+    @Test
+    fun skipButtonsUseAnOpenEndAndNeedAKnownDuration() {
+        assertTrue(showSkipIntro(positionMs = 0L, introEndMs = 90_000L, isSeeking = false))
+        assertFalse(showSkipIntro(positionMs = 90_000L, introEndMs = 90_000L, isSeeking = false))
+        assertFalse(showSkipIntro(positionMs = 1_000L, introEndMs = 90_000L, isSeeking = true))
+        assertFalse(showSkipOutro(positionMs = 500_000L, outroStartMs = 480_000L, durationMs = 0L, isSeeking = false))
+        assertTrue(showSkipOutro(positionMs = 500_000L, outroStartMs = 480_000L, durationMs = 600_000L, isSeeking = false))
+        assertFalse(showSkipOutro(positionMs = 600_000L, outroStartMs = 480_000L, durationMs = 600_000L, isSeeking = false))
     }
 }

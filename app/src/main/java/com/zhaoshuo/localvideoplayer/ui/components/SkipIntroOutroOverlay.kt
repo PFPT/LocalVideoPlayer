@@ -34,7 +34,7 @@ fun SkipIntroOutroOverlay(
             exit = fadeOut(),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 20.dp, bottom = 96.dp),
+                .padding(end = 20.dp, bottom = 120.dp),
         ) {
             Text(
                 text = stringResource(R.string.skip_intro_action),
@@ -52,7 +52,7 @@ fun SkipIntroOutroOverlay(
             exit = fadeOut(),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 20.dp, bottom = 96.dp),
+                .padding(end = 20.dp, bottom = 120.dp),
         ) {
             Text(
                 text = stringResource(R.string.skip_outro_action),

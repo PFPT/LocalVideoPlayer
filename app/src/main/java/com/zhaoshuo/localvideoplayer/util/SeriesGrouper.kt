@@ -34,7 +34,7 @@ object SeriesGrouper {
     )
 
     fun groupVideos(videos: List<VideoItem>): List<VideoLibraryEntry> {
-        val parsed = videos.map { video ->
+        val parsed = dedupeLibraryVideos(videos).map { video ->
             val parsedTitle = TitleParser.parse(video.title)
             video.copy(
                 season = parsedTitle.season,

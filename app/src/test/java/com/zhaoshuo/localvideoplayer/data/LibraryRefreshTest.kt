@@ -55,6 +55,18 @@ class LibraryRefreshTest {
     }
 
     @Test
+    fun incrementalMergeDropsADownloadCopyOfTheSameFile() {
+        val existing = video(1, "Cool Show S01E01.mp4").copy(relativePath = "Download/Cool Show/")
+        val downloadCopy = video(9, "Cool Show S01E01.mp4").copy(
+            uri = Uri.parse("content://media/external/downloads/9"),
+            relativePath = "Download/Cool Show/",
+            durationMs = 0L,
+        )
+        val merged = mergeIncrementalVideos(listOf(existing), listOf(downloadCopy))
+        assertEquals(listOf(existing.uri), merged?.map { it.uri })
+    }
+
+    @Test
     fun missingMediaStoreIdIsRemoved() {
         val existing = listOf(
             video(1, "a.mp4"),

@@ -10,6 +10,7 @@ import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
 import com.zhaoshuo.localvideoplayer.player.PlaylistState
 import com.zhaoshuo.localvideoplayer.util.M3uPlaylistParser
 import com.zhaoshuo.localvideoplayer.util.SeriesGrouper
+import com.zhaoshuo.localvideoplayer.util.dedupeLibraryVideos
 import com.zhaoshuo.localvideoplayer.util.isM3u8Title
 
 class VideoRepository(private val context: Context) {
@@ -17,8 +18,9 @@ class VideoRepository(private val context: Context) {
     fun loadVideos(): List<VideoItem> {
         val fromVideo = queryVideos(selection = null, selectionArgs = null)
         val seen = fromVideo.mapTo(mutableSetOf()) { it.uri.toString() }
+        val fromDownloads = queryDownloadVideos(seen)
         val fromFiles = queryOrphanVideosByExtension(seen)
-        return if (fromFiles.isEmpty()) fromVideo else fromVideo + fromFiles
+        return dedupeLibraryVideos(fromVideo + fromDownloads + fromFiles)
     }
 
     fun loadVideoIds(): Set<Long>? {
@@ -37,6 +39,7 @@ class VideoRepository(private val context: Context) {
                     ids.add(it.getLong(idColumn))
                 }
             }
+            ids += queryDownloadVideoIds()
             ids += queryOrphanVideoFileIds()
             ids
         } catch (_: Exception) {
@@ -54,12 +57,13 @@ class VideoRepository(private val context: Context) {
         )
         val fromVideo = queryVideos(selection, selectionArgs)
         val seen = fromVideo.mapTo(mutableSetOf()) { it.uri.toString() }
+        val fromDownloads = queryDownloadVideos(seen, minDateAdded, minId)
         val fromFiles = queryOrphanVideosByExtension(
             seenUris = seen,
             minDateAdded = minDateAdded,
             minId = minId,
         )
-        return if (fromFiles.isEmpty()) fromVideo else fromVideo + fromFiles
+        return dedupeLibraryVideos(fromVideo + fromDownloads + fromFiles)
     }
 
     private fun queryVideos(selection: String?, selectionArgs: Array<String>?): List<VideoItem> {
@@ -131,6 +135,114 @@ class VideoRepository(private val context: Context) {
         }
 
         return videos
+    }
+
+    private fun queryDownloadVideos(
+        seenUris: MutableSet<String>,
+        minDateAdded: Long? = null,
+        minId: Long? = null,
+    ): List<VideoItem> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return emptyList()
+        val videos = mutableListOf<VideoItem>()
+        val incremental = minDateAdded != null && minId != null
+        val projection = arrayOf(
+            MediaStore.Downloads._ID,
+            MediaStore.Downloads.DISPLAY_NAME,
+            MediaStore.Downloads.MIME_TYPE,
+            MediaStore.Downloads.DATE_ADDED,
+            MediaStore.Downloads.DATE_MODIFIED,
+            MediaStore.Downloads.RELATIVE_PATH,
+            MediaStore.MediaColumns.IS_PENDING,
+        )
+        val selectionArgs = buildList {
+            addAll(VIDEO_EXTENSIONS.map { "%.$it" })
+            if (incremental) {
+                add(minDateAdded.toString())
+                add(minDateAdded.toString())
+                add(minId.toString())
+            }
+        }.toTypedArray()
+        try {
+            context.contentResolver.query(
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                projection,
+                downloadVideoSelection(incremental),
+                selectionArgs,
+                "${MediaStore.Downloads.DATE_ADDED} ASC, ${MediaStore.Downloads._ID} ASC",
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID)
+                val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DISPLAY_NAME)
+                val mimeColumn = cursor.getColumnIndex(MediaStore.Downloads.MIME_TYPE)
+                val dateAddedColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DATE_ADDED)
+                val dateModifiedColumn = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DATE_MODIFIED)
+                val relativePathColumn = cursor.getColumnIndex(MediaStore.Downloads.RELATIVE_PATH)
+                val pendingColumn = cursor.getColumnIndex(MediaStore.MediaColumns.IS_PENDING)
+                while (cursor.moveToNext()) {
+                    if (pendingColumn >= 0 && cursor.getInt(pendingColumn) == 1) continue
+                    val name = cursor.getString(nameColumn) ?: continue
+                    val mime = if (mimeColumn >= 0) cursor.getString(mimeColumn).orEmpty() else ""
+                    if (!FolderVideoScanner.isVideoFile(name, mime)) continue
+                    val id = cursor.getLong(idColumn)
+                    val contentUri = ContentUris.withAppendedId(
+                        MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                        id,
+                    )
+                    if (!seenUris.add(contentUri.toString())) continue
+                    val relativePath = if (relativePathColumn >= 0) {
+                        cursor.getString(relativePathColumn)
+                    } else {
+                        null
+                    }
+                    videos.add(
+                        VideoItem(
+                            id = id,
+                            uri = contentUri,
+                            title = name,
+                            durationMs = 0L,
+                            dateAdded = cursor.getLong(dateAddedColumn),
+                            dateModified = cursor.getLong(dateModifiedColumn),
+                            thumbnailUri = null,
+                            relativePath = relativePath,
+                            bucketName = leafBucketName(relativePath),
+                        ),
+                    )
+                }
+            }
+        } catch (_: Exception) {
+            return emptyList()
+        }
+        return videos
+    }
+
+    private fun queryDownloadVideoIds(): Set<Long> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return emptySet()
+        return queryDownloadVideos(mutableSetOf()).mapTo(mutableSetOf()) { it.id }
+    }
+
+    private fun downloadVideoSelection(incremental: Boolean): String {
+        val extensionClauses = VIDEO_EXTENSIONS.joinToString(" OR ") {
+            "${MediaStore.Downloads.DISPLAY_NAME} LIKE ?"
+        }
+        return buildString {
+            append("((")
+            append(MediaStore.Downloads.MIME_TYPE)
+            append(" LIKE 'video/%') OR ")
+            append(extensionClauses)
+            append(") AND (")
+            append(MediaStore.MediaColumns.IS_PENDING)
+            append(" = 0 OR ")
+            append(MediaStore.MediaColumns.IS_PENDING)
+            append(" IS NULL)")
+            if (incremental) {
+                append(" AND ((")
+                append(MediaStore.Downloads.DATE_ADDED)
+                append(" > ?) OR (")
+                append(MediaStore.Downloads.DATE_ADDED)
+                append(" = ? AND ")
+                append(MediaStore.Downloads._ID)
+                append(" > ?))")
+            }
+        }
     }
 
     private fun queryOrphanVideosByExtension(

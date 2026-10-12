@@ -205,6 +205,9 @@ class DownloadService : Service() {
             taskProgressSnapshots.remove(taskId)
             lastNotificationAt.remove(taskId)
             cancelTaskNotification(taskId)
+            if (manager.get(taskId)?.status == DownloadStatus.QUEUED) {
+                fillDownloadSlots()
+            }
         }
     }
 
@@ -536,13 +539,19 @@ class DownloadService : Service() {
                 }
                 return
             } catch (error: IOException) {
+                if (control.stopped || control.canceled) throw error
                 lastError = error
                 dest.delete()
                 onProgress(0)
-                attempt++
-                if (attempt < SEGMENT_MAX_RETRIES) {
-                    Thread.sleep(RETRY_BACKOFF_MS[attempt - 1])
-                }
+                val next = nextDownloadAttempt(
+                    stopped = false,
+                    canceled = false,
+                    attempt = attempt,
+                    maxAttempts = SEGMENT_MAX_RETRIES,
+                )
+                if (next == null) break
+                attempt = next
+                Thread.sleep(RETRY_BACKOFF_MS[attempt - 1])
             }
         }
         throw lastError ?: IOException(getString(R.string.download_failed))
@@ -785,11 +794,17 @@ class DownloadService : Service() {
                     return body.bytes()
                 }
             } catch (error: IOException) {
+                if (control.stopped || control.canceled) throw error
                 lastError = error
-                attempt++
-                if (attempt < SEGMENT_MAX_RETRIES) {
-                    Thread.sleep(RETRY_BACKOFF_MS[attempt - 1])
-                }
+                val next = nextDownloadAttempt(
+                    stopped = false,
+                    canceled = false,
+                    attempt = attempt,
+                    maxAttempts = SEGMENT_MAX_RETRIES,
+                )
+                if (next == null) break
+                attempt = next
+                Thread.sleep(RETRY_BACKOFF_MS[attempt - 1])
             }
         }
         throw lastError ?: IOException(getString(R.string.download_failed))
@@ -858,12 +873,18 @@ class DownloadService : Service() {
                 }
                 return
             } catch (error: IOException) {
+                if (control.stopped || control.canceled) throw error
                 lastError = error
                 partFile.delete()
-                attempt++
-                if (attempt < SEGMENT_MAX_RETRIES) {
-                    Thread.sleep(RETRY_BACKOFF_MS[attempt - 1])
-                }
+                val next = nextDownloadAttempt(
+                    stopped = false,
+                    canceled = false,
+                    attempt = attempt,
+                    maxAttempts = SEGMENT_MAX_RETRIES,
+                )
+                if (next == null) break
+                attempt = next
+                Thread.sleep(RETRY_BACKOFF_MS[attempt - 1])
             }
         }
         throw lastError ?: IOException(getString(R.string.download_failed))

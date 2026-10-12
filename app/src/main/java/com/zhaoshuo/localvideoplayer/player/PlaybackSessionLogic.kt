@@ -1,5 +1,7 @@
 package com.zhaoshuo.localvideoplayer.player
 
+import androidx.media3.common.Player
+
 enum class PlaybackOpenAction {
     Reuse,
     Replace,
@@ -93,4 +95,26 @@ fun formatSleepRemaining(remainingMs: Long): String {
     val minutes = totalSeconds / 60L
     val seconds = totalSeconds % 60L
     return "%d:%02d".format(minutes, seconds)
+}
+
+fun showsPauseIcon(playWhenReady: Boolean, playbackState: Int): Boolean {
+    return playWhenReady && playbackState != Player.STATE_ENDED
+}
+
+fun showSkipIntro(positionMs: Long, introEndMs: Long, isSeeking: Boolean): Boolean {
+    return introEndMs > 0L && !isSeeking && positionMs >= 0L && positionMs < introEndMs
+}
+
+fun showSkipOutro(
+    positionMs: Long,
+    outroStartMs: Long,
+    durationMs: Long,
+    isSeeking: Boolean,
+): Boolean {
+    return outroStartMs >= 0L &&
+        durationMs > 0L &&
+        outroStartMs < durationMs &&
+        !isSeeking &&
+        positionMs >= outroStartMs &&
+        positionMs < durationMs
 }

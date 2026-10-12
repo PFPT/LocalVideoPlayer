@@ -43,6 +43,30 @@ class SeriesGrouperTest {
         assertEquals(1, playlist.currentIndex)
     }
 
+    @Test
+    fun duplicateFilesDoNotDoubleTheEpisodeCount() {
+        val path = "Download/Cool Show/"
+        val videos = listOf(
+            video(1, "Cool Show S01E01.mp4").copy(relativePath = path),
+            video(2, "Cool Show S01E02.mp4").copy(relativePath = path),
+            video(11, "Cool Show S01E01.mp4").copy(
+                uri = Uri.parse("content://media/external/downloads/11"),
+                relativePath = path,
+                durationMs = 0L,
+            ),
+            video(12, "Cool Show S01E02.mp4").copy(
+                uri = Uri.parse("content://media/external/downloads/12"),
+                relativePath = path,
+                durationMs = 0L,
+            ),
+        )
+        val series = SeriesGrouper.groupVideos(videos)
+            .filterIsInstance<VideoLibraryEntry.Series>()
+            .filter { it.series.groupKind == SeriesGroupKind.EPISODE }
+        assertEquals(1, series.size)
+        assertEquals(2, series.single().series.episodes.size)
+    }
+
     private fun video(id: Long, title: String): VideoItem {
         return VideoItem(
             id = id,

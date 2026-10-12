@@ -33,8 +33,7 @@ fun buildExoPlayer(
         }
     }
     val safeIndex = startIndex.coerceIn(0, (playlist.size - 1).coerceAtLeast(0))
-    val startVideo = playlist.getOrNull(safeIndex)
-    val useCbr = startVideo != null && needsConstantBitrateSeeking(context, startVideo)
+    val useCbr = playlist.any { needsConstantBitrateSeeking(context, it) }
     val mediaSourceFactory = if (useCbr) {
         DefaultMediaSourceFactory(
             context,

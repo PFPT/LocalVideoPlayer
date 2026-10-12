@@ -108,15 +108,19 @@ class VideoDurationResolver(
         }
     }
 
-    suspend fun resolveAll(videos: List<VideoItem>): Map<String, Long> {
+    suspend fun resolveAll(
+        videos: List<VideoItem>,
+        onPartial: (suspend (Map<String, Long>) -> Unit)? = null,
+    ): Map<String, Long> {
         if (videos.isEmpty()) return emptyMap()
         return withContext(Dispatchers.IO) {
             ensureCacheLoaded()
             disguisedFlags.clear()
             try {
                 coroutineScope {
+                    val ordered = videos.sortedByDescending { it.dateAdded }
                     val semaphore = Semaphore(PARALLELISM)
-                    val fast = videos.map { video ->
+                    val fast = ordered.map { video ->
                         async {
                             semaphore.withPermit {
                                 video.uri.toString() to readFastDurationMs(video)
@@ -125,7 +129,7 @@ class VideoDurationResolver(
                     }.awaitAll()
                     val resolved = LinkedHashMap<String, Long>()
                     val needPlayer = mutableListOf<VideoItem>()
-                    videos.forEachIndexed { index, video ->
+                    ordered.forEachIndexed { index, video ->
                         val duration = fast[index].second
                         if (duration > 0L) {
                             resolved[video.uri.toString()] = duration
@@ -133,6 +137,10 @@ class VideoDurationResolver(
                             needPlayer += video
                         }
                     }
+                    if (resolved.isNotEmpty()) {
+                        onPartial?.invoke(resolved.toMap())
+                    }
+                    var pendingBatch = LinkedHashMap<String, Long>()
                     for (video in needPlayer) {
                         coroutineContext.ensureActive()
                         if (isProbeFailedRecently(video.uri.toString(), video.dateModified)) continue
@@ -148,9 +156,17 @@ class VideoDurationResolver(
                             clearProbeFailure(video.uri.toString(), video.dateModified)
                             cache.put(video.uri.toString(), video.dateModified, duration)
                             resolved[video.uri.toString()] = duration
+                            pendingBatch[video.uri.toString()] = duration
+                            if (pendingBatch.size >= PLAYER_PARTIAL_BATCH) {
+                                onPartial?.invoke(pendingBatch.toMap())
+                                pendingBatch = LinkedHashMap()
+                            }
                         } else {
                             markProbeFailed(video.uri.toString(), video.dateModified)
                         }
+                    }
+                    if (pendingBatch.isNotEmpty()) {
+                        onPartial?.invoke(pendingBatch.toMap())
                     }
                     cache.save()
                     resolved
@@ -398,6 +414,7 @@ class VideoDurationResolver(
 
     companion object {
         private const val PARALLELISM = 4
+        private const val PLAYER_PARTIAL_BATCH = 3
         private const val PROBE_TIMEOUT_MS = 12_000L
         private const val PROBE_FAILURE_TTL_MS = 30 * 60_000L
         private const val PROBE_QUEUE_TIMEOUT_MS = 5_000L

@@ -18,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,6 +43,8 @@ fun PlayerMoreSheet(
     isFavorite: Boolean,
     skipIntroSeconds: Int,
     skipOutroSeconds: Int,
+    bindsSeriesSkip: Boolean,
+    seriesSkipCustomized: Boolean,
     subtitleTextSize: SubtitleTextSize,
     subtitleYellow: Boolean,
     subtitleDelayMs: Int,
@@ -61,6 +64,7 @@ fun PlayerMoreSheet(
     onCast: () -> Unit,
     onSkipIntroSecondsChange: (Int) -> Unit,
     onSkipOutroSecondsChange: (Int) -> Unit,
+    onFollowGlobalSkip: () -> Unit,
     onSubtitleTextSize: (SubtitleTextSize) -> Unit,
     onSubtitleYellowToggle: () -> Unit,
     onSubtitleDelayChange: (Int) -> Unit,
@@ -249,7 +253,11 @@ fun PlayerMoreSheet(
                     color = theme.onSurfaceMuted,
                 )
                 Text(
-                    text = stringResource(R.string.skip_intro_seconds) + " · ${skipIntroSeconds}s",
+                    text = if (bindsSeriesSkip) {
+                        stringResource(R.string.skip_intro_series, skipIntroSeconds)
+                    } else {
+                        stringResource(R.string.skip_intro_seconds) + " · ${skipIntroSeconds}s"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Slider(
@@ -258,7 +266,11 @@ fun PlayerMoreSheet(
                     valueRange = 0f..180f,
                 )
                 Text(
-                    text = stringResource(R.string.skip_outro_seconds) + " · ${skipOutroSeconds}s",
+                    text = if (bindsSeriesSkip) {
+                        stringResource(R.string.skip_outro_series, skipOutroSeconds)
+                    } else {
+                        stringResource(R.string.skip_outro_seconds) + " · ${skipOutroSeconds}s"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Slider(
@@ -266,6 +278,11 @@ fun PlayerMoreSheet(
                     onValueChange = { onSkipOutroSecondsChange(it.toInt()) },
                     valueRange = 0f..180f,
                 )
+                if (bindsSeriesSkip && seriesSkipCustomized) {
+                    TextButton(onClick = onFollowGlobalSkip) {
+                        Text(stringResource(R.string.skip_follow_global))
+                    }
+                }
                 Text(
                     text = stringResource(R.string.subtitle_size),
                     style = MaterialTheme.typography.bodyMedium,

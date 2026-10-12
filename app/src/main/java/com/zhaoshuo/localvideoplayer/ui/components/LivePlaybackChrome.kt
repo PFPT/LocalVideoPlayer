@@ -13,6 +13,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zhaoshuo.localvideoplayer.cast.LocalCastManager
 import com.zhaoshuo.localvideoplayer.player.PlayerProgressState
+import com.zhaoshuo.localvideoplayer.player.showSkipIntro
+import com.zhaoshuo.localvideoplayer.player.showSkipOutro
 import com.zhaoshuo.localvideoplayer.ui.PlayerUiState
 import com.zhaoshuo.localvideoplayer.util.SeekPreviewFrames
 import kotlinx.coroutines.delay
@@ -127,24 +129,20 @@ fun LiveSkipIntroOutro(
 ) {
     val castPositionMs = rememberCastPositionMs()
     if (isCasting) return
-    val positionMs = if (ui.controlsVisible || ui.isSeeking) {
-        playbackDisplayPositionMs(
+    val positionMs = when {
+        ui.isSeeking -> ui.previewPositionMs
+        ui.controlsVisible -> playbackDisplayPositionMs(
             progress = progress,
             ui = ui,
             isCasting = false,
             castPositionMs = castPositionMs,
         )
-    } else {
-        ui.hiddenPlaybackPositionMs
+        ui.skipPositionReady -> ui.hiddenPlaybackPositionMs
+        else -> -1L
     }
-    val showSkipIntro = introEndMs > 0L && !ui.isSeeking && positionMs in 0L..introEndMs
-    val showSkipOutro = outroStartMs >= 0L &&
-        !ui.isSeeking &&
-        durationMs > 0L &&
-        positionMs >= outroStartMs
     SkipIntroOutroOverlay(
-        showSkipIntro = showSkipIntro,
-        showSkipOutro = showSkipOutro,
+        showSkipIntro = showSkipIntro(positionMs, introEndMs, ui.isSeeking),
+        showSkipOutro = showSkipOutro(positionMs, outroStartMs, durationMs, ui.isSeeking),
         onSkipIntro = onSkipIntro,
         onSkipOutro = onSkipOutro,
     )

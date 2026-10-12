@@ -188,16 +188,6 @@ fun PortraitPlayerLayout(
                     volumeFraction = volumeFraction,
                 )
                 SpeedBoostOverlay(visible = isSpeedBoosted)
-                LiveSkipIntroOutro(
-                    progress = progress,
-                    ui = ui,
-                    isCasting = isCasting,
-                    introEndMs = introEndMs,
-                    outroStartMs = outroStartMs,
-                    durationMs = durationMs,
-                    onSkipIntro = onSkipIntro,
-                    onSkipOutro = onSkipOutro,
-                )
                 androidx.compose.animation.AnimatedVisibility(
                     visible = showChrome,
                     enter = fadeIn(),
@@ -254,6 +244,16 @@ fun PortraitPlayerLayout(
                         )
                     }
                 }
+                LiveSkipIntroOutro(
+                    progress = progress,
+                    ui = ui,
+                    isCasting = isCasting,
+                    introEndMs = introEndMs,
+                    outroStartMs = outroStartMs,
+                    durationMs = durationMs,
+                    onSkipIntro = onSkipIntro,
+                    onSkipOutro = onSkipOutro,
+                )
                 LiveSeekPreview(
                     ui = ui,
                     durationMs = durationMs,

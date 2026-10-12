@@ -47,7 +47,7 @@ object PlayerSession {
 
     fun togglePlayPause() {
         val current = player ?: return
-        if (current.isPlaying) {
+        if (showsPauseIcon(current.playWhenReady, current.playbackState)) {
             current.pause()
         } else {
             current.play()
@@ -60,7 +60,8 @@ object PlayerSession {
     }
 
     fun isPlaying(): Boolean {
-        return player?.isPlaying == true
+        val current = player ?: return false
+        return showsPauseIcon(current.playWhenReady, current.playbackState)
     }
 
     fun currentMediaItemIndex(): Int {

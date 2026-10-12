@@ -164,7 +164,11 @@ class PlaybackSession(
 
     fun togglePlayPause() {
         val current = player ?: return
-        if (current.isPlaying) current.pause() else current.play()
+        if (showsPauseIcon(current.playWhenReady, current.playbackState)) {
+            current.pause()
+        } else {
+            current.play()
+        }
         publish()
     }
 
@@ -226,6 +230,10 @@ class PlaybackSession(
     private fun install(created: ExoPlayer) {
         val playbackListener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                publish()
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
                 publish()
             }
 
@@ -411,7 +419,9 @@ class PlaybackSession(
             active = current != null && !stopping,
             onPlayerScreen = onPlayerScreen,
             title = playlist.getOrNull(index)?.title.orEmpty(),
-            isPlaying = current?.isPlaying == true && !stopping,
+            isPlaying = current != null &&
+                !stopping &&
+                showsPauseIcon(current.playWhenReady, current.playbackState),
             sleepChoice = sleepChoice,
         )
     }

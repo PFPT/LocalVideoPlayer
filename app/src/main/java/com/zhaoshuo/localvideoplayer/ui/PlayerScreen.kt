@@ -74,6 +74,7 @@ import com.zhaoshuo.localvideoplayer.player.applyTrackSelection
 import com.zhaoshuo.localvideoplayer.player.abLoopTarget
 import com.zhaoshuo.localvideoplayer.player.episodeStartPositionMs
 import com.zhaoshuo.localvideoplayer.player.seekTargetMs
+import com.zhaoshuo.localvideoplayer.player.showsPauseIcon
 import com.zhaoshuo.localvideoplayer.player.isSoftwareDecodeRetryable
 import com.zhaoshuo.localvideoplayer.player.isSourceReadFailure
 import com.zhaoshuo.localvideoplayer.player.rememberPlayerProgressState
@@ -541,7 +542,7 @@ private fun PlayerScreenContent(
         if (pipSupported) {
             activity?.enterPipMode(
                 hasNext = ui.currentIndex < playlist.lastIndex,
-                isPlaying = exoPlayer.isPlaying,
+                isPlaying = showsPauseIcon(exoPlayer.playWhenReady, exoPlayer.playbackState),
                 aspectRatio = currentPipAspectRatio(),
             )
         } else {
@@ -581,6 +582,20 @@ private fun PlayerScreenContent(
         ui.showDoubleTapSeek = true
     }
 
+    fun togglePlayback() {
+        if (isCasting) {
+            if (castManager?.playback?.isPlaying?.value == true) {
+                castManager.playback.pause()
+            } else {
+                castManager?.playback?.play()
+            }
+        } else if (showsPauseIcon(exoPlayer.playWhenReady, exoPlayer.playbackState)) {
+            exoPlayer.pause()
+        } else {
+            exoPlayer.play()
+        }
+    }
+
     fun handleDoubleTap(offset: Offset, width: Float) {
         if (ui.controlsLocked) return
         if (ui.videoScale > 1f) {
@@ -588,14 +603,14 @@ private fun PlayerScreenContent(
             return
         }
         if (!preferences.gestureDoubleTapSeek) {
-            if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+            togglePlayback()
             return
         }
         val ratio = offset.x / width.coerceAtLeast(1f)
         when {
             ratio < 0.33f -> seekBy(-DOUBLE_TAP_SEEK_MS)
             ratio > 0.67f -> seekBy(DOUBLE_TAP_SEEK_MS)
-            else -> if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+            else -> togglePlayback()
         }
     }
 
@@ -686,12 +701,12 @@ private fun PlayerScreenContent(
         val pipActionListener: () -> Unit = {
             progress.syncFromPlayer(exoPlayer)
             ui.currentIndex = exoPlayer.currentMediaItemIndex
-            ui.isPlaying = exoPlayer.isPlaying
+            ui.isPlaying = showsPauseIcon(exoPlayer.playWhenReady, exoPlayer.playbackState)
             updateVideoFormat()
             if (activity?.isInPipMode == true) {
                 activity.updatePipActions(
                     hasNext = exoPlayer.currentMediaItemIndex < playlist.lastIndex,
-                    isPlaying = exoPlayer.isPlaying,
+                    isPlaying = ui.isPlaying,
                     aspectRatio = currentPipAspectRatio(),
                 )
             }
@@ -753,11 +768,12 @@ private fun PlayerScreenContent(
         }
 
         val listener = object : Player.Listener {
-            override fun onIsPlayingChanged(playing: Boolean) {
-                ui.isPlaying = playing
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                ui.isPlaying = showsPauseIcon(playWhenReady, exoPlayer.playbackState)
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
+                ui.isPlaying = showsPauseIcon(exoPlayer.playWhenReady, playbackState)
                 if (playbackState == Player.STATE_READY) {
                     ui.playbackFailure = null
                     ui.softDecodeRetryPending = false
@@ -780,6 +796,7 @@ private fun PlayerScreenContent(
                 }
                 ui.currentIndex = index
                 ui.playbackFailure = null
+                ui.hiddenPlaybackPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
                 progress.resetForNewItem()
                 val knownDuration = playlist.getOrNull(index)?.durationMs ?: 0L
                 if (knownDuration > 0L) {
@@ -795,6 +812,7 @@ private fun PlayerScreenContent(
             }
         }
         ui.softDecodeRetryPending = false
+        ui.isPlaying = showsPauseIcon(exoPlayer.playWhenReady, exoPlayer.playbackState)
         exoPlayer.addListener(listener)
         exoPlayer.playerError?.let(::handlePlayerError)
         progress.syncFromPlayer(exoPlayer)
@@ -947,6 +965,26 @@ private fun PlayerScreenContent(
             Toast.makeText(context, context.getString(R.string.series_intro_cleared), Toast.LENGTH_SHORT).show()
         }
     }
+    fun rememberSkipPosition(positionMs: Long) {
+        progress.currentPositionMs = positionMs
+        ui.hiddenPlaybackPositionMs = positionMs
+        ui.skipPositionReady = true
+    }
+    fun skipIntro() {
+        if (isCasting) return
+        val position = effectiveIntroSeconds * 1_000L
+        exoPlayer.seekTo(position)
+        rememberSkipPosition(position)
+    }
+    fun skipOutro() {
+        if (isCasting) return
+        if (hasNext) {
+            playAdjacentEpisode(1, markCurrentComplete = true)
+        } else if (displayDurationMs > 0L) {
+            exoPlayer.seekTo(displayDurationMs)
+            rememberSkipPosition(displayDurationMs)
+        }
+    }
     fun clearSeriesOutro() {
         val key = seriesKey ?: return
         scope.launch {
@@ -964,17 +1002,20 @@ private fun PlayerScreenContent(
         null
     }
     val useLandscapeLayout = ui.isLandscape || ui.isFullscreen
-    LaunchedEffect(exoPlayer, ui.controlsVisible, effectiveIntroSeconds, effectiveOutroSeconds) {
-        val trackWhileHidden = !ui.controlsVisible &&
-            (effectiveIntroSeconds > 0 || effectiveOutroSeconds > 0)
-        if (!trackWhileHidden) return@LaunchedEffect
+    val showsPause = if (isCasting) castPlaying else ui.isPlaying
+    LaunchedEffect(exoPlayer, effectiveIntroSeconds, effectiveOutroSeconds) {
+        if (effectiveIntroSeconds <= 0 && effectiveOutroSeconds <= 0) {
+            ui.skipPositionReady = false
+            return@LaunchedEffect
+        }
         while (true) {
             ui.hiddenPlaybackPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
-            delay(1_000)
+            ui.skipPositionReady = true
+            delay(250)
         }
     }
-    LaunchedEffect(ui.controlsVisible, ui.isPlaying, ui.isSeeking, useLandscapeLayout, ui.controlsLocked, ui.isAdjustingBrightness, ui.isAdjustingVolume, ui.isFullscreen) {
-        if (ui.controlsVisible && !ui.isSeeking && !ui.isAdjustingBrightness && !ui.isAdjustingVolume && (ui.controlsLocked || ui.isPlaying)) {
+    LaunchedEffect(ui.controlsVisible, showsPause, ui.isSeeking, useLandscapeLayout, ui.controlsLocked, ui.isAdjustingBrightness, ui.isAdjustingVolume, ui.isFullscreen) {
+        if (ui.controlsVisible && !ui.isSeeking && !ui.isAdjustingBrightness && !ui.isAdjustingVolume && (ui.controlsLocked || showsPause)) {
             delay(3000)
             ui.controlsVisible = false
         }
@@ -984,11 +1025,11 @@ private fun PlayerScreenContent(
         updateFullscreenSystemBars()
     }
 
-    LaunchedEffect(ui.isInPipMode, ui.isPlaying, hasNext, ui.currentIndex, ui.videoWidth, ui.videoHeight) {
+    LaunchedEffect(ui.isInPipMode, showsPause, hasNext, ui.currentIndex, ui.videoWidth, ui.videoHeight) {
         if (ui.isInPipMode) {
             activity?.updatePipActions(
                 hasNext = hasNext,
-                isPlaying = ui.isPlaying,
+                isPlaying = showsPause,
                 aspectRatio = currentPipAspectRatio(),
             )
         }
@@ -1033,8 +1074,10 @@ private fun PlayerScreenContent(
             shuffleEnabled = preferences.shuffleEnabled,
             softDecodeEnabled = ui.appliedSoftDecode,
             isFavorite = isFavorite,
-            skipIntroSeconds = preferences.skipIntroSeconds,
-            skipOutroSeconds = preferences.skipOutroSeconds,
+            skipIntroSeconds = effectiveIntroSeconds,
+            skipOutroSeconds = effectiveOutroSeconds,
+            bindsSeriesSkip = !seriesKey.isNullOrBlank(),
+            seriesSkipCustomized = seriesSkip.hasAny,
             subtitleTextSize = preferences.subtitleTextSize,
             subtitleYellow = preferences.subtitleYellow,
             subtitleDelayMs = preferences.subtitleDelayMs,
@@ -1086,10 +1129,28 @@ private fun PlayerScreenContent(
                 castSheet.open()
             },
             onSkipIntroSecondsChange = { seconds ->
-                scope.launch { playerPreferencesStore.setSkipIntroSeconds(seconds) }
+                scope.launch {
+                    val key = seriesKey
+                    if (key.isNullOrBlank()) {
+                        playerPreferencesStore.setSkipIntroSeconds(seconds)
+                    } else {
+                        seriesSkipStore.setIntroSeconds(key, seconds)
+                    }
+                }
             },
             onSkipOutroSecondsChange = { seconds ->
-                scope.launch { playerPreferencesStore.setSkipOutroSeconds(seconds) }
+                scope.launch {
+                    val key = seriesKey
+                    if (key.isNullOrBlank()) {
+                        playerPreferencesStore.setSkipOutroSeconds(seconds)
+                    } else {
+                        seriesSkipStore.setOutroSeconds(key, seconds)
+                    }
+                }
+            },
+            onFollowGlobalSkip = {
+                val key = seriesKey ?: return@PlayerMoreSheet
+                scope.launch { seriesSkipStore.clear(key) }
             },
             onSubtitleTextSize = { size ->
                 scope.launch { playerPreferencesStore.setSubtitleTextSize(size) }
@@ -1214,7 +1275,7 @@ private fun PlayerScreenContent(
                     isFullscreen = ui.isFullscreen,
                     title = currentTitle,
                     resolution = resolution,
-                    isPlaying = ui.isPlaying,
+                    isPlaying = showsPause,
                     playbackSpeed = ui.playbackSpeed,
                     repeatOne = ui.repeatOne,
                     isSpeedBoosted = ui.isSpeedBoosted,
@@ -1269,17 +1330,7 @@ private fun PlayerScreenContent(
                     onBack = ::handleBack,
                     onPlayPauseClick = {
                         ui.resetControlsTimer()
-                        if (isCasting) {
-                            if (castManager?.playback?.isPlaying?.value == true) {
-                                castManager.playback.pause()
-                            } else {
-                                castManager?.playback?.play()
-                            }
-                        } else if (exoPlayer.isPlaying) {
-                            exoPlayer.pause()
-                        } else {
-                            exoPlayer.play()
-                        }
+                        togglePlayback()
                     },
                     onPreviousClick = {
                         ui.resetControlsTimer()
@@ -1327,20 +1378,8 @@ private fun PlayerScreenContent(
                         ui.resetControlsTimer()
                         ui.showMoreSheet = true
                     },
-                    onSkipIntro = {
-                        if (isCasting) return@LandscapePlayerContent
-                        val position = effectiveIntroSeconds * 1_000L
-                        exoPlayer.seekTo(position)
-                        progress.currentPositionMs = position
-                    },
-                    onSkipOutro = {
-                        if (isCasting) return@LandscapePlayerContent
-                        if (hasNext) {
-                            playAdjacentEpisode(1, markCurrentComplete = true)
-                        } else {
-                            exoPlayer.seekTo(displayDurationMs)
-                        }
-                    },
+                    onSkipIntro = ::skipIntro,
+                    onSkipOutro = ::skipOutro,
                     pipSupported = pipSupported,
                     onPipClick = ::handlePipClick,
                     onFullscreenClick = ::handleFullscreenToggleClick,
@@ -1365,7 +1404,7 @@ private fun PlayerScreenContent(
                         controlsVisible = ui.controlsVisible,
                         episodes = playlist,
                         currentIndex = ui.currentIndex,
-                        isPlaying = ui.isPlaying,
+                        isPlaying = showsPause,
                         hasPrevious = hasPrevious,
                         hasNext = hasNext,
                         canEditSeriesSkip = canEditSeriesSkip && !isCasting,
@@ -1408,17 +1447,7 @@ private fun PlayerScreenContent(
                         onVideoTap = { ui.toggleControlsVisibility() },
                         onPlayPauseClick = {
                             ui.resetControlsTimer()
-                            if (isCasting) {
-                                if (castManager?.playback?.isPlaying?.value == true) {
-                                    castManager.playback.pause()
-                                } else {
-                                    castManager?.playback?.play()
-                                }
-                            } else if (exoPlayer.isPlaying) {
-                                exoPlayer.pause()
-                            } else {
-                                exoPlayer.play()
-                            }
+                            togglePlayback()
                         },
                         onPreviousClick = {
                             ui.resetControlsTimer()
@@ -1455,20 +1484,8 @@ private fun PlayerScreenContent(
                             scope.launch { playerPreferencesStore.setRepeatOne(ui.repeatOne) }
                         },
                         onMoreClick = { ui.showMoreSheet = true },
-                        onSkipIntro = {
-                            if (isCasting) return@PortraitPlayerContent
-                            val position = effectiveIntroSeconds * 1_000L
-                            exoPlayer.seekTo(position)
-                            progress.currentPositionMs = position
-                        },
-                        onSkipOutro = {
-                            if (isCasting) return@PortraitPlayerContent
-                            if (hasNext) {
-                                playAdjacentEpisode(1, markCurrentComplete = true)
-                            } else {
-                                exoPlayer.seekTo(displayDurationMs)
-                            }
-                        },
+                        onSkipIntro = ::skipIntro,
+                        onSkipOutro = ::skipOutro,
                         onVideoDoubleTap = ::handleDoubleTap,
                         onFullscreenClick = ::enterLandscapeFullscreen,
                         contentScale = ui.aspectRatioMode.contentScale,
@@ -1676,16 +1693,6 @@ private fun LandscapePlayerContent(
                 frameAspectRatio = frameAspectRatio,
                 useTextureView = useTextureView,
             )
-            LiveSkipIntroOutro(
-                progress = progress,
-                ui = ui,
-                isCasting = isCasting,
-                introEndMs = introEndMs,
-                outroStartMs = outroStartMs,
-                durationMs = durationMs,
-                onSkipIntro = onSkipIntro,
-                onSkipOutro = onSkipOutro,
-            )
         }
     }
 
@@ -1745,6 +1752,16 @@ private fun LandscapePlayerContent(
         onMoreClick = onMoreClick,
         modifier = Modifier.fillMaxSize(),
     )
+        LiveSkipIntroOutro(
+            progress = progress,
+            ui = ui,
+            isCasting = isCasting,
+            introEndMs = introEndMs,
+            outroStartMs = outroStartMs,
+            durationMs = durationMs,
+            onSkipIntro = onSkipIntro,
+            onSkipOutro = onSkipOutro,
+        )
         LiveSeekPreview(
             ui = ui,
             durationMs = durationMs,

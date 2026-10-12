@@ -166,7 +166,8 @@ fun LocalVideoPlayerApp(
         downloadManager.tasks.collect { tasks ->
             val completed = tasks.filter { it.status.name == "COMPLETED" }.map { it.id }.toSet()
             if (hasPermission && (completed - knownCompleted).isNotEmpty()) {
-                libraryViewModel.refresh()
+                libraryViewModel.invalidateFolderCache()
+                libraryViewModel.refresh(incrementalPreferred = true)
             }
             knownCompleted = completed
         }

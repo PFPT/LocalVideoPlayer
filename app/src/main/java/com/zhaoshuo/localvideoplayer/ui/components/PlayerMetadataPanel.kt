@@ -113,7 +113,7 @@ fun PlayerMetadataPanel(
             ) {
                 itemsIndexed(
                     items = episodes,
-                    key = { _, episode -> episode.id },
+                    key = { _, episode -> episode.uri.toString() },
                 ) { index, episode ->
                     EpisodeListItem(
                         episode = episode,

@@ -176,6 +176,9 @@
     <string name="skip_outro_action">跳过片尾</string>
     <string name="skip_intro_seconds">片头时长（秒）</string>
     <string name="skip_outro_seconds">片尾时长（秒）</string>
+    <string name="skip_intro_series">本剧片头 · %1$d秒</string>
+    <string name="skip_outro_series">本剧片尾 · %1$d秒</string>
+    <string name="skip_follow_global">跟随全局</string>
     <string name="series_intro_saved">已保存本剧片头 %1$d 秒</string>
     <string name="series_outro_saved">已保存本剧片尾 %1$d 秒</string>
     <string name="series_skip_invalid">当前位置无效，无法设置</string>

@@ -48,6 +48,7 @@ class PlayerUiState(
     var previewPositionMs by mutableLongStateOf(0L)
     var seekStartPositionMs by mutableLongStateOf(0L)
     var hiddenPlaybackPositionMs by mutableLongStateOf(0L)
+    var skipPositionReady by mutableStateOf(false)
     var repeatOne by mutableStateOf(initialRepeatOne)
     var aspectRatioMode by mutableStateOf(initialAspect)
     var showAspectSheet by mutableStateOf(false)
