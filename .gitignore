@@ -31,3 +31,4 @@ out/
 *.jks
 *.keystore
 !debug.keystore
+keystore.properties
