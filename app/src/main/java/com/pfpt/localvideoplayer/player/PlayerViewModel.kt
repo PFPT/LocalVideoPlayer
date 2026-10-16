@@ -1,10 +1,10 @@
-package com.zhaoshuo.localvideoplayer.player
+package com.pfpt.localvideoplayer.player
 
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.zhaoshuo.localvideoplayer.data.PlaybackStore
-import com.zhaoshuo.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.data.PlaybackStore
+import com.pfpt.localvideoplayer.model.VideoItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

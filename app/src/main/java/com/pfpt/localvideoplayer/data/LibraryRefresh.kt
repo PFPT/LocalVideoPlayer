@@ -1,13 +1,13 @@
-package com.zhaoshuo.localvideoplayer.data
+package com.pfpt.localvideoplayer.data
 
-import com.zhaoshuo.localvideoplayer.model.SeriesGroupKind
-import com.zhaoshuo.localvideoplayer.model.VideoItem
-import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
-import com.zhaoshuo.localvideoplayer.model.VideoSeries
-import com.zhaoshuo.localvideoplayer.util.SeriesGrouper
-import com.zhaoshuo.localvideoplayer.util.TitleParser
-import com.zhaoshuo.localvideoplayer.util.dedupeLibraryVideos
-import com.zhaoshuo.localvideoplayer.util.isM3u8Title
+import com.pfpt.localvideoplayer.model.SeriesGroupKind
+import com.pfpt.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.model.VideoLibraryEntry
+import com.pfpt.localvideoplayer.model.VideoSeries
+import com.pfpt.localvideoplayer.util.SeriesGrouper
+import com.pfpt.localvideoplayer.util.TitleParser
+import com.pfpt.localvideoplayer.util.dedupeLibraryVideos
+import com.pfpt.localvideoplayer.util.isM3u8Title
 
 fun keepKnownDurations(existing: List<VideoItem>, incoming: List<VideoItem>): List<VideoItem> {
     if (existing.isEmpty() || incoming.isEmpty()) return incoming

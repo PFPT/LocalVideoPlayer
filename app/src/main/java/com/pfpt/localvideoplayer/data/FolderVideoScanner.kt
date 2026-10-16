@@ -1,9 +1,9 @@
-package com.zhaoshuo.localvideoplayer.data
+package com.pfpt.localvideoplayer.data
 
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
-import com.zhaoshuo.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.model.VideoItem
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.coroutineScope
 import java.io.File

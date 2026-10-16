@@ -1,6 +1,6 @@
-package com.zhaoshuo.localvideoplayer.player
+package com.pfpt.localvideoplayer.player
 
-import com.zhaoshuo.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.model.VideoItem
 
 data class PlaylistState(
     val items: List<VideoItem>,

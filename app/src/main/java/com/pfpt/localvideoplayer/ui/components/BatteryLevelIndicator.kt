@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import android.content.BroadcastReceiver
 import android.content.Context

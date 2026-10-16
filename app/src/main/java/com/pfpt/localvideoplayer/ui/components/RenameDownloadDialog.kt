@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,9 +16,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.download.DownloadNameResolver
-import com.zhaoshuo.localvideoplayer.download.DownloadTask
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.download.DownloadNameResolver
+import com.pfpt.localvideoplayer.download.DownloadTask
 
 @Composable
 fun RenameDownloadDialog(

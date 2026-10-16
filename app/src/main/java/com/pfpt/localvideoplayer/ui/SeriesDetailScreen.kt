@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui
+package com.pfpt.localvideoplayer.ui
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -33,18 +33,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.data.HiddenVideosStore
-import com.zhaoshuo.localvideoplayer.data.PlayCountStore
-import com.zhaoshuo.localvideoplayer.data.PlaybackStore
-import com.zhaoshuo.localvideoplayer.data.VideoRepository
-import com.zhaoshuo.localvideoplayer.model.VideoSeries
-import com.zhaoshuo.localvideoplayer.player.PlaylistState
-import com.zhaoshuo.localvideoplayer.ui.components.DeleteVideoDialog
-import com.zhaoshuo.localvideoplayer.ui.components.EpisodeListItem
-import com.zhaoshuo.localvideoplayer.ui.components.LumenListHeader
-import com.zhaoshuo.localvideoplayer.ui.components.SelectionTopBar
-import com.zhaoshuo.localvideoplayer.ui.components.rememberPlaybackProgress
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.data.HiddenVideosStore
+import com.pfpt.localvideoplayer.data.PlayCountStore
+import com.pfpt.localvideoplayer.data.PlaybackStore
+import com.pfpt.localvideoplayer.data.VideoRepository
+import com.pfpt.localvideoplayer.model.VideoSeries
+import com.pfpt.localvideoplayer.player.PlaylistState
+import com.pfpt.localvideoplayer.ui.components.DeleteVideoDialog
+import com.pfpt.localvideoplayer.ui.components.EpisodeListItem
+import com.pfpt.localvideoplayer.ui.components.LumenListHeader
+import com.pfpt.localvideoplayer.ui.components.SelectionTopBar
+import com.pfpt.localvideoplayer.ui.components.rememberPlaybackProgress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

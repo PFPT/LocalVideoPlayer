@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.theme
+package com.pfpt.localvideoplayer.ui.theme
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp

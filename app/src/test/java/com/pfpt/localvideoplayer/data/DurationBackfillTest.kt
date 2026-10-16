@@ -1,7 +1,7 @@
-package com.zhaoshuo.localvideoplayer.data
+package com.pfpt.localvideoplayer.data
 
 import android.net.Uri
-import com.zhaoshuo.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.model.VideoItem
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith

@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -20,12 +20,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.model.VideoItem
-import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenMetadataGradientEnd
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenMetadataGradientStart
-import com.zhaoshuo.localvideoplayer.util.formatDuration
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.ui.theme.LumenMetadataGradientEnd
+import com.pfpt.localvideoplayer.ui.theme.LumenMetadataGradientStart
+import com.pfpt.localvideoplayer.util.formatDuration
 
 @Composable
 fun PlayerMetadataPanel(

@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.cast
+package com.pfpt.localvideoplayer.cast
 
 import android.content.Context
 import com.google.android.gms.cast.framework.CastOptions
@@ -15,7 +15,7 @@ class CastOptionsProvider : OptionsProvider {
                 CastMediaOptions.Builder()
                     .setNotificationOptions(
                         NotificationOptions.Builder()
-                            .setTargetActivityClassName("com.zhaoshuo.localvideoplayer.MainActivity")
+                            .setTargetActivityClassName("com.pfpt.localvideoplayer.MainActivity")
                             .build(),
                     )
                     .build(),

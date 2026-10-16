@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,9 +23,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.cast.CastDevice
-import com.zhaoshuo.localvideoplayer.cast.CastUiState
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.cast.CastDevice
+import com.pfpt.localvideoplayer.cast.CastUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

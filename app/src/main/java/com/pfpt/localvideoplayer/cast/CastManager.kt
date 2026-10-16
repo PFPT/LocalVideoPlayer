@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.cast
+package com.pfpt.localvideoplayer.cast
 
 import android.content.Context
 import android.net.Uri
@@ -17,8 +17,8 @@ import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.Session
 import com.google.android.gms.cast.framework.SessionManagerListener
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.data.PlaybackStore
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.data.PlaybackStore
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope

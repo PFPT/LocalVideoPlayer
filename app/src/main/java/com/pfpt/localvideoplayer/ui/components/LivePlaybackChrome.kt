@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import android.net.Uri
 import androidx.compose.runtime.Composable
@@ -11,12 +11,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.zhaoshuo.localvideoplayer.cast.LocalCastManager
-import com.zhaoshuo.localvideoplayer.player.PlayerProgressState
-import com.zhaoshuo.localvideoplayer.player.showSkipIntro
-import com.zhaoshuo.localvideoplayer.player.showSkipOutro
-import com.zhaoshuo.localvideoplayer.ui.PlayerUiState
-import com.zhaoshuo.localvideoplayer.util.SeekPreviewFrames
+import com.pfpt.localvideoplayer.cast.LocalCastManager
+import com.pfpt.localvideoplayer.player.PlayerProgressState
+import com.pfpt.localvideoplayer.player.showSkipIntro
+import com.pfpt.localvideoplayer.player.showSkipOutro
+import com.pfpt.localvideoplayer.ui.PlayerUiState
+import com.pfpt.localvideoplayer.util.SeekPreviewFrames
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.isActive

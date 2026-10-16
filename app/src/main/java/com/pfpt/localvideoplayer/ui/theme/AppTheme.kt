@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.theme
+package com.pfpt.localvideoplayer.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -18,7 +18,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.zhaoshuo.localvideoplayer.R
+import com.pfpt.localvideoplayer.R
 
 val GeistFontFamily = FontFamily(
     Font(R.font.geist_variable, FontWeight.Normal),

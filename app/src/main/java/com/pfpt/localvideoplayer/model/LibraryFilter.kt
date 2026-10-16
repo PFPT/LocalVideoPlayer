@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.model
+package com.pfpt.localvideoplayer.model
 
 import java.util.Calendar
 import java.util.concurrent.TimeUnit

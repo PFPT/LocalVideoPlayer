@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.player
+package com.pfpt.localvideoplayer.player
 
 import android.content.ContentUris
 import android.content.Context
@@ -6,7 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.DocumentsContract
 import android.provider.MediaStore
-import com.zhaoshuo.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.model.VideoItem
 
 fun findSidecarSubtitle(context: Context, video: VideoItem): Uri? {
     findTreeSidecar(context, video)?.let { return it }

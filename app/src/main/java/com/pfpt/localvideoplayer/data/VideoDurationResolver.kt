@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.data
+package com.pfpt.localvideoplayer.data
 
 import android.content.Context
 import android.media.MediaExtractor
@@ -16,7 +16,7 @@ import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.extractor.DefaultExtractorsFactory
-import com.zhaoshuo.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.model.VideoItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll

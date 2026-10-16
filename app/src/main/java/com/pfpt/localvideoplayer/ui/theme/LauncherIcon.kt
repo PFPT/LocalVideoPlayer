@@ -1,8 +1,8 @@
-package com.zhaoshuo.localvideoplayer.ui.theme
+package com.pfpt.localvideoplayer.ui.theme
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import com.zhaoshuo.localvideoplayer.R
+import com.pfpt.localvideoplayer.R
 
 enum class LauncherIcon(
     val id: String,

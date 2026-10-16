@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.download
+package com.pfpt.localvideoplayer.download
 
 import okhttp3.Cookie
 import okhttp3.HttpUrl.Companion.toHttpUrl

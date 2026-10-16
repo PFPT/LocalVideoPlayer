@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -19,9 +19,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.ExoPlayer
 import android.net.Uri
-import com.zhaoshuo.localvideoplayer.model.VideoItem
-import com.zhaoshuo.localvideoplayer.player.PlayerProgressState
-import com.zhaoshuo.localvideoplayer.ui.PlayerUiState
+import com.pfpt.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.player.PlayerProgressState
+import com.pfpt.localvideoplayer.ui.PlayerUiState
 
 @Composable
 fun PortraitPlayerLayout(

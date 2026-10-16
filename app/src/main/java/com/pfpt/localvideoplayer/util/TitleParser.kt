@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.util
+package com.pfpt.localvideoplayer.util
 
 data class ParsedTitle(
     val seriesName: String,

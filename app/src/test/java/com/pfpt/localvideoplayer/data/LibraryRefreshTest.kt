@@ -1,10 +1,10 @@
-package com.zhaoshuo.localvideoplayer.data
+package com.pfpt.localvideoplayer.data
 
 import android.net.Uri
-import com.zhaoshuo.localvideoplayer.model.SeriesGroupKind
-import com.zhaoshuo.localvideoplayer.model.VideoItem
-import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
-import com.zhaoshuo.localvideoplayer.model.VideoSeries
+import com.pfpt.localvideoplayer.model.SeriesGroupKind
+import com.pfpt.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.model.VideoLibraryEntry
+import com.pfpt.localvideoplayer.model.VideoSeries
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull

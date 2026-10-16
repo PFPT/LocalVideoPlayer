@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -28,9 +28,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenAccentText
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenOnBackground
-import com.zhaoshuo.localvideoplayer.util.formatDuration
+import com.pfpt.localvideoplayer.ui.theme.LumenAccentText
+import com.pfpt.localvideoplayer.ui.theme.LumenOnBackground
+import com.pfpt.localvideoplayer.util.formatDuration
 import kotlin.math.abs
 
 @Composable

@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import android.net.Uri
 import androidx.compose.animation.Crossfade
@@ -38,9 +38,9 @@ import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenThumbCorner
-import com.zhaoshuo.localvideoplayer.util.VideoThumbnailCache
+import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.ui.theme.LumenThumbCorner
+import com.pfpt.localvideoplayer.util.VideoThumbnailCache
 
 @Composable
 fun LumenMediaCard(

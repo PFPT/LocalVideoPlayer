@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -36,9 +36,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenBuffered
-import com.zhaoshuo.localvideoplayer.util.formatDuration
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.ui.theme.LumenBuffered
+import com.pfpt.localvideoplayer.util.formatDuration
 
 data class TimelineMarks(
     val bookmarkPositionsMs: List<Long> = emptyList(),

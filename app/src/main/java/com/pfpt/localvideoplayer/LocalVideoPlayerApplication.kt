@@ -1,8 +1,8 @@
-package com.zhaoshuo.localvideoplayer
+package com.pfpt.localvideoplayer
 
 import android.app.Application
 import android.content.Context
-import com.zhaoshuo.localvideoplayer.data.VideoDurationResolver
+import com.pfpt.localvideoplayer.data.VideoDurationResolver
 
 class LocalVideoPlayerApplication : Application() {
     lateinit var durationResolver: VideoDurationResolver

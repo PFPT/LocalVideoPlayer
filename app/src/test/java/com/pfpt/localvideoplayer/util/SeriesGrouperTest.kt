@@ -1,9 +1,9 @@
-package com.zhaoshuo.localvideoplayer.util
+package com.pfpt.localvideoplayer.util
 
 import android.net.Uri
-import com.zhaoshuo.localvideoplayer.model.SeriesGroupKind
-import com.zhaoshuo.localvideoplayer.model.VideoItem
-import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
+import com.pfpt.localvideoplayer.model.SeriesGroupKind
+import com.pfpt.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.model.VideoLibraryEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

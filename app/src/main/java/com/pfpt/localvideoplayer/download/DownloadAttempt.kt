@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.download
+package com.pfpt.localvideoplayer.download
 
 fun nextDownloadAttempt(stopped: Boolean, canceled: Boolean, attempt: Int, maxAttempts: Int): Int? {
     if (stopped || canceled) return null

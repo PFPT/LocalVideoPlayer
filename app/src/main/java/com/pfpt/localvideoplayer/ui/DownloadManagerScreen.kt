@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui
+package com.pfpt.localvideoplayer.ui
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -60,22 +60,22 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.download.DownloadFormat
-import com.zhaoshuo.localvideoplayer.download.DownloadListStatusFilter
-import com.zhaoshuo.localvideoplayer.download.DownloadManager
-import com.zhaoshuo.localvideoplayer.download.DownloadStatus
-import com.zhaoshuo.localvideoplayer.download.DownloadTask
-import com.zhaoshuo.localvideoplayer.download.filterDownloadTasks
-import com.zhaoshuo.localvideoplayer.ui.components.AddDownloadBottomSheet
-import com.zhaoshuo.localvideoplayer.ui.components.GlassSurface
-import com.zhaoshuo.localvideoplayer.ui.components.LumenEmptyState
-import com.zhaoshuo.localvideoplayer.ui.components.LumenListHeader
-import com.zhaoshuo.localvideoplayer.ui.components.LumenModalBottomSheet
-import com.zhaoshuo.localvideoplayer.ui.components.RenameDownloadDialog
-import com.zhaoshuo.localvideoplayer.ui.components.SwipeableListItem
-import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenThumbCorner
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.download.DownloadFormat
+import com.pfpt.localvideoplayer.download.DownloadListStatusFilter
+import com.pfpt.localvideoplayer.download.DownloadManager
+import com.pfpt.localvideoplayer.download.DownloadStatus
+import com.pfpt.localvideoplayer.download.DownloadTask
+import com.pfpt.localvideoplayer.download.filterDownloadTasks
+import com.pfpt.localvideoplayer.ui.components.AddDownloadBottomSheet
+import com.pfpt.localvideoplayer.ui.components.GlassSurface
+import com.pfpt.localvideoplayer.ui.components.LumenEmptyState
+import com.pfpt.localvideoplayer.ui.components.LumenListHeader
+import com.pfpt.localvideoplayer.ui.components.LumenModalBottomSheet
+import com.pfpt.localvideoplayer.ui.components.RenameDownloadDialog
+import com.pfpt.localvideoplayer.ui.components.SwipeableListItem
+import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.ui.theme.LumenThumbCorner
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)

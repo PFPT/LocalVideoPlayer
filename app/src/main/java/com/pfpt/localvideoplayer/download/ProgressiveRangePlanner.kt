@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.download
+package com.pfpt.localvideoplayer.download
 
 data class ByteRange(val start: Long, val endInclusive: Long) {
     val length: Long get() = endInclusive - start + 1

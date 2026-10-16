@@ -1,13 +1,13 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.model.VideoItem
-import com.zhaoshuo.localvideoplayer.util.formatDuration
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.util.formatDuration
 
 @Composable
 fun VideoInfoDialog(

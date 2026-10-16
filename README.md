@@ -112,7 +112,7 @@ cd LocalVideoPlayer
 ## 项目结构
 
 ```
-app/src/main/java/com/zhaoshuo/localvideoplayer/
+app/src/main/java/com/pfpt/localvideoplayer/
 ├── cast/           # Chromecast、本地 HTTP 侧载、保活服务
 ├── data/           # Repository、DataStore、LibraryViewModel、Room 相关仓库
 ├── download/       # 下载管理、HLS/种子、前台服务
@@ -126,7 +126,7 @@ app/src/main/java/com/zhaoshuo/localvideoplayer/
 
 ## 开发说明
 
-- 应用包名：`com.zhaoshuo.localvideoplayer`
+- 应用包名：`com.pfpt.localvideoplayer`
 - 显示名称：**LumenPlay**
 - 库缓存：视频列表 + 已分组结果；启动先读缓存，再后台刷新
 - Release 默认开启 R8 / shrinkResources

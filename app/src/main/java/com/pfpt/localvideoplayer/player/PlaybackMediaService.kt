@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.player
+package com.pfpt.localvideoplayer.player
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -13,8 +13,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
-import com.zhaoshuo.localvideoplayer.MainActivity
-import com.zhaoshuo.localvideoplayer.R
+import com.pfpt.localvideoplayer.MainActivity
+import com.pfpt.localvideoplayer.R
 
 @UnstableApi
 class PlaybackMediaService : MediaSessionService() {

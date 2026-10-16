@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.download
+package com.pfpt.localvideoplayer.download
 
 import android.content.ContentValues
 import android.content.Context
@@ -6,7 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.MediaStore
 import androidx.core.content.ContextCompat
-import com.zhaoshuo.localvideoplayer.R
+import com.pfpt.localvideoplayer.R
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager

@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.download
+package com.pfpt.localvideoplayer.download
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

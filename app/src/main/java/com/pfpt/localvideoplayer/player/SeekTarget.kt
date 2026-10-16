@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.player
+package com.pfpt.localvideoplayer.player
 
 const val SEEK_FULL_SWIPE_MS = 10 * 60_000L
 const val SEEK_UNKNOWN_DURATION_SWIPE_MS = 60_000L

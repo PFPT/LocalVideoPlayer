@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import android.content.ClipboardManager
 import android.view.ViewTreeObserver
@@ -34,10 +34,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.download.DownloadManager
-import com.zhaoshuo.localvideoplayer.download.DownloadNameResolver
-import com.zhaoshuo.localvideoplayer.download.DownloadUrlClassifier
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.download.DownloadManager
+import com.pfpt.localvideoplayer.download.DownloadNameResolver
+import com.pfpt.localvideoplayer.download.DownloadUrlClassifier
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)

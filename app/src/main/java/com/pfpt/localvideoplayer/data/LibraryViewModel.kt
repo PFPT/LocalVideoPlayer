@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.data
+package com.pfpt.localvideoplayer.data
 
 import android.content.Context
 import android.database.ContentObserver
@@ -9,12 +9,12 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
-import com.zhaoshuo.localvideoplayer.model.VideoItem
-import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
-import com.zhaoshuo.localvideoplayer.model.withoutUris
-import com.zhaoshuo.localvideoplayer.util.SeriesGrouper
-import com.zhaoshuo.localvideoplayer.util.dedupeLibraryVideos
-import com.zhaoshuo.localvideoplayer.util.isM3u8Title
+import com.pfpt.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.model.VideoLibraryEntry
+import com.pfpt.localvideoplayer.model.withoutUris
+import com.pfpt.localvideoplayer.util.SeriesGrouper
+import com.pfpt.localvideoplayer.util.dedupeLibraryVideos
+import com.pfpt.localvideoplayer.util.isM3u8Title
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,7 +40,7 @@ class LibraryViewModel(
     private val playCountStore: PlayCountStore = PlayCountStore(context),
     private val folderSourceStore: FolderSourceStore = FolderSourceStore(context),
     private val durationResolver: VideoDurationResolver =
-        (context.applicationContext as? com.zhaoshuo.localvideoplayer.LocalVideoPlayerApplication)
+        (context.applicationContext as? com.pfpt.localvideoplayer.LocalVideoPlayerApplication)
             ?.durationResolver
             ?: VideoDurationResolver(context),
     private val folderVideoScanner: FolderVideoScanner = FolderVideoScanner(context, durationResolver),

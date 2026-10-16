@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer
+package com.pfpt.localvideoplayer
 
 import android.content.res.Configuration
 import android.Manifest
@@ -15,9 +15,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.zhaoshuo.localvideoplayer.player.PlaybackMediaService
-import com.zhaoshuo.localvideoplayer.util.PictureInPictureHelper
-import com.zhaoshuo.localvideoplayer.download.DownloadService
+import com.pfpt.localvideoplayer.player.PlaybackMediaService
+import com.pfpt.localvideoplayer.util.PictureInPictureHelper
+import com.pfpt.localvideoplayer.download.DownloadService
 
 class MainActivity : ComponentActivity() {
 

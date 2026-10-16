@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -31,10 +31,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.player.PlayerProgressState
-import com.zhaoshuo.localvideoplayer.ui.PlayerUiState
-import com.zhaoshuo.localvideoplayer.util.formatSystemTime
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.player.PlayerProgressState
+import com.pfpt.localvideoplayer.ui.PlayerUiState
+import com.pfpt.localvideoplayer.util.formatSystemTime
 import kotlinx.coroutines.delay
 
 @Composable

@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.util
+package com.pfpt.localvideoplayer.util
 
 import android.content.ContentValues
 import android.content.Context

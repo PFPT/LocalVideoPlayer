@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.player
+package com.pfpt.localvideoplayer.player
 
 import androidx.media3.common.MimeTypes
 import org.junit.Assert.assertEquals

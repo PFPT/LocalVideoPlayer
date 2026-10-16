@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.download.torrent
+package com.pfpt.localvideoplayer.download.torrent
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay

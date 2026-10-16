@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -30,10 +30,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.player.SleepChoice
-import com.zhaoshuo.localvideoplayer.player.formatSleepRemaining
-import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.player.SleepChoice
+import com.pfpt.localvideoplayer.player.formatSleepRemaining
+import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import kotlinx.coroutines.flow.StateFlow
 
 @Composable

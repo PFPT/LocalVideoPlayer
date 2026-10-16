@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer
+package com.pfpt.localvideoplayer
 
 import android.content.pm.PackageManager
 import android.graphics.Color as AndroidColor
@@ -37,37 +37,37 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.zhaoshuo.localvideoplayer.cast.CastManager
-import com.zhaoshuo.localvideoplayer.cast.CastUiState
-import com.zhaoshuo.localvideoplayer.cast.LocalCastManager
-import com.zhaoshuo.localvideoplayer.data.BookmarkStore
-import com.zhaoshuo.localvideoplayer.data.LibraryPreferencesStore
-import com.zhaoshuo.localvideoplayer.data.LibraryViewModel
-import com.zhaoshuo.localvideoplayer.data.PlaybackStore
-import com.zhaoshuo.localvideoplayer.data.PlayerPreferencesStore
-import com.zhaoshuo.localvideoplayer.data.PinnedItemsStore
-import com.zhaoshuo.localvideoplayer.data.PlayCountStore
-import com.zhaoshuo.localvideoplayer.data.HiddenVideosStore
-import com.zhaoshuo.localvideoplayer.data.FolderSourceStore
-import com.zhaoshuo.localvideoplayer.data.SeriesSkipStore
-import com.zhaoshuo.localvideoplayer.data.ThemePreferencesStore
-import com.zhaoshuo.localvideoplayer.data.VideoRepository
-import com.zhaoshuo.localvideoplayer.download.DownloadManager
-import com.zhaoshuo.localvideoplayer.download.DownloadTask
-import com.zhaoshuo.localvideoplayer.model.VideoItem
-import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
-import com.zhaoshuo.localvideoplayer.player.PlaybackSessionViewModel
-import com.zhaoshuo.localvideoplayer.player.PlaylistState
-import com.zhaoshuo.localvideoplayer.ui.PlayerScreen
-import com.zhaoshuo.localvideoplayer.ui.DownloadManagerScreen
-import com.zhaoshuo.localvideoplayer.ui.SeriesDetailScreen
-import com.zhaoshuo.localvideoplayer.ui.SettingsScreen
-import com.zhaoshuo.localvideoplayer.ui.VideoListScreen
-import com.zhaoshuo.localvideoplayer.ui.components.PlaybackMiniBar
-import com.zhaoshuo.localvideoplayer.ui.theme.LocalVideoPlayerTheme
-import com.zhaoshuo.localvideoplayer.ui.theme.ThemeState
-import com.zhaoshuo.localvideoplayer.util.LauncherIconSwitcher
-import com.zhaoshuo.localvideoplayer.util.Permissions
+import com.pfpt.localvideoplayer.cast.CastManager
+import com.pfpt.localvideoplayer.cast.CastUiState
+import com.pfpt.localvideoplayer.cast.LocalCastManager
+import com.pfpt.localvideoplayer.data.BookmarkStore
+import com.pfpt.localvideoplayer.data.LibraryPreferencesStore
+import com.pfpt.localvideoplayer.data.LibraryViewModel
+import com.pfpt.localvideoplayer.data.PlaybackStore
+import com.pfpt.localvideoplayer.data.PlayerPreferencesStore
+import com.pfpt.localvideoplayer.data.PinnedItemsStore
+import com.pfpt.localvideoplayer.data.PlayCountStore
+import com.pfpt.localvideoplayer.data.HiddenVideosStore
+import com.pfpt.localvideoplayer.data.FolderSourceStore
+import com.pfpt.localvideoplayer.data.SeriesSkipStore
+import com.pfpt.localvideoplayer.data.ThemePreferencesStore
+import com.pfpt.localvideoplayer.data.VideoRepository
+import com.pfpt.localvideoplayer.download.DownloadManager
+import com.pfpt.localvideoplayer.download.DownloadTask
+import com.pfpt.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.model.VideoLibraryEntry
+import com.pfpt.localvideoplayer.player.PlaybackSessionViewModel
+import com.pfpt.localvideoplayer.player.PlaylistState
+import com.pfpt.localvideoplayer.ui.PlayerScreen
+import com.pfpt.localvideoplayer.ui.DownloadManagerScreen
+import com.pfpt.localvideoplayer.ui.SeriesDetailScreen
+import com.pfpt.localvideoplayer.ui.SettingsScreen
+import com.pfpt.localvideoplayer.ui.VideoListScreen
+import com.pfpt.localvideoplayer.ui.components.PlaybackMiniBar
+import com.pfpt.localvideoplayer.ui.theme.LocalVideoPlayerTheme
+import com.pfpt.localvideoplayer.ui.theme.ThemeState
+import com.pfpt.localvideoplayer.util.LauncherIconSwitcher
+import com.pfpt.localvideoplayer.util.Permissions
 
 private const val ROUTE_VIDEO_LIST = "video_list"
 private const val ROUTE_SERIES = "series/{seriesId}"

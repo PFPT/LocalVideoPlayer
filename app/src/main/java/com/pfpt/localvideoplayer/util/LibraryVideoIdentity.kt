@@ -1,6 +1,6 @@
-package com.zhaoshuo.localvideoplayer.util
+package com.pfpt.localvideoplayer.util
 
-import com.zhaoshuo.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.model.VideoItem
 
 fun libraryFileKey(video: VideoItem): String? {
     val title = video.title.trim().lowercase()

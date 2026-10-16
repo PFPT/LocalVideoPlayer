@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.cast
+package com.pfpt.localvideoplayer.cast
 
 data class CastDevice(
     val id: String,

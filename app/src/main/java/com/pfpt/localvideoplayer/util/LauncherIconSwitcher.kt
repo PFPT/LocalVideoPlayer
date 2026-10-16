@@ -1,9 +1,9 @@
-package com.zhaoshuo.localvideoplayer.util
+package com.pfpt.localvideoplayer.util
 
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
-import com.zhaoshuo.localvideoplayer.ui.theme.LauncherIcon
+import com.pfpt.localvideoplayer.ui.theme.LauncherIcon
 
 object LauncherIconSwitcher {
 

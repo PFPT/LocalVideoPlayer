@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.cast
+package com.pfpt.localvideoplayer.cast
 
 import androidx.media3.common.Player
 import kotlinx.coroutines.CoroutineScope

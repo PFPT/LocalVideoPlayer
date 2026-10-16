@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.player
+package com.pfpt.localvideoplayer.player
 
 fun abLoopTarget(pointA: Long?, pointB: Long?, positionMs: Long): Long? {
     if (pointA == null || pointB == null || pointB <= pointA) return null

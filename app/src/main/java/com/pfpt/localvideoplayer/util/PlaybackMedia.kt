@@ -1,13 +1,13 @@
-package com.zhaoshuo.localvideoplayer.util
+package com.pfpt.localvideoplayer.util
 
 import android.content.Context
 import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
-import com.zhaoshuo.localvideoplayer.data.isDisguisedMpegTsMedia
-import com.zhaoshuo.localvideoplayer.data.looksLikeTsName
-import com.zhaoshuo.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.data.isDisguisedMpegTsMedia
+import com.pfpt.localvideoplayer.data.looksLikeTsName
+import com.pfpt.localvideoplayer.model.VideoItem
 
 fun VideoItem.toMediaItem(context: Context? = null): MediaItem {
     val builder = MediaItem.Builder()

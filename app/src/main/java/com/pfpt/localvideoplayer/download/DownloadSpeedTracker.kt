@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.download
+package com.pfpt.localvideoplayer.download
 
 class DownloadSpeedTracker(
     private val windowMs: Long = 3000,

@@ -1,14 +1,14 @@
-package com.zhaoshuo.localvideoplayer.util
+package com.pfpt.localvideoplayer.util
 
-import com.zhaoshuo.localvideoplayer.data.FolderVideoScanner
-import com.zhaoshuo.localvideoplayer.model.SeriesGroupKind
-import com.zhaoshuo.localvideoplayer.model.VideoItem
-import com.zhaoshuo.localvideoplayer.model.VideoLibraryEntry
-import com.zhaoshuo.localvideoplayer.model.VideoSeries
-import com.zhaoshuo.localvideoplayer.model.APP_DOWNLOAD_BUCKET
-import com.zhaoshuo.localvideoplayer.model.APP_DOWNLOAD_FOLDER_KEY
-import com.zhaoshuo.localvideoplayer.model.isAppDownloadLocation
-import com.zhaoshuo.localvideoplayer.player.PlaylistState
+import com.pfpt.localvideoplayer.data.FolderVideoScanner
+import com.pfpt.localvideoplayer.model.SeriesGroupKind
+import com.pfpt.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.model.VideoLibraryEntry
+import com.pfpt.localvideoplayer.model.VideoSeries
+import com.pfpt.localvideoplayer.model.APP_DOWNLOAD_BUCKET
+import com.pfpt.localvideoplayer.model.APP_DOWNLOAD_FOLDER_KEY
+import com.pfpt.localvideoplayer.model.isAppDownloadLocation
+import com.pfpt.localvideoplayer.player.PlaylistState
 import java.util.Calendar
 import java.util.Locale
 

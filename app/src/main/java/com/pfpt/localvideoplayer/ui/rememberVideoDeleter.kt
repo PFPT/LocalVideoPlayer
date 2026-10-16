@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui
+package com.pfpt.localvideoplayer.ui
 
 import android.app.Activity
 import android.content.IntentSender
@@ -15,12 +15,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.data.HiddenVideosStore
-import com.zhaoshuo.localvideoplayer.data.PlayCountStore
-import com.zhaoshuo.localvideoplayer.data.PlaybackStore
-import com.zhaoshuo.localvideoplayer.util.MediaDeleteHelper
-import com.zhaoshuo.localvideoplayer.util.UriConfirmRequest
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.data.HiddenVideosStore
+import com.pfpt.localvideoplayer.data.PlayCountStore
+import com.pfpt.localvideoplayer.data.PlaybackStore
+import com.pfpt.localvideoplayer.util.MediaDeleteHelper
+import com.pfpt.localvideoplayer.util.UriConfirmRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.model
+package com.pfpt.localvideoplayer.model
 
 import androidx.compose.ui.layout.ContentScale
 

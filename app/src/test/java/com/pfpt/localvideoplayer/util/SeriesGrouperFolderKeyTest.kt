@@ -1,8 +1,8 @@
-package com.zhaoshuo.localvideoplayer.util
+package com.pfpt.localvideoplayer.util
 
 import android.net.Uri
-import com.zhaoshuo.localvideoplayer.data.FolderVideoScanner
-import com.zhaoshuo.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.data.FolderVideoScanner
+import com.pfpt.localvideoplayer.model.VideoItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.download
+package com.pfpt.localvideoplayer.download
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,9 +10,9 @@ import android.net.Uri
 import android.os.IBinder
 import android.provider.MediaStore
 import androidx.core.app.NotificationCompat
-import com.zhaoshuo.localvideoplayer.MainActivity
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.download.torrent.TorrentSession
+import com.pfpt.localvideoplayer.MainActivity
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.download.torrent.TorrentSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -1387,10 +1387,10 @@ class DownloadService : Service() {
     }
 
     companion object {
-        const val ACTION_RUN_QUEUE = "com.zhaoshuo.localvideoplayer.download.RUN_QUEUE"
-        const val ACTION_STOP_CURRENT = "com.zhaoshuo.localvideoplayer.download.STOP_CURRENT"
-        const val ACTION_CANCEL_CURRENT = "com.zhaoshuo.localvideoplayer.download.CANCEL_CURRENT"
-        const val ACTION_OPEN_DOWNLOADS = "com.zhaoshuo.localvideoplayer.download.OPEN_DOWNLOADS"
+        const val ACTION_RUN_QUEUE = "com.pfpt.localvideoplayer.download.RUN_QUEUE"
+        const val ACTION_STOP_CURRENT = "com.pfpt.localvideoplayer.download.STOP_CURRENT"
+        const val ACTION_CANCEL_CURRENT = "com.pfpt.localvideoplayer.download.CANCEL_CURRENT"
+        const val ACTION_OPEN_DOWNLOADS = "com.pfpt.localvideoplayer.download.OPEN_DOWNLOADS"
         const val EXTRA_TASK_ID = "task_id"
         const val EXTRA_OPEN_DOWNLOADS = "open_downloads"
         private const val CHANNEL_ID = "downloads"

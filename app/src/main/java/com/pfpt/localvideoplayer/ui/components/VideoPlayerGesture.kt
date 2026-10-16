@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -13,8 +13,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalViewConfiguration
-import com.zhaoshuo.localvideoplayer.player.seekTargetMs
-import com.zhaoshuo.localvideoplayer.player.swipeSeekRangeMs
+import com.pfpt.localvideoplayer.player.seekTargetMs
+import com.pfpt.localvideoplayer.player.swipeSeekRangeMs
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay

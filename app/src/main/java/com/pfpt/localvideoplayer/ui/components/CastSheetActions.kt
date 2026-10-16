@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import android.content.pm.PackageManager
 import android.widget.Toast
@@ -12,10 +12,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.media3.common.Player
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.cast.CastManager
-import com.zhaoshuo.localvideoplayer.cast.CastUiState
-import com.zhaoshuo.localvideoplayer.util.Permissions
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.cast.CastManager
+import com.pfpt.localvideoplayer.cast.CastUiState
+import com.pfpt.localvideoplayer.util.Permissions
 
 data class CastSheetActions(
     val showSheet: Boolean,

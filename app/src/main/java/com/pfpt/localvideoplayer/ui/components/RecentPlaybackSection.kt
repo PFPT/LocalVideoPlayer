@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -40,7 +40,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.zhaoshuo.localvideoplayer.data.PlaybackStore
+import com.pfpt.localvideoplayer.data.PlaybackStore
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -49,11 +49,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.model.PlaybackRecord
-import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenDelete
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenThumbCorner
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.model.PlaybackRecord
+import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.ui.theme.LumenDelete
+import com.pfpt.localvideoplayer.ui.theme.LumenThumbCorner
 
 @Composable
 fun RecentPlaybackSection(
@@ -99,7 +99,7 @@ private fun RecentPlaybackCard(
             append(" · ")
         }
         if (record.durationMs > 0) {
-            append(com.zhaoshuo.localvideoplayer.util.formatDuration(record.durationMs))
+            append(com.pfpt.localvideoplayer.util.formatDuration(record.durationMs))
         }
     }
 

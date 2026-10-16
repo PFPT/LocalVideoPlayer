@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.player
+package com.pfpt.localvideoplayer.player
 
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer

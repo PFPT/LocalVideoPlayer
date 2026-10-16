@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import android.os.Build
 import androidx.compose.foundation.Canvas
@@ -63,18 +63,18 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.model.LibraryTypeTab
-import com.zhaoshuo.localvideoplayer.ui.theme.HsvColor
-import com.zhaoshuo.localvideoplayer.ui.theme.LauncherIcon
-import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenThemeColors
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenThumbCorner
-import com.zhaoshuo.localvideoplayer.ui.theme.ThemeMode
-import com.zhaoshuo.localvideoplayer.ui.theme.formatAlphaPercent
-import com.zhaoshuo.localvideoplayer.ui.theme.toColor
-import com.zhaoshuo.localvideoplayer.ui.theme.toHexArgb
-import com.zhaoshuo.localvideoplayer.ui.theme.toHsv
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.model.LibraryTypeTab
+import com.pfpt.localvideoplayer.ui.theme.HsvColor
+import com.pfpt.localvideoplayer.ui.theme.LauncherIcon
+import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.ui.theme.LumenThemeColors
+import com.pfpt.localvideoplayer.ui.theme.LumenThumbCorner
+import com.pfpt.localvideoplayer.ui.theme.ThemeMode
+import com.pfpt.localvideoplayer.ui.theme.formatAlphaPercent
+import com.pfpt.localvideoplayer.ui.theme.toColor
+import com.pfpt.localvideoplayer.ui.theme.toHexArgb
+import com.pfpt.localvideoplayer.ui.theme.toHsv
 import kotlinx.coroutines.launch
 
 private enum class ThemeColorTarget {

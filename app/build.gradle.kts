@@ -16,11 +16,11 @@ if (hasReleaseKeystore) {
 }
 
 android {
-    namespace = "com.zhaoshuo.localvideoplayer"
+    namespace = "com.pfpt.localvideoplayer"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.zhaoshuo.localvideoplayer"
+        applicationId = "com.pfpt.localvideoplayer"
         minSdk = 28
         targetSdk = 35
         versionCode = 1

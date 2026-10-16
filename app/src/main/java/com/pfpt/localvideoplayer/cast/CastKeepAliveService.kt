@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.cast
+package com.pfpt.localvideoplayer.cast
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -14,8 +14,8 @@ import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import com.zhaoshuo.localvideoplayer.MainActivity
-import com.zhaoshuo.localvideoplayer.R
+import com.pfpt.localvideoplayer.MainActivity
+import com.pfpt.localvideoplayer.R
 
 class CastKeepAliveService : Service() {
     private var wifiLock: WifiManager.WifiLock? = null
@@ -122,7 +122,7 @@ class CastKeepAliveService : Service() {
     companion object {
         private const val CHANNEL_ID = "cast_keepalive"
         private const val NOTIFICATION_ID = 4201
-        const val ACTION_STOP = "com.zhaoshuo.localvideoplayer.cast.STOP"
+        const val ACTION_STOP = "com.pfpt.localvideoplayer.cast.STOP"
 
         fun start(context: Context) {
             val intent = Intent(context, CastKeepAliveService::class.java)

@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.util
+package com.pfpt.localvideoplayer.util
 
 import android.app.Activity
 import android.app.PendingIntent
@@ -10,8 +10,8 @@ import android.content.pm.PackageManager
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.util.Rational
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.pip.PipActionReceiver
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.pip.PipActionReceiver
 
 object PictureInPictureHelper {
 

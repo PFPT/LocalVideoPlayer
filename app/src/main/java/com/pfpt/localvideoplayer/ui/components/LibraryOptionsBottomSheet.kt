@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -23,13 +23,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.model.DateFilter
-import com.zhaoshuo.localvideoplayer.model.DurationFilter
-import com.zhaoshuo.localvideoplayer.model.LibraryFilter
-import com.zhaoshuo.localvideoplayer.model.LibraryViewLayout
-import com.zhaoshuo.localvideoplayer.model.VideoSortOrder
-import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.model.DateFilter
+import com.pfpt.localvideoplayer.model.DurationFilter
+import com.pfpt.localvideoplayer.model.LibraryFilter
+import com.pfpt.localvideoplayer.model.LibraryViewLayout
+import com.pfpt.localvideoplayer.model.VideoSortOrder
+import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)

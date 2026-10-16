@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.theme
+package com.pfpt.localvideoplayer.ui.theme
 
 enum class ThemeMode {
     System,

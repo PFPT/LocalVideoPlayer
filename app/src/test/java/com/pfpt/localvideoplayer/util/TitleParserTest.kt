@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.util
+package com.pfpt.localvideoplayer.util
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

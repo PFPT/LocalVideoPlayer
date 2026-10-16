@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui.components
+package com.pfpt.localvideoplayer.ui.components
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
@@ -14,9 +14,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.model.VideoItem
-import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui
+package com.pfpt.localvideoplayer.ui
 
 import android.net.Uri
 import androidx.compose.runtime.Stable
@@ -8,7 +8,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.zhaoshuo.localvideoplayer.model.AspectRatioMode
+import com.pfpt.localvideoplayer.model.AspectRatioMode
 import kotlinx.coroutines.Job
 
 enum class PlaybackFailure {

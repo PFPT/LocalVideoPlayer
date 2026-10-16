@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.ui
+package com.pfpt.localvideoplayer.ui
 
 import android.content.Intent
 import android.net.Uri
@@ -48,25 +48,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.data.FolderSourceStore
-import com.zhaoshuo.localvideoplayer.data.HiddenVideosStore
-import com.zhaoshuo.localvideoplayer.data.hiddenDisplayLabel
-import com.zhaoshuo.localvideoplayer.data.LibraryPreferencesStore
-import com.zhaoshuo.localvideoplayer.data.PlayerPreferencesStore
-import com.zhaoshuo.localvideoplayer.data.ThemePreferencesStore
-import com.zhaoshuo.localvideoplayer.model.AspectRatioMode
-import com.zhaoshuo.localvideoplayer.model.LibraryViewLayout
-import com.zhaoshuo.localvideoplayer.model.VideoSortOrder
-import com.zhaoshuo.localvideoplayer.ui.components.AspectRatioSheet
-import com.zhaoshuo.localvideoplayer.ui.components.LumenListHeader
-import com.zhaoshuo.localvideoplayer.ui.components.SpeedSelectorSheet
-import com.zhaoshuo.localvideoplayer.ui.components.ThemeColorBottomSheet
-import com.zhaoshuo.localvideoplayer.ui.components.labelRes
-import com.zhaoshuo.localvideoplayer.ui.theme.LauncherIcon
-import com.zhaoshuo.localvideoplayer.ui.theme.LocalLumenTheme
-import com.zhaoshuo.localvideoplayer.ui.theme.ThemeState
-import com.zhaoshuo.localvideoplayer.util.LauncherIconSwitcher
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.data.FolderSourceStore
+import com.pfpt.localvideoplayer.data.HiddenVideosStore
+import com.pfpt.localvideoplayer.data.hiddenDisplayLabel
+import com.pfpt.localvideoplayer.data.LibraryPreferencesStore
+import com.pfpt.localvideoplayer.data.PlayerPreferencesStore
+import com.pfpt.localvideoplayer.data.ThemePreferencesStore
+import com.pfpt.localvideoplayer.model.AspectRatioMode
+import com.pfpt.localvideoplayer.model.LibraryViewLayout
+import com.pfpt.localvideoplayer.model.VideoSortOrder
+import com.pfpt.localvideoplayer.ui.components.AspectRatioSheet
+import com.pfpt.localvideoplayer.ui.components.LumenListHeader
+import com.pfpt.localvideoplayer.ui.components.SpeedSelectorSheet
+import com.pfpt.localvideoplayer.ui.components.ThemeColorBottomSheet
+import com.pfpt.localvideoplayer.ui.components.labelRes
+import com.pfpt.localvideoplayer.ui.theme.LauncherIcon
+import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.ui.theme.ThemeState
+import com.pfpt.localvideoplayer.util.LauncherIconSwitcher
 import kotlinx.coroutines.launch
 
 @Composable
@@ -87,10 +87,10 @@ fun SettingsScreen(
     val theme = LocalLumenTheme.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val libraryPrefs by libraryPreferencesStore.preferences.collectAsStateWithLifecycle(
-        initialValue = com.zhaoshuo.localvideoplayer.data.LibraryPreferences(),
+        initialValue = com.pfpt.localvideoplayer.data.LibraryPreferences(),
     )
     val playerPrefs by playerPreferencesStore.preferences.collectAsStateWithLifecycle(
-        initialValue = com.zhaoshuo.localvideoplayer.data.PlayerPreferences(),
+        initialValue = com.pfpt.localvideoplayer.data.PlayerPreferences(),
     )
     val folderSources by folderSourceStore.sources.collectAsStateWithLifecycle(initialValue = emptyList())
     val hiddenEntries by hiddenVideosStore.hiddenEntries.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -207,9 +207,9 @@ fun SettingsScreen(
                 title = stringResource(R.string.theme_color),
                 subtitle = stringResource(
                     when (themeState.mode) {
-                        com.zhaoshuo.localvideoplayer.ui.theme.ThemeMode.System -> R.string.theme_mode_system
-                        com.zhaoshuo.localvideoplayer.ui.theme.ThemeMode.Light -> R.string.theme_mode_light
-                        com.zhaoshuo.localvideoplayer.ui.theme.ThemeMode.Dark -> R.string.theme_mode_dark
+                        com.pfpt.localvideoplayer.ui.theme.ThemeMode.System -> R.string.theme_mode_system
+                        com.pfpt.localvideoplayer.ui.theme.ThemeMode.Light -> R.string.theme_mode_light
+                        com.pfpt.localvideoplayer.ui.theme.ThemeMode.Dark -> R.string.theme_mode_dark
                     },
                 ),
                 onClick = { showThemeSheet = true },

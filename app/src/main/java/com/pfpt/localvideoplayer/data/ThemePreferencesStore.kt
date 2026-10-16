@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.data
+package com.pfpt.localvideoplayer.data
 
 import android.content.Context
 import android.content.res.Configuration
@@ -9,12 +9,12 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.zhaoshuo.localvideoplayer.ui.theme.LauncherIcon
-import com.zhaoshuo.localvideoplayer.ui.theme.LumenThemeColors
-import com.zhaoshuo.localvideoplayer.ui.theme.ThemeMode
-import com.zhaoshuo.localvideoplayer.ui.theme.ThemeState
-import com.zhaoshuo.localvideoplayer.ui.theme.toArgbInt
-import com.zhaoshuo.localvideoplayer.ui.theme.toComposeColor
+import com.pfpt.localvideoplayer.ui.theme.LauncherIcon
+import com.pfpt.localvideoplayer.ui.theme.LumenThemeColors
+import com.pfpt.localvideoplayer.ui.theme.ThemeMode
+import com.pfpt.localvideoplayer.ui.theme.ThemeState
+import com.pfpt.localvideoplayer.ui.theme.toArgbInt
+import com.pfpt.localvideoplayer.ui.theme.toComposeColor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map

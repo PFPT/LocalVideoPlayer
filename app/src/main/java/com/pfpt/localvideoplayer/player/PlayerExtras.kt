@@ -1,4 +1,4 @@
-package com.zhaoshuo.localvideoplayer.player
+package com.pfpt.localvideoplayer.player
 
 import android.content.Context
 import android.net.Uri
@@ -12,11 +12,11 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.extractor.DefaultExtractorsFactory
-import com.zhaoshuo.localvideoplayer.R
-import com.zhaoshuo.localvideoplayer.data.needsConstantBitrateSeeking
-import com.zhaoshuo.localvideoplayer.model.VideoItem
-import com.zhaoshuo.localvideoplayer.ui.components.TrackOption
-import com.zhaoshuo.localvideoplayer.util.toMediaItem
+import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.data.needsConstantBitrateSeeking
+import com.pfpt.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.ui.components.TrackOption
+import com.pfpt.localvideoplayer.util.toMediaItem
 
 fun buildExoPlayer(
     context: Context,
