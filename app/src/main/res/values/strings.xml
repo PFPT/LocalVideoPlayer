@@ -287,7 +287,7 @@
     <string name="download_status_merging">正在合并</string>
     <string name="download_timeout_retry">连接超时，点击继续重试</string>
     <string name="download_direct_link_failed">无法访问视频直链，请检查分享链接是否有效</string>
-    <string name="download_proxy_unwrapped">已切换为直链下载，无需保持蜂米播放</string>
+    <string name="download_proxy_unwrapped">正在通过本机代理下载，请保持来源应用在后台</string>
     <string name="download_progress_size_unknown">未知</string>
     <string name="download_eta">剩余 %1$s</string>
     <string name="download_notification_segments">分片 %1$d/%2$d</string>

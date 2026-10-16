@@ -22,6 +22,20 @@ class DownloadUrlResolverTest {
   }
 
   @Test
+  fun keepsLocalProxyAsTaskUrl() {
+    val url = "http://127.0.0.1:9979/proxy?do=m3u8&url=https%3A%2F%2Fcdn.example.com%2F20260712%2F12602_8c511196%2Findex.m3u8"
+    assertEquals(url, DownloadUrlResolver.taskDownloadUrl(url))
+    assertEquals(url, DownloadUrlResolver.mediaFetchUrl(url))
+  }
+
+  @Test
+  fun keepsLocalProxySegmentUrl() {
+    val url = "http://127.0.0.1:9978/proxy?do=m3u8&url=https%3A%2F%2Fcdn.example.com%2Fseg00001.ts"
+    assertEquals(url, DownloadUrlResolver.mediaFetchUrl(url))
+    assertEquals("https://cdn.example.com/seg00001.ts", DownloadUrlResolver.unwrapProxyUrl(url))
+  }
+
+  @Test
   fun leavesDirectCdnUrlUnchanged() {
     val url = "https://cdn.example.com/video/index.m3u8"
     assertEquals(url, DownloadUrlResolver.resolveDownloadUrl(url))

@@ -22,6 +22,7 @@ object DownloadNameResolver {
     data class ParsedShare(
         val title: String?,
         val url: String?,
+        val explicitTitle: Boolean = false,
     )
 
     internal data class FongMiMedia(
@@ -52,6 +53,7 @@ object DownloadNameResolver {
         val text: String,
         val title: String?,
         val pasted: Boolean,
+        val explicitTitle: Boolean = false,
     )
 
     fun applyDownloadFieldChange(current: String, incoming: String): DownloadFieldChange {
@@ -62,12 +64,12 @@ object DownloadNameResolver {
         if (!pasted) return DownloadFieldChange(text = cleaned, title = null, pasted = false)
         val parsed = parseSharedText(cleaned)
         if (!parsed.url.isNullOrBlank()) {
-            return DownloadFieldChange(text = parsed.url, title = parsed.title, pasted = true)
+            return DownloadFieldChange(text = parsed.url, title = parsed.title, pasted = true, explicitTitle = parsed.explicitTitle)
         }
         val flattened = cleaned.replace("\r", "").replace("\n", "").trim()
         val reparsed = parseSharedText(flattened)
         if (!reparsed.url.isNullOrBlank()) {
-            return DownloadFieldChange(text = reparsed.url, title = reparsed.title, pasted = true)
+            return DownloadFieldChange(text = reparsed.url, title = reparsed.title, pasted = true, explicitTitle = reparsed.explicitTitle)
         }
         return DownloadFieldChange(text = flattened, title = null, pasted = true)
     }
@@ -81,8 +83,8 @@ object DownloadNameResolver {
                 val left = parts[0].trim()
                 val right = parts[1].trim()
                 return when {
-                    left.isDownloadUrl() -> ParsedShare(title = sanitizeTitle(right), url = left.normalizeDownloadUrl())
-                    right.isDownloadUrl() -> ParsedShare(title = sanitizeTitle(left), url = right.normalizeDownloadUrl())
+                    left.isDownloadUrl() -> shareWithExplicitTitle(sanitizeTitle(right), left.normalizeDownloadUrl())
+                    right.isDownloadUrl() -> shareWithExplicitTitle(sanitizeTitle(left), right.normalizeDownloadUrl())
                     else -> {
                         val embedded = extractInlineDownloadUrl(trimmed)
                         ParsedShare(
@@ -111,6 +113,9 @@ object DownloadNameResolver {
         return ParsedShare(null, extractInlineDownloadUrl(trimmed))
     }
 
+    private fun shareWithExplicitTitle(title: String, url: String): ParsedShare =
+        ParsedShare(title = title, url = url, explicitTitle = title.isNotBlank())
+
     suspend fun resolve(url: String, fallback: String, context: Context? = null): String =
         resolveForEnqueue(url, "", fallback, context)
 
@@ -119,6 +124,7 @@ object DownloadNameResolver {
         userFileName: String,
         fallback: String,
         context: Context? = null,
+        trustUserFileName: Boolean = false,
     ): String {
         val trimmed = url.trim()
         if (trimmed.isEmpty()) return fallback
@@ -132,7 +138,7 @@ object DownloadNameResolver {
         }
         val isHls = DownloadUrlClassifier.isHlsDownloadUrl(trimmed)
         val sanitizedUser = sanitizeTitle(userFileName)
-        if (sanitizedUser.isNotBlank() && titleMatchesDownload(sanitizedUser, trimmed)) {
+        if (sanitizedUser.isNotBlank() && (trustUserFileName || titleMatchesDownload(sanitizedUser, trimmed))) {
             return toOutputFileName(sanitizedUser, isHls, fallback)
         }
         extractMatchingTitleFromUrl(trimmed)?.let { return toOutputFileName(it, isHls, fallback) }

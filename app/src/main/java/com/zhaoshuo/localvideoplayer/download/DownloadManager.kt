@@ -53,28 +53,47 @@ class DownloadManager private constructor(private val context: Context) {
         }
     }
 
-    fun enqueue(url: String, fileName: String, headers: Map<String, String>, saveToMovies: Boolean, callback: ((Boolean) -> Unit)? = null) {
+    fun enqueue(
+        url: String,
+        fileName: String,
+        headers: Map<String, String>,
+        saveToMovies: Boolean,
+        trustFileName: Boolean = false,
+        callback: ((Boolean) -> Unit)? = null,
+    ) {
         scope.launch {
-            val usedProxy = enqueueInternal(url, fileName, headers, saveToMovies)
+            val usedProxy = enqueueInternal(url, fileName, headers, saveToMovies, trustFileName)
             callback?.invoke(usedProxy)
         }
     }
 
-    suspend fun enqueue(url: String, fileName: String, headers: Map<String, String>, saveToMovies: Boolean): Boolean =
-        enqueueInternal(url, fileName, headers, saveToMovies)
+    suspend fun enqueue(
+        url: String,
+        fileName: String,
+        headers: Map<String, String>,
+        saveToMovies: Boolean,
+        trustFileName: Boolean = false,
+    ): Boolean = enqueueInternal(url, fileName, headers, saveToMovies, trustFileName)
 
     private suspend fun enqueueInternal(
         url: String,
         fileName: String,
         headers: Map<String, String>,
         saveToMovies: Boolean,
+        trustFileName: Boolean,
     ): Boolean {
         ready.await()
         val fallback = context.getString(R.string.download_default_file_name)
         val trustedFileName = fileName.trim().takeIf {
-            it.isNotBlank() && DownloadNameResolver.titleMatchesDownload(it, url)
+            it.isNotBlank() && (trustFileName || DownloadNameResolver.titleMatchesDownload(it, url))
         }.orEmpty()
-        val resolvedName = DownloadNameResolver.resolveForEnqueue(url, trustedFileName, fallback, context)
+        val resolvedName = DownloadNameResolver.resolveForEnqueue(
+            url,
+            trustedFileName,
+            fallback,
+            context,
+            trustFileName && trustedFileName.isNotBlank(),
+        )
         DownloadNameResolver.downloadCdnIdentityKey(url)?.let { cdnKey ->
             val cacheableTitle = DownloadNameResolver.cacheableTitle(resolvedName)
             DownloadTitleCache.put(context, cdnKey, cacheableTitle)
@@ -88,10 +107,10 @@ class DownloadManager private constructor(private val context: Context) {
                 }
         }
         val resolvedHeaders = DownloadUrlResolver.inferHeaders(url, headers)
-        val directUrl = DownloadUrlResolver.resolveDownloadUrl(url)
+        val downloadUrl = DownloadUrlResolver.taskDownloadUrl(url)
         val usedProxy = DownloadUrlClassifier.isLocalProxyUrl(url)
         val task = DownloadTask(
-            url = directUrl,
+            url = downloadUrl,
             fileName = resolvedName,
             headers = resolvedHeaders,
             saveToMovies = saveToMovies,

@@ -1,7 +1,10 @@
 package com.zhaoshuo.localvideoplayer.download
 
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DownloadNameResolverTest {
@@ -10,6 +13,24 @@ class DownloadNameResolverTest {
         val parsed = DownloadNameResolver.parseSharedText("说唱巅峰对决 2026-20260712 下|http://127.0.0.1:9978/m3u8?url=abc")
         assertEquals("说唱巅峰对决 2026-20260712 下", parsed.title)
         assertEquals("http://127.0.0.1:9978/m3u8?url=abc", parsed.url)
+        assertTrue(parsed.explicitTitle)
+    }
+
+    @Test
+    fun keepsExplicitEpisodeTitleForProxyShare() = runBlocking {
+        val url = "http://127.0.0.1:9979/proxy?do=m3u8&url=https%3A%2F%2Fcdn.example.com%2F20260712%2F12602_8c511196%2Findex.m3u8"
+        val parsed = DownloadNameResolver.parseSharedText("请记住我的名字-第01集|$url")
+        assertEquals("请记住我的名字-第01集", parsed.title)
+        assertEquals(url, parsed.url)
+        assertTrue(parsed.explicitTitle)
+        assertFalse(DownloadNameResolver.titleMatchesDownload(parsed.title!!, parsed.url!!))
+        val name = DownloadNameResolver.resolveForEnqueue(
+            parsed.url!!,
+            parsed.title!!,
+            "download.mp4",
+            trustUserFileName = true,
+        )
+        assertEquals("请记住我的名字-第01集.mp4", name)
     }
 
     @Test
@@ -22,6 +43,7 @@ class DownloadNameResolverTest {
         )
         assertEquals("说唱巅峰对决 2026-20260712 下", parsed.title)
         assertEquals("http://127.0.0.1:9978/m3u8?url=abc", parsed.url)
+        assertFalse(parsed.explicitTitle)
     }
 
     @Test

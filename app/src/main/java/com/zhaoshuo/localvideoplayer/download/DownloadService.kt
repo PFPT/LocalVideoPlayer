@@ -219,19 +219,19 @@ class DownloadService : Service() {
     }
 
     private fun effectiveTask(task: DownloadTask): DownloadTask {
-        val directUrl = DownloadUrlResolver.resolveDownloadUrl(task.url)
+        val downloadUrl = DownloadUrlResolver.taskDownloadUrl(task.url)
         val headers = DownloadUrlResolver.inferHeaders(task.url, task.headers)
-        return if (directUrl == task.url && headers == task.headers) task else task.copy(url = directUrl, headers = headers)
+        return if (downloadUrl == task.url && headers == task.headers) task else task.copy(url = downloadUrl, headers = headers)
     }
 
     private fun unwrapPlaylist(playlist: HlsVodPlaylist): HlsVodPlaylist = playlist.copy(
-        url = DownloadUrlResolver.unwrapProxyUrl(playlist.url),
-        initSegmentUrl = playlist.initSegmentUrl?.let(DownloadUrlResolver::unwrapProxyUrl),
+        url = DownloadUrlResolver.mediaFetchUrl(playlist.url),
+        initSegmentUrl = playlist.initSegmentUrl?.let(DownloadUrlResolver::mediaFetchUrl),
         segments = playlist.segments.map { segment ->
             segment.copy(
-                url = DownloadUrlResolver.unwrapProxyUrl(segment.url),
+                url = DownloadUrlResolver.mediaFetchUrl(segment.url),
                 encryption = segment.encryption?.let { encryption ->
-                    encryption.copy(keyUrl = DownloadUrlResolver.unwrapProxyUrl(encryption.keyUrl))
+                    encryption.copy(keyUrl = DownloadUrlResolver.mediaFetchUrl(encryption.keyUrl))
                 },
             )
         },

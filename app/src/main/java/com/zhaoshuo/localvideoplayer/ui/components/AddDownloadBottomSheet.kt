@@ -59,22 +59,44 @@ fun AddDownloadBottomSheet(
     var fileNameEdited by remember { mutableStateOf(false) }
     var autoFilledFileName by remember { mutableStateOf(false) }
     var pendingShareTitle by remember { mutableStateOf<String?>(null) }
+    var trustShareFileName by remember { mutableStateOf(false) }
+    var shareFilledUrl by remember { mutableStateOf<String?>(null) }
     var clipboardAutoFilled by remember { mutableStateOf(false) }
     val invalidUrl = stringResource(R.string.download_invalid_url)
     val invalidHeaders = stringResource(R.string.download_invalid_headers)
     val defaultFileName = stringResource(R.string.download_default_file_name)
 
-    fun trustedShareTitle(title: String?, sharedUrl: String): String {
+    fun trustedShareTitle(title: String?, sharedUrl: String, explicitTitle: Boolean): String {
         val raw = title?.trim().orEmpty()
         if (raw.isEmpty()) return ""
+        if (explicitTitle) return raw
         return raw.takeIf { DownloadNameResolver.titleMatchesDownload(raw, sharedUrl) }.orEmpty()
     }
 
     fun applySharedText(text: String, showClipboardToast: Boolean): Boolean {
         val parsed = DownloadNameResolver.parseSharedText(text)
         val sharedUrl = parsed.url ?: return false
-        pendingShareTitle = trustedShareTitle(parsed.title, sharedUrl).ifBlank { null }
+        val trusted = trustedShareTitle(parsed.title, sharedUrl, parsed.explicitTitle)
+        val trustName = parsed.explicitTitle && trusted.isNotBlank()
+        pendingShareTitle = null
+        trustShareFileName = trustName
+        shareFilledUrl = sharedUrl
         url = sharedUrl
+        scope.launch {
+            val resolved = runCatching {
+                DownloadNameResolver.resolveForEnqueue(
+                    sharedUrl,
+                    trusted,
+                    defaultFileName,
+                    context,
+                    trustName,
+                )
+            }.getOrDefault(defaultFileName)
+            if (shareFilledUrl != sharedUrl) return@launch
+            fileName = resolved
+            autoFilledFileName = true
+            if (trusted.isNotBlank()) fileNameEdited = true
+        }
         if (showClipboardToast) {
             Toast.makeText(context, context.getString(R.string.download_clipboard_filled), Toast.LENGTH_SHORT).show()
         }
@@ -122,13 +144,14 @@ fun AddDownloadBottomSheet(
         val trimmed = url.trim()
         if (trimmed.isEmpty()) {
             autoFilledFileName = false
-            pendingShareTitle = null
             return@LaunchedEffect
         }
+        if (trimmed == shareFilledUrl) return@LaunchedEffect
         if (fileNameEdited && !autoFilledFileName) return@LaunchedEffect
         val shareTitle = pendingShareTitle.orEmpty().also { pendingShareTitle = null }
+        val trustName = trustShareFileName && shareTitle.isNotBlank()
         val resolved = runCatching {
-            DownloadNameResolver.resolveForEnqueue(trimmed, shareTitle, defaultFileName, context)
+            DownloadNameResolver.resolveForEnqueue(trimmed, shareTitle, defaultFileName, context, trustName)
         }.getOrDefault(defaultFileName)
         fileName = resolved
         autoFilledFileName = true
@@ -179,17 +202,22 @@ fun AddDownloadBottomSheet(
             OutlinedTextField(
                 value = url,
                 onValueChange = { raw ->
+                    shareFilledUrl = null
                     val change = DownloadNameResolver.applyDownloadFieldChange(url, raw)
                     inputError = null
                     if (change.pasted) {
-                        pendingShareTitle = change.title
-                            ?.let { trustedShareTitle(it, change.text) }
-                            ?.ifBlank { null }
+                        val trusted = change.title
+                            ?.let { trustedShareTitle(it, change.text, change.explicitTitle) }
+                            .orEmpty()
+                        pendingShareTitle = trusted.ifBlank { null }
+                        trustShareFileName = change.explicitTitle && trusted.isNotBlank()
                     }
                     url = change.text
                     if (change.text.isBlank()) {
                         fileNameEdited = false
                         autoFilledFileName = false
+                        pendingShareTitle = null
+                        trustShareFileName = false
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -280,7 +308,13 @@ fun AddDownloadBottomSheet(
                                 inputError = invalidHeaders
                                 return@launch
                             }
-                            val usedProxy = manager.enqueue(parsedUrl, fileName.trim(), headers, saveToMovies)
+                            val usedProxy = manager.enqueue(
+                                parsedUrl,
+                                fileName.trim(),
+                                headers,
+                                saveToMovies,
+                                trustShareFileName,
+                            )
                             if (usedProxy) {
                                 Toast.makeText(
                                     context,

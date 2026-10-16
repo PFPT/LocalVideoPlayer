@@ -30,6 +30,19 @@ object DownloadUrlResolver {
         return unwrapProxyUrl(trimmed)
     }
 
+    fun taskDownloadUrl(url: String): String {
+        val trimmed = url.trim()
+        if (trimmed.isEmpty()) return trimmed
+        if (DownloadUrlClassifier.isLocalProxyUrl(trimmed)) return trimmed
+        return resolveDownloadUrl(trimmed)
+    }
+
+    fun mediaFetchUrl(url: String): String {
+        val trimmed = url.trim()
+        if (DownloadUrlClassifier.isLocalProxyUrl(trimmed)) return trimmed
+        return unwrapProxyUrl(trimmed)
+    }
+
     fun inferHeaders(url: String, userHeaders: Map<String, String>): Map<String, String> {
         if (DownloadUrlClassifier.isMagnetUrl(url)) return userHeaders
         val merged = LinkedHashMap<String, String>()
