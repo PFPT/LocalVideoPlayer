@@ -60,6 +60,7 @@ class PlaybackSession(
     private var playlistKey: String = ""
     private var softDecode: Boolean = false
     private var onPlayerScreen: Boolean = false
+    private var hostStarted: Boolean = true
     private var returnToExisting: Boolean = false
     private var sleepChoice: SleepChoice = SleepChoice.Off
     private var sleepDeadlineMs: Long? = null
@@ -137,6 +138,7 @@ class PlaybackSession(
 
     fun onEnterScreen() {
         onPlayerScreen = true
+        applyVideoSuppression()
         publish()
     }
 
@@ -145,10 +147,38 @@ class PlaybackSession(
             player?.pause()
         }
         onPlayerScreen = false
+        applyVideoSuppression()
         if (save) {
             scope.launch { saveProgress() }
         }
         publish()
+    }
+
+    fun onHostStarted() {
+        hostStarted = true
+        applyVideoSuppression()
+    }
+
+    fun onHostStopped() {
+        hostStarted = false
+        applyVideoSuppression()
+    }
+
+    fun skipBy(delta: Int, markCurrentComplete: Boolean = false) {
+        scope.launch {
+            gate.withLock {
+                val current = player ?: return@withLock
+                val target = current.currentMediaItemIndex + delta
+                if (target !in playlist.indices) return@withLock
+                if (markCurrentComplete) {
+                    saveCompletedProgress()
+                } else {
+                    saveProgress()
+                }
+                resumedIndices.remove(target)
+                seekToResume(target)
+            }
+        }
     }
 
     fun stop() {
@@ -271,6 +301,7 @@ class PlaybackSession(
         created.addListener(playbackListener)
         player = created
         PlayerSession.attach(created)
+        PlayerSession.onSkipBy = { delta -> skipBy(delta) }
         appContext.startForegroundService(Intent(appContext, PlaybackMediaService::class.java))
         progressJob?.cancel()
         progressJob = scope.launch {
@@ -296,6 +327,7 @@ class PlaybackSession(
         }
         listener = null
         if (current != null) {
+            PlayerSession.onSkipBy = null
             PlayerSession.detach(current)
         }
         appContext.stopService(Intent(appContext, PlaybackMediaService::class.java))
@@ -402,6 +434,28 @@ class PlaybackSession(
                 delay(1_000)
             }
         }
+    }
+
+    private fun applyVideoSuppression() {
+        val current = player ?: return
+        val suppress = !onPlayerScreen || !hostStarted
+        val videoDisabled = current.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_VIDEO)
+        if (videoDisabled == suppress) return
+        current.trackSelectionParameters = current.trackSelectionParameters
+            .buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, suppress)
+            .build()
+    }
+
+    private suspend fun saveCompletedProgress() {
+        val snapshot = withContext(Dispatchers.Main.immediate) { capture() } ?: return
+        val (video, _, durationMs) = snapshot
+        playbackStore.saveProgress(
+            uri = video.uri,
+            title = video.title,
+            positionMs = durationMs,
+            durationMs = durationMs,
+        )
     }
 
     private fun capture(): Triple<VideoItem, Long, Long>? {

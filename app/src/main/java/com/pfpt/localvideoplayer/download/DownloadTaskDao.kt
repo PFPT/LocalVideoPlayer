@@ -39,6 +39,12 @@ interface DownloadTaskDao {
     @Query("UPDATE download_tasks SET status = 'QUEUED', isMerging = 0 WHERE status = 'RUNNING'")
     suspend fun recoverRunningTasks(): Int
 
+    @Query(
+        "UPDATE download_tasks SET status = 'QUEUED', isMerging = 0 " +
+            "WHERE status = 'RUNNING' AND id NOT IN (:activeIds)",
+    )
+    suspend fun recoverRunningTasksExcept(activeIds: List<String>): Int
+
     @Query("UPDATE download_tasks SET status = 'RUNNING' WHERE id = :id AND status = 'QUEUED'")
     suspend fun claimQueued(id: String): Int
 

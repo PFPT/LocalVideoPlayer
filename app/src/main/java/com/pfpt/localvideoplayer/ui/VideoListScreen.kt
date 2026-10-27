@@ -102,7 +102,7 @@ import com.pfpt.localvideoplayer.data.PinnedItemsStore
 import com.pfpt.localvideoplayer.data.PlayCountStore
 import com.pfpt.localvideoplayer.data.PlaybackStore
 import com.pfpt.localvideoplayer.data.ThemePreferencesStore
-import com.pfpt.localvideoplayer.data.VideoRepository
+import com.pfpt.localvideoplayer.data.LibraryViewModel
 import com.pfpt.localvideoplayer.model.LibraryFilter
 import com.pfpt.localvideoplayer.model.LibraryTypeTab
 import com.pfpt.localvideoplayer.model.LibraryViewLayout
@@ -131,18 +131,18 @@ import com.pfpt.localvideoplayer.ui.components.LumenLibraryTabBar
 import com.pfpt.localvideoplayer.ui.components.LumenListHeader
 import com.pfpt.localvideoplayer.ui.components.RecentPlaybackSection
 import com.pfpt.localvideoplayer.ui.components.SelectionTopBar
-import com.pfpt.localvideoplayer.ui.components.SeriesFolderItem
-import com.pfpt.localvideoplayer.ui.components.VideoListItem
-import com.pfpt.localvideoplayer.ui.components.rememberEpisodeProgressList
-import com.pfpt.localvideoplayer.ui.components.rememberPlaybackProgress
-import com.pfpt.localvideoplayer.ui.components.rememberSeriesPlaybackStats
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import com.pfpt.localvideoplayer.ui.theme.ThemeMode
 import com.pfpt.localvideoplayer.ui.theme.ThemeState
 import com.pfpt.localvideoplayer.util.M3uPlaylistParser
-import com.pfpt.localvideoplayer.util.SeriesGrouper
+import com.pfpt.localvideoplayer.ui.library.AnyLibraryRow
+import com.pfpt.localvideoplayer.ui.library.playCountKeyForVideo
+import com.pfpt.localvideoplayer.ui.library.subtitleForDelete
+import com.pfpt.localvideoplayer.ui.library.titleForUri
+import com.pfpt.localvideoplayer.ui.library.titleForUris
+import com.pfpt.localvideoplayer.ui.library.urisForEntry
 import com.pfpt.localvideoplayer.util.isM3u8Title
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -204,7 +204,7 @@ fun VideoListScreen(
     isLibraryLoading: Boolean,
     isRefreshing: Boolean,
     hasPermission: Boolean,
-    repository: VideoRepository,
+    libraryViewModel: LibraryViewModel,
     hiddenVideosStore: HiddenVideosStore,
     playbackStore: PlaybackStore,
     pinnedItemsStore: PinnedItemsStore,
@@ -423,47 +423,10 @@ fun VideoListScreen(
         }
     }
 
-    fun urisForEntry(entry: VideoLibraryEntry): List<Uri> {
-        return when (entry) {
-            is VideoLibraryEntry.Series -> entry.series.episodes.map { it.uri }
-            is VideoLibraryEntry.Single -> listOf(entry.video.uri)
-        }
-    }
-
     fun urisForKeys(keys: Set<String>): List<Uri> {
         return displayLibrary
             .filter { entryKey(it) in keys }
             .flatMap { urisForEntry(it) }
-    }
-
-    fun titleForUris(uris: List<Uri>): String? {
-        if (uris.size != 1) return null
-        val target = uris.first().toString()
-        libraryEntries.forEach { entry ->
-            when (entry) {
-                is VideoLibraryEntry.Single -> {
-                    if (entry.video.uri.toString() == target) return entry.video.title
-                }
-                is VideoLibraryEntry.Series -> {
-                    entry.series.episodes.firstOrNull { it.uri.toString() == target }?.let {
-                        return it.title
-                    }
-                }
-            }
-        }
-        return null
-    }
-
-    fun subtitleForDelete(uris: List<Uri>): String? {
-        if (uris.size == 1) return titleForUris(uris)
-        val uriSet = uris.map { it.toString() }.toSet()
-        libraryEntries.forEach { entry ->
-            if (entry is VideoLibraryEntry.Series) {
-                val entryUris = entry.series.episodes.map { it.uri.toString() }.toSet()
-                if (entryUris == uriSet) return entry.series.title
-            }
-        }
-        return null
     }
 
     fun closeDeleteDialog() {
@@ -476,7 +439,7 @@ fun VideoListScreen(
     fun openDeleteDialog(uris: List<Uri>) {
         if (uris.isEmpty()) return
         pendingDeleteUris = uris
-        pendingDeleteSubtitle = subtitleForDelete(uris)
+        pendingDeleteSubtitle = subtitleForDelete(uris, libraryEntries)
         showDeleteDialog = true
     }
 
@@ -493,26 +456,11 @@ fun VideoListScreen(
         searchQuery = ""
     }
 
-    fun titleForUri(uri: Uri): String {
-        val key = uri.toString()
-        libraryEntries.forEach { entry ->
-            when (entry) {
-                is VideoLibraryEntry.Single -> {
-                    if (entry.video.uri.toString() == key) return entry.video.title
-                }
-                is VideoLibraryEntry.Series -> {
-                    entry.series.episodes.firstOrNull { it.uri.toString() == key }?.let { return it.title }
-                }
-            }
-        }
-        return ""
-    }
-
     val deleteFromDevice = rememberVideoDeleter(
         playbackStore = playbackStore,
         hiddenVideosStore = hiddenVideosStore,
         playCountStore = playCountStore,
-        titleForUri = ::titleForUri,
+        titleForUri = { uri -> titleForUri(uri, libraryEntries) },
         onVideosRemoved = onVideosRemoved,
         onDeleteStarted = { isDeleting = true },
         onDeleteFinished = {
@@ -520,23 +468,6 @@ fun VideoListScreen(
             closeDeleteDialog()
         },
     )
-
-    fun playCountKeyForVideo(video: VideoItem): String {
-        val targetUri = video.uri.toString()
-        libraryEntries.forEach { entry ->
-            when (entry) {
-                is VideoLibraryEntry.Single -> {
-                    if (entry.video.uri.toString() == targetUri) return entryKey(entry)
-                }
-                is VideoLibraryEntry.Series -> {
-                    if (entry.series.episodes.any { it.uri.toString() == targetUri }) {
-                        return entryKey(entry)
-                    }
-                }
-            }
-        }
-        return "single:${video.uri}"
-    }
 
     fun incrementPlayCount(key: String) {
         scope.launch(Dispatchers.IO) {
@@ -548,37 +479,23 @@ fun VideoListScreen(
     val onPlayVideoState by rememberUpdatedState(onPlayVideo)
 
     suspend fun resolvePlaylist(video: VideoItem): PlaylistState {
-        val entries = libraryEntriesState
-        val fromLibrary = withContext(Dispatchers.IO) {
-            repository.playlistStateFor(video, entries)
-        }
-        if (fromLibrary.items.size > 1) {
-            return fromLibrary
-        }
-        val videos = entries.flatMap { entry ->
-            when (entry) {
-                is VideoLibraryEntry.Single -> listOf(entry.video)
-                is VideoLibraryEntry.Series -> entry.series.episodes
-            }
-        }
-        return withContext(Dispatchers.Default) {
-            SeriesGrouper.quickPlaylistFor(video, videos.ifEmpty { listOf(video) })
-        }
+        return libraryViewModel.playlistStateFor(video, libraryEntriesState)
     }
 
     fun playVideoItem(video: VideoItem) {
-        incrementPlayCount(playCountKeyForVideo(video))
+        incrementPlayCount(playCountKeyForVideo(video, libraryEntries))
         scope.launch {
             onPlayVideoState(resolvePlaylist(video))
         }
     }
 
-    val playVideoHandler = remember(scope, repository) {
+    val playVideoHandler: (VideoItem) -> Unit = remember(scope, libraryViewModel) {
         { video: VideoItem ->
-            incrementPlayCount(playCountKeyForVideo(video))
+            incrementPlayCount(playCountKeyForVideo(video, libraryEntries))
             scope.launch {
                 onPlayVideoState(resolvePlaylist(video))
             }
+            Unit
         }
     }
     val openSeriesHandler = remember(onOpenSeries) { { seriesId: String -> onOpenSeries(seriesId) } }
@@ -602,72 +519,22 @@ fun VideoListScreen(
     }
 
     @Composable
-    fun SeriesLibraryRow(entry: VideoLibraryEntry.Series) {
-        val key = entryKey(entry)
-        val isSelected = key in selectedKeys
-        val episodeProgress = rememberEpisodeProgressList(
-            series = entry.series,
-            playbackStore = playbackStore,
-        )
-        val playbackStats = rememberSeriesPlaybackStats(
-            series = entry.series,
-            episodeProgress = episodeProgress,
-        )
-        SeriesFolderItem(
-            series = entry.series,
-            playbackStats = playbackStats,
+    fun LibraryListRow(entry: VideoLibraryEntry) {
+        AnyLibraryRow(
+            entry = entry,
+            selectedKeys = selectedKeys,
             selectionMode = selectionMode,
-            selected = isSelected,
-            deferThumbnailLoad = isListScrolling,
-            marked = key in pinnedKeys,
-            onToggleMark = { toggleMark(key) },
-            onClick = {
-                if (selectionMode) {
-                    toggleSelectionHandler(key, isSelected)
-                } else {
-                    incrementPlayCount(key)
-                    openSeriesHandler(entry.series.id)
-                }
-            },
-            onLongClick = { enterSelectionHandler(key) },
-            onSwipeDelete = { openDeleteHandler(urisForEntry(entry)) },
-        )
-    }
-
-    @Composable
-    fun SingleLibraryRow(entry: VideoLibraryEntry.Single) {
-        val key = entryKey(entry)
-        val isSelected = key in selectedKeys
-        val progress = rememberPlaybackProgress(
-            uriKey = entry.video.uri.toString(),
+            isListScrolling = isListScrolling,
+            pinnedKeys = pinnedKeys,
             playbackStore = playbackStore,
+            onToggleMark = ::toggleMark,
+            onToggleSelection = toggleSelectionHandler,
+            onOpenSeries = openSeriesHandler,
+            onIncrementPlayCount = ::incrementPlayCount,
+            onPlayVideo = playVideoHandler,
+            onEnterSelection = enterSelectionHandler,
+            onDeleteUris = openDeleteHandler,
         )
-        VideoListItem(
-            video = entry.video,
-            progress = progress,
-            selectionMode = selectionMode,
-            selected = isSelected,
-            deferThumbnailLoad = isListScrolling,
-            marked = key in pinnedKeys,
-            onToggleMark = { toggleMark(key) },
-            onClick = {
-                if (selectionMode) {
-                    toggleSelectionHandler(key, isSelected)
-                } else {
-                    playVideoHandler(entry.video)
-                }
-            },
-            onLongClick = { enterSelectionHandler(key) },
-            onSwipeDelete = { openDeleteHandler(listOf(entry.video.uri)) },
-        )
-    }
-
-    @Composable
-    fun AnyLibraryRow(entry: VideoLibraryEntry) {
-        when (entry) {
-            is VideoLibraryEntry.Series -> SeriesLibraryRow(entry)
-            is VideoLibraryEntry.Single -> SingleLibraryRow(entry)
-        }
     }
 
     fun playRecentRecord(record: PlaybackRecord) {
@@ -695,7 +562,7 @@ fun VideoListScreen(
             withContext(Dispatchers.IO) {
                 hiddenVideosStore.hideAll(
                     uris,
-                    uris.associate { it.toString() to titleForUri(it) },
+                    uris.associate { it.toString() to titleForUri(it, libraryEntries) },
                 )
                 playbackStore.removeRecords(uris)
                 playCountStore.removeForUris(uris)
@@ -1161,7 +1028,7 @@ fun VideoListScreen(
                                     },
                                 ) { entry ->
                                     Box(modifier = Modifier.animateItem(placementSpec = null)) {
-                                        AnyLibraryRow(entry)
+                                        LibraryListRow(entry)
                                     }
                                 }
                             } else {
@@ -1185,7 +1052,7 @@ fun VideoListScreen(
                                             },
                                         ) { entry ->
                                             Box(modifier = Modifier.animateItem(placementSpec = null)) {
-                                                AnyLibraryRow(entry)
+                                                LibraryListRow(entry)
                                             }
                                         }
                                     }
@@ -1203,7 +1070,7 @@ fun VideoListScreen(
                                             contentType = { 0 },
                                         ) { entry ->
                                             Box(modifier = Modifier.animateItem(placementSpec = null)) {
-                                                SeriesLibraryRow(entry)
+                                                LibraryListRow(entry)
                                             }
                                         }
                                     }
@@ -1221,7 +1088,7 @@ fun VideoListScreen(
                                             contentType = { 0 },
                                         ) { entry ->
                                             Box(modifier = Modifier.animateItem(placementSpec = null)) {
-                                                SeriesLibraryRow(entry)
+                                                LibraryListRow(entry)
                                             }
                                         }
                                     }
@@ -1239,7 +1106,7 @@ fun VideoListScreen(
                                             contentType = { 0 },
                                         ) { entry ->
                                             Box(modifier = Modifier.animateItem(placementSpec = null)) {
-                                                SeriesLibraryRow(entry)
+                                                LibraryListRow(entry)
                                             }
                                         }
                                     }
@@ -1274,7 +1141,7 @@ fun VideoListScreen(
                                                     contentType = { 1 },
                                                 ) { entry ->
                                                     Box(modifier = Modifier.animateItem(placementSpec = null)) {
-                                                        SingleLibraryRow(entry)
+                                                        LibraryListRow(entry)
                                                     }
                                                 }
                                             }

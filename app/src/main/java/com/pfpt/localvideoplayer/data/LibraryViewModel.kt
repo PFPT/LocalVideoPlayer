@@ -12,6 +12,7 @@ import android.util.Log
 import com.pfpt.localvideoplayer.model.VideoItem
 import com.pfpt.localvideoplayer.model.VideoLibraryEntry
 import com.pfpt.localvideoplayer.model.withoutUris
+import com.pfpt.localvideoplayer.player.PlaylistState
 import com.pfpt.localvideoplayer.util.SeriesGrouper
 import com.pfpt.localvideoplayer.util.dedupeLibraryVideos
 import com.pfpt.localvideoplayer.util.isM3u8Title
@@ -218,6 +219,27 @@ class LibraryViewModel(
 
     fun playlistStateFor(video: VideoItem) =
         repository.playlistStateFor(video, _libraryEntries.value)
+
+    suspend fun playlistStateFor(
+        video: VideoItem,
+        entries: List<VideoLibraryEntry>,
+    ): PlaylistState {
+        val fromLibrary = withContext(Dispatchers.IO) {
+            repository.playlistStateFor(video, entries)
+        }
+        if (fromLibrary.items.size > 1) {
+            return fromLibrary
+        }
+        val videos = entries.flatMap { entry ->
+            when (entry) {
+                is VideoLibraryEntry.Single -> listOf(entry.video)
+                is VideoLibraryEntry.Series -> entry.series.episodes
+            }
+        }
+        return withContext(Dispatchers.Default) {
+            SeriesGrouper.quickPlaylistFor(video, videos.ifEmpty { listOf(video) })
+        }
+    }
 
     private suspend fun performRefresh(
         showLoading: Boolean,

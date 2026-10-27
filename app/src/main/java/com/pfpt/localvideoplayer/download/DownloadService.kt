@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import com.pfpt.localvideoplayer.MainActivity
 import com.pfpt.localvideoplayer.R
 import com.pfpt.localvideoplayer.download.torrent.TorrentSession
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -74,7 +75,7 @@ class DownloadService : Service() {
             }
             ACTION_RUN_QUEUE, null -> ensureSchedulerRunning()
         }
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     private fun ensureSchedulerRunning() {
@@ -96,6 +97,7 @@ class DownloadService : Service() {
             fillLock.withLock {
                 val manager = DownloadManager.get(this@DownloadService)
                 manager.awaitReady()
+                manager.requeueOrphanedRunning(activeJobs.keys.toSet())
                 while (true) {
                     val limit = manager.effectiveConcurrentLimit(activeJobs.size + manager.countQueued())
                     if (activeJobs.size >= limit) break
@@ -168,6 +170,8 @@ class DownloadService : Service() {
                 )
             }
             download(taskId, manager, control)
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: Exception) {
             val current = manager.get(taskId) ?: return
             if (control.canceled || current.status == DownloadStatus.CANCELED) {

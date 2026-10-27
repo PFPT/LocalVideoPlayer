@@ -13,11 +13,14 @@ import androidx.work.WorkManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -73,7 +76,9 @@ class DownloadManager private constructor(private val context: Context) {
         headers: Map<String, String>,
         saveToMovies: Boolean,
         trustFileName: Boolean = false,
-    ): Boolean = enqueueInternal(url, fileName, headers, saveToMovies, trustFileName)
+    ): Boolean = scope.async {
+        enqueueInternal(url, fileName, headers, saveToMovies, trustFileName)
+    }.await()
 
     private suspend fun enqueueInternal(
         url: String,
@@ -115,7 +120,9 @@ class DownloadManager private constructor(private val context: Context) {
             headers = resolvedHeaders,
             saveToMovies = saveToMovies,
         )
-        repository.insert(task)
+        withContext(NonCancellable) {
+            repository.insert(task)
+        }
         startService()
         return usedProxy
     }
@@ -300,6 +307,11 @@ class DownloadManager private constructor(private val context: Context) {
 
     internal suspend fun claimNextQueued(): DownloadTask? = repository.claimNextQueued()
 
+    internal suspend fun requeueOrphanedRunning(activeIds: Set<String>) {
+        ready.await()
+        repository.requeueOrphanedRunning(activeIds)
+    }
+
     internal suspend fun hasQueued(): Boolean = repository.hasQueued()
 
     internal suspend fun hasPendingWork(): Boolean = repository.hasQueued()
@@ -344,10 +356,16 @@ class DownloadManager private constructor(private val context: Context) {
     }
 
     private fun startService() {
-        ContextCompat.startForegroundService(
-            context,
-            Intent(context, DownloadService::class.java).setAction(DownloadService.ACTION_RUN_QUEUE),
-        )
+        try {
+            ContextCompat.startForegroundService(
+                context,
+                Intent(context, DownloadService::class.java).setAction(DownloadService.ACTION_RUN_QUEUE),
+            )
+        } catch (_: IllegalStateException) {
+            scheduleRecovery()
+        } catch (_: SecurityException) {
+            scheduleRecovery()
+        }
     }
 
     private fun scheduleRecovery() {

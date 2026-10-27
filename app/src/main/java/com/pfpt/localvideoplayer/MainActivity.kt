@@ -15,7 +15,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModelProvider
 import com.pfpt.localvideoplayer.player.PlaybackMediaService
+import com.pfpt.localvideoplayer.player.PlaybackSessionViewModel
 import com.pfpt.localvideoplayer.util.PictureInPictureHelper
 import com.pfpt.localvideoplayer.download.DownloadService
 
@@ -57,6 +59,16 @@ class MainActivity : ComponentActivity() {
                 openPlayerTick = openPlayerTick,
             )
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        ViewModelProvider(this)[PlaybackSessionViewModel::class.java].session.onHostStarted()
+    }
+
+    override fun onStop() {
+        ViewModelProvider(this)[PlaybackSessionViewModel::class.java].session.onHostStopped()
+        super.onStop()
     }
 
     override fun onNewIntent(intent: Intent) {

@@ -40,6 +40,14 @@ class DownloadTaskRepository(
         dao.deleteById(id)
     }
 
+    suspend fun requeueOrphanedRunning(activeIds: Set<String>) {
+        if (activeIds.isEmpty()) {
+            dao.recoverRunningTasks()
+        } else {
+            dao.recoverRunningTasksExcept(activeIds.toList())
+        }
+    }
+
     suspend fun claimNextQueued(): DownloadTask? = database.withTransaction {
         val queued = dao.nextQueued() ?: return@withTransaction null
         if (dao.claimQueued(queued.id) == 1) toTask(queued.copy(status = DownloadStatus.RUNNING.name)) else null

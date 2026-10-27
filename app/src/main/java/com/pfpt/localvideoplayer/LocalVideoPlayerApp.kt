@@ -242,7 +242,7 @@ fun LocalVideoPlayerApp(
                             isLibraryLoading = isLibraryLoading && libraryEntries.isEmpty(),
                             isRefreshing = isRefreshing,
                             hasPermission = hasPermission,
-                            repository = repository,
+                            libraryViewModel = libraryViewModel,
                             hiddenVideosStore = hiddenVideosStore,
                             playbackStore = playbackStore,
                             pinnedItemsStore = pinnedItemsStore,

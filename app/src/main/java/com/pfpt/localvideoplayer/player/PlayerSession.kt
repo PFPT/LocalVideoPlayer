@@ -9,6 +9,7 @@ object PlayerSession {
     var hasNextProvider: () -> Boolean = { false }
     var onStateChanged: (() -> Unit)? = null
     var onPlayNext: (() -> Unit)? = null
+    var onSkipBy: ((Int) -> Unit)? = null
 
     fun current(): ExoPlayer? = player
 
@@ -31,17 +32,30 @@ object PlayerSession {
         onStateChanged?.invoke()
     }
 
+    fun skipBy(delta: Int) {
+        val skip = onSkipBy
+        if (skip != null) {
+            skip(delta)
+            onStateChanged?.invoke()
+            return
+        }
+        val current = player ?: return
+        val target = current.currentMediaItemIndex + delta
+        if (target !in 0 until current.mediaItemCount) return
+        current.seekTo(target, 0L)
+        onStateChanged?.invoke()
+    }
+
     fun seekToNext(): Boolean {
+        val current = player ?: return false
+        if (!current.hasNextMediaItem()) return false
         val callback = onPlayNext
         if (callback != null) {
             callback()
             onStateChanged?.invoke()
             return true
         }
-        val current = player ?: return false
-        if (!current.hasNextMediaItem()) return false
-        current.seekToNextMediaItem()
-        onStateChanged?.invoke()
+        skipBy(1)
         return true
     }
 
