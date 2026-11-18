@@ -39,6 +39,9 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.ui.theme.LumenCardPadding
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceMd
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceXs
 import com.pfpt.localvideoplayer.ui.theme.LumenThumbCorner
 import com.pfpt.localvideoplayer.util.VideoThumbnailCache
 
@@ -76,7 +79,7 @@ fun LumenMediaCard(
                 Modifier.border(1.dp, theme.glassBorder, cardShape)
             },
         )
-        .padding(12.dp)
+        .padding(LumenCardPadding)
 
     Row(
         modifier = rowModifier,
@@ -104,27 +107,15 @@ fun LumenMediaCard(
                         .background(theme.surface),
                 )
             }
-            if (progress != null && progress > 0.01f) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .background(Color.Black.copy(alpha = 0.4f)),
-                )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth(progress.coerceIn(0f, 1f))
-                        .height(3.dp)
-                        .background(theme.accent),
-                )
-            }
+            MediaProgressRail(
+                progress = progress,
+                modifier = Modifier.align(Alignment.BottomStart),
+            )
         }
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(start = 12.dp),
+                .padding(start = LumenSpaceMd),
         ) {
             Text(
                 text = title,
@@ -136,10 +127,35 @@ fun LumenMediaCard(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = theme.onSurfaceMuted,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = LumenSpaceXs),
             )
         }
         trailingContent?.invoke()
+    }
+}
+
+@Composable
+fun MediaProgressRail(
+    progress: Float?,
+    modifier: Modifier = Modifier,
+) {
+    if (progress == null || progress <= 0.01f) return
+    val theme = LocalLumenTheme.current
+    Box(modifier = modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .height(3.dp)
+                .background(Color.Black.copy(alpha = 0.4f)),
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth(progress.coerceIn(0f, 1f))
+                .height(3.dp)
+                .background(theme.accent),
+        )
     }
 }
 

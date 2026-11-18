@@ -47,7 +47,15 @@
             android:enableOnBackInvokedCallback="true"
             android:resizeableActivity="true"
             android:supportsPictureInPicture="true"
-            android:theme="@style/Theme.LocalVideoPlayer">
+            android:theme="@style/Theme.LocalVideoPlayer" />
+
+        <activity
+            android:name=".download.DownloadShareActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay">
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />

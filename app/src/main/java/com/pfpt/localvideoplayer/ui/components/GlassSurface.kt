@@ -13,11 +13,13 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.ui.theme.LumenSheetTopCorner
+import com.pfpt.localvideoplayer.ui.theme.LumenVideoCorner
 
 @Composable
 fun GlassSurface(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(20.dp),
+    shape: Shape = RoundedCornerShape(LumenVideoCorner),
     fillAlpha: Float? = null,
     borderWidth: Dp = 1.dp,
     content: @Composable BoxScope.() -> Unit,
@@ -36,7 +38,7 @@ fun GlassSurface(
 @Composable
 fun LumenSheetSurface(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+    shape: Shape = RoundedCornerShape(topStart = LumenSheetTopCorner, topEnd = LumenSheetTopCorner),
     content: @Composable BoxScope.() -> Unit,
 ) {
     val theme = LocalLumenTheme.current

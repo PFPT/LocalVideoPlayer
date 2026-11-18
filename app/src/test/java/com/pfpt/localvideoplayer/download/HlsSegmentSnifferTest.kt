@@ -19,6 +19,24 @@ class HlsSegmentSnifferTest {
     }
 
     @Test
+    fun stripsPngDisguiseBeforeTsSync() {
+        val prefix = ByteArray(126)
+        prefix[0] = 0x89.toByte()
+        prefix[1] = 0x50
+        prefix[2] = 0x4E
+        prefix[3] = 0x47
+        val packet = ByteArray(188)
+        packet[0] = 0x47
+        val disguised = prefix + packet + packet + packet
+        val offset = HlsSegmentSniffer.tsSyncOffset(disguised)
+        assertEquals(126, offset)
+        assertEquals(
+            HlsSegmentFormat.TS,
+            HlsSegmentSniffer.detectBytes(disguised.copyOfRange(offset!!, offset + 16)),
+        )
+    }
+
+    @Test
     fun rejectsCorruptSegments() {
         assertFalse(HlsSegmentSniffer.isRecognizedMedia(listOf(bytesFile(0x10, 0x20, 0x30))))
     }

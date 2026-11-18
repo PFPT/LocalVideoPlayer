@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.ui.theme.LumenOnVideo
 import com.pfpt.localvideoplayer.ui.theme.LumenAccentText
 
 @Composable
@@ -66,7 +67,7 @@ private fun ToolbarItem(
     Text(
         text = text,
         style = MaterialTheme.typography.bodyMedium,
-        color = if (highlighted) LumenAccentText else Color.White.copy(alpha = 0.9f),
+        color = if (highlighted) LumenAccentText else LumenOnVideo.copy(alpha = 0.9f),
         modifier = Modifier
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 4.dp),

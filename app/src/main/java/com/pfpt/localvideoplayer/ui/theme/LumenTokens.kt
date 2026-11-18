@@ -28,10 +28,33 @@ val LumenLightGlassBorder = Color.Black.copy(alpha = 0.12f)
 val LumenLightSheetBg = Color.White.copy(alpha = 0.98f)
 val LumenLightSheetBorder = Color.Black.copy(alpha = 0.10f)
 
+val LumenOnVideo = Color.White
+val LumenOnVideoMuted = Color.White.copy(alpha = 0.72f)
+val LumenScrim = Color.Black.copy(alpha = 0.45f)
+val LumenProgressMark = Color(0xFFFFB74D)
+val LumenProgressIntro = Color(0xFF66BB6A)
+val LumenProgressOutro = Color(0xFFEF5350)
+val LumenProgressThumb = Color.White
+
+val LumenSpaceXs = 4.dp
+val LumenSpaceSm = 8.dp
+val LumenSpaceMd = 12.dp
+val LumenSpaceLg = 16.dp
+val LumenSpaceXl = 24.dp
+
+val LumenListHorizontalInset = 16.dp
+val LumenListItemGap = 12.dp
+val LumenCardPadding = 12.dp
+
 val LumenVideoCorner = 20.dp
 val LumenThumbCorner = 12.dp
 val LumenSheetTopCorner = 32.dp
+val LumenMiniBarCorner = 16.dp
+val LumenChipCorner = 20.dp
+val LumenOverlayPillCorner = 20.dp
+
 val LumenMainPlayButtonSize = 80.dp
 val LumenOverlayPlayButtonSize = 64.dp
 val LumenCompactMainPlayButtonSize = 52.dp
 val LumenCompactOverlayPlayButtonSize = 44.dp
+val LumenHeaderActionSize = 40.dp

@@ -33,6 +33,11 @@ val GeistMonoFontFamily = FontFamily(
 )
 
 private val lumenTypography = Typography(
+    headlineMedium = TextStyle(
+        fontFamily = GeistFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 22.sp,
+    ),
     titleLarge = TextStyle(
         fontFamily = GeistFontFamily,
         fontWeight = FontWeight.SemiBold,
@@ -42,6 +47,11 @@ private val lumenTypography = Typography(
         fontFamily = GeistFontFamily,
         fontWeight = FontWeight.SemiBold,
         fontSize = 15.sp,
+    ),
+    titleSmall = TextStyle(
+        fontFamily = GeistFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 13.sp,
     ),
     bodyLarge = TextStyle(
         fontFamily = GeistFontFamily,
@@ -56,6 +66,16 @@ private val lumenTypography = Typography(
     bodySmall = TextStyle(
         fontFamily = GeistMonoFontFamily,
         fontWeight = FontWeight.Normal,
+        fontSize = 12.sp,
+    ),
+    labelLarge = TextStyle(
+        fontFamily = GeistFontFamily,
+        fontWeight = FontWeight.Medium,
+        fontSize = 13.sp,
+    ),
+    labelMedium = TextStyle(
+        fontFamily = GeistFontFamily,
+        fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
     ),
     labelSmall = TextStyle(

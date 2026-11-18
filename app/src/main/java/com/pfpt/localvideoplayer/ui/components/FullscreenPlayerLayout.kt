@@ -32,6 +32,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.ui.theme.LumenOnVideo
 import com.pfpt.localvideoplayer.player.PlayerProgressState
 import com.pfpt.localvideoplayer.ui.PlayerUiState
 import com.pfpt.localvideoplayer.util.formatSystemTime
@@ -95,7 +97,7 @@ internal fun FullscreenPlayerLayout(
                     Icon(
                         imageVector = Icons.Default.Lock,
                         contentDescription = stringResource(R.string.unlock_controls),
-                        tint = Color(0xFFFFD700),
+                        tint = LocalLumenTheme.current.accent,
                         modifier = Modifier.size(22.dp),
                     )
                 }
@@ -123,7 +125,7 @@ internal fun FullscreenPlayerLayout(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.back),
-                            tint = Color.White,
+                            tint = LumenOnVideo,
                             modifier = Modifier.size(22.dp),
                         )
                     }
@@ -236,7 +238,7 @@ private fun FullscreenSystemClock(modifier: Modifier = Modifier) {
     Text(
         text = timeText,
         style = MaterialTheme.typography.titleMedium,
-        color = Color.White,
+        color = LumenOnVideo,
         modifier = modifier,
     )
 }

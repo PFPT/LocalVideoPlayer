@@ -19,11 +19,22 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
+
+internal data class LiveDownloadProgress(
+    val downloadedBytes: Long,
+    val totalBytes: Long,
+    val hlsCompletedSegments: Int = 0,
+    val hlsTotalSegments: Int = 0,
+    val downloadSpeedBps: Long = 0,
+)
 
 class DownloadManager private constructor(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -31,14 +42,23 @@ class DownloadManager private constructor(private val context: Context) {
     private val headerCipher = DownloadHeaderCipher(context)
     private val repository = DownloadTaskRepository(DownloadDatabase.get(context), headerCipher)
     private val ready = CompletableDeferred<Unit>()
+    private val pendingEnqueues = AtomicInteger(0)
+    private val storedTasks = MutableStateFlow<List<DownloadTask>>(emptyList())
+    private val liveProgress = MutableStateFlow<Map<String, LiveDownloadProgress>>(emptyMap())
     private val _tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
     val tasks: StateFlow<List<DownloadTask>> = _tasks.asStateFlow()
+    private var knownQueuedIds = emptySet<String>()
     private val _maxConcurrentDownloads = MutableStateFlow(readMaxConcurrentDownloads())
     val maxConcurrentDownloadsFlow: StateFlow<Int> = _maxConcurrentDownloads.asStateFlow()
     private val _connectionsPerDownload = MutableStateFlow(readConnectionsPerDownload())
     val connectionsPerDownloadFlow: StateFlow<Int> = _connectionsPerDownload.asStateFlow()
 
     init {
+        scope.launch {
+            combine(storedTasks, liveProgress) { stored, live ->
+                applyLiveProgress(stored, live)
+            }.collect { _tasks.value = it }
+        }
         scope.launch {
             try {
                 val migrated = runCatching { repository.initialize(readLegacyTasks()) }.getOrDefault(false)
@@ -47,12 +67,65 @@ class DownloadManager private constructor(private val context: Context) {
                 ready.complete(Unit)
             }
             repository.tasks.collect { current ->
-                _tasks.value = current
-                if (current.any { it.status == DownloadStatus.QUEUED }) {
+                storedTasks.value = current
+                clearStaleLiveProgress(current)
+                val queued = current
+                    .filter { it.status == DownloadStatus.QUEUED }
+                    .map { it.id }
+                    .toSet()
+                if ((queued - knownQueuedIds).isNotEmpty()) {
                     scheduleRecovery()
                     startService()
                 }
+                knownQueuedIds = queued
             }
+        }
+    }
+
+    internal fun publishLiveProgress(id: String, progress: LiveDownloadProgress) {
+        liveProgress.update { current ->
+            if (current[id] == progress) current else current + (id to progress)
+        }
+    }
+
+    internal fun clearLiveProgress(id: String) {
+        liveProgress.update { current -> if (id in current) current - id else current }
+    }
+
+    private fun clearStaleLiveProgress(tasks: List<DownloadTask>) {
+        val visible = tasks
+            .filter { it.status == DownloadStatus.RUNNING && !it.isMerging }
+            .map { it.id }
+            .toSet()
+        liveProgress.update { current ->
+            val stale = current.keys.filter { it !in visible }
+            if (stale.isEmpty()) current else current - stale.toSet()
+        }
+    }
+
+    private fun applyLiveProgress(
+        tasks: List<DownloadTask>,
+        live: Map<String, LiveDownloadProgress>,
+    ): List<DownloadTask> {
+        if (live.isEmpty()) return tasks
+        return tasks.map { task ->
+            val snapshot = live[task.id] ?: return@map task
+            if (task.status != DownloadStatus.RUNNING || task.isMerging) return@map task
+            task.copy(
+                downloadedBytes = snapshot.downloadedBytes,
+                totalBytes = if (snapshot.totalBytes > 0) snapshot.totalBytes else task.totalBytes,
+                downloadSpeedBps = snapshot.downloadSpeedBps,
+                hlsCompletedSegments = if (snapshot.hlsTotalSegments > 0) {
+                    snapshot.hlsCompletedSegments
+                } else {
+                    task.hlsCompletedSegments
+                },
+                hlsTotalSegments = if (snapshot.hlsTotalSegments > 0) {
+                    snapshot.hlsTotalSegments
+                } else {
+                    task.hlsTotalSegments
+                },
+            )
         }
     }
 
@@ -64,9 +137,14 @@ class DownloadManager private constructor(private val context: Context) {
         trustFileName: Boolean = false,
         callback: ((Boolean) -> Unit)? = null,
     ) {
+        beginEnqueue()
         scope.launch {
-            val usedProxy = enqueueInternal(url, fileName, headers, saveToMovies, trustFileName)
-            callback?.invoke(usedProxy)
+            try {
+                val usedProxy = enqueueInternal(url, fileName, headers, saveToMovies, trustFileName)
+                callback?.invoke(usedProxy)
+            } finally {
+                finishEnqueue()
+            }
         }
     }
 
@@ -76,9 +154,16 @@ class DownloadManager private constructor(private val context: Context) {
         headers: Map<String, String>,
         saveToMovies: Boolean,
         trustFileName: Boolean = false,
-    ): Boolean = scope.async {
-        enqueueInternal(url, fileName, headers, saveToMovies, trustFileName)
-    }.await()
+    ): Boolean {
+        beginEnqueue()
+        return scope.async {
+            try {
+                enqueueInternal(url, fileName, headers, saveToMovies, trustFileName)
+            } finally {
+                finishEnqueue()
+            }
+        }.await()
+    }
 
     private suspend fun enqueueInternal(
         url: String,
@@ -313,6 +398,18 @@ class DownloadManager private constructor(private val context: Context) {
     }
 
     internal suspend fun hasQueued(): Boolean = repository.hasQueued()
+
+    internal fun hasPendingEnqueue(): Boolean = pendingEnqueues.get() > 0
+
+    private fun beginEnqueue() {
+        pendingEnqueues.incrementAndGet()
+        startService()
+    }
+
+    private fun finishEnqueue() {
+        pendingEnqueues.decrementAndGet()
+        startService()
+    }
 
     internal suspend fun hasPendingWork(): Boolean = repository.hasQueued()
 

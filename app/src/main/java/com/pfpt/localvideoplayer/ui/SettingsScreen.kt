@@ -23,7 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -59,12 +59,20 @@ import com.pfpt.localvideoplayer.model.AspectRatioMode
 import com.pfpt.localvideoplayer.model.LibraryViewLayout
 import com.pfpt.localvideoplayer.model.VideoSortOrder
 import com.pfpt.localvideoplayer.ui.components.AspectRatioSheet
+import com.pfpt.localvideoplayer.ui.components.GlassSurface
 import com.pfpt.localvideoplayer.ui.components.LumenListHeader
 import com.pfpt.localvideoplayer.ui.components.SpeedSelectorSheet
 import com.pfpt.localvideoplayer.ui.components.ThemeColorBottomSheet
 import com.pfpt.localvideoplayer.ui.components.labelRes
 import com.pfpt.localvideoplayer.ui.theme.LauncherIcon
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.ui.theme.LumenListHorizontalInset
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceLg
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceMd
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceSm
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceXl
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceXs
+import com.pfpt.localvideoplayer.ui.theme.LumenVideoCorner
 import com.pfpt.localvideoplayer.ui.theme.ThemeState
 import com.pfpt.localvideoplayer.util.LauncherIconSwitcher
 import kotlinx.coroutines.launch
@@ -200,212 +208,235 @@ fun SettingsScreen(
                 .padding(innerPadding)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 24.dp),
+                .padding(horizontal = LumenListHorizontalInset)
+                .padding(bottom = LumenSpaceXl),
+            verticalArrangement = Arrangement.spacedBy(LumenSpaceLg),
         ) {
-            SettingsSectionTitle(stringResource(R.string.settings_appearance))
-            SettingsClickRow(
-                title = stringResource(R.string.theme_color),
-                subtitle = stringResource(
-                    when (themeState.mode) {
-                        com.pfpt.localvideoplayer.ui.theme.ThemeMode.System -> R.string.theme_mode_system
-                        com.pfpt.localvideoplayer.ui.theme.ThemeMode.Light -> R.string.theme_mode_light
-                        com.pfpt.localvideoplayer.ui.theme.ThemeMode.Dark -> R.string.theme_mode_dark
-                    },
-                ),
-                onClick = { showThemeSheet = true },
-            )
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), color = theme.surface.copy(alpha = 0.4f))
-
-            SettingsSectionTitle(stringResource(R.string.settings_library))
-            SettingsClickRow(
-                title = stringResource(R.string.sort),
-                subtitle = stringResource(sortLabel(libraryPrefs.sortOrder)),
-                onClick = {
-                    val next = nextSort(libraryPrefs.sortOrder)
-                    scope.launch { libraryPreferencesStore.setSortOrder(next) }
-                },
-            )
-            SettingsClickRow(
-                title = stringResource(R.string.view_layout),
-                subtitle = stringResource(
-                    if (libraryPrefs.viewLayout == LibraryViewLayout.SECTIONED) {
-                        R.string.view_sectioned
-                    } else {
-                        R.string.view_flat
-                    },
-                ),
-                onClick = {
-                    val next = if (libraryPrefs.viewLayout == LibraryViewLayout.SECTIONED) {
-                        LibraryViewLayout.FLAT
-                    } else {
-                        LibraryViewLayout.SECTIONED
-                    }
-                    scope.launch { libraryPreferencesStore.setViewLayout(next) }
-                },
-            )
-            SettingsSectionTitle(stringResource(R.string.settings_folder_sources))
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            SettingsGlassGroup(title = stringResource(R.string.settings_appearance)) {
                 SettingsClickRow(
-                    title = stringResource(R.string.settings_all_files_access),
+                    title = stringResource(R.string.theme_color),
                     subtitle = stringResource(
-                        if (hasAllFilesAccess) {
-                            R.string.settings_all_files_access_on
+                        when (themeState.mode) {
+                            com.pfpt.localvideoplayer.ui.theme.ThemeMode.System -> R.string.theme_mode_system
+                            com.pfpt.localvideoplayer.ui.theme.ThemeMode.Light -> R.string.theme_mode_light
+                            com.pfpt.localvideoplayer.ui.theme.ThemeMode.Dark -> R.string.theme_mode_dark
+                        },
+                    ),
+                    onClick = { showThemeSheet = true },
+                )
+            }
+
+            SettingsGlassGroup(title = stringResource(R.string.settings_library)) {
+                SettingsClickRow(
+                    title = stringResource(R.string.sort),
+                    subtitle = stringResource(sortLabel(libraryPrefs.sortOrder)),
+                    onClick = {
+                        val next = nextSort(libraryPrefs.sortOrder)
+                        scope.launch { libraryPreferencesStore.setSortOrder(next) }
+                    },
+                )
+                SettingsClickRow(
+                    title = stringResource(R.string.view_layout),
+                    subtitle = stringResource(
+                        if (libraryPrefs.viewLayout == LibraryViewLayout.SECTIONED) {
+                            R.string.view_sectioned
                         } else {
-                            R.string.settings_all_files_access_off
+                            R.string.view_flat
                         },
                     ),
                     onClick = {
-                        val intent = Intent(
-                            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                            Uri.parse("package:${context.packageName}"),
-                        )
-                        runCatching { context.startActivity(intent) }.onFailure {
-                            context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+                        val next = if (libraryPrefs.viewLayout == LibraryViewLayout.SECTIONED) {
+                            LibraryViewLayout.FLAT
+                        } else {
+                            LibraryViewLayout.SECTIONED
                         }
+                        scope.launch { libraryPreferencesStore.setViewLayout(next) }
                     },
                 )
             }
-            if (folderSources.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.settings_no_folders),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = theme.onSurfaceMuted,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                )
-            } else {
-                folderSources.forEach { source ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = source.name,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = theme.onBackground,
-                            modifier = Modifier.weight(1f),
-                        )
-                        IconButton(
-                            onClick = {
-                                runCatching {
-                                    context.contentResolver.releasePersistableUriPermission(
-                                        Uri.parse(source.treeUri),
-                                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                                            Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                                    )
-                                }
-                                scope.launch { folderSourceStore.remove(source.treeUri) }
-                            },
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = stringResource(R.string.settings_remove_folder),
-                                tint = theme.onSurfaceMuted,
-                            )
-                        }
-                    }
-                }
-            }
-            TextButton(
-                onClick = { folderPicker.launch(null) },
-                modifier = Modifier.padding(horizontal = 12.dp),
-            ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = null)
-                Text(
-                    text = stringResource(R.string.settings_add_folder),
-                    modifier = Modifier.padding(start = 8.dp),
-                )
-            }
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), color = theme.surface.copy(alpha = 0.4f))
 
-            SettingsSectionTitle(stringResource(R.string.settings_hidden_videos))
-            if (hiddenEntries.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.settings_no_hidden_videos),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = theme.onSurfaceMuted,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                )
-            } else {
-                hiddenEntries.forEach { entry ->
+            SettingsGlassGroup(title = stringResource(R.string.settings_folder_sources)) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     SettingsClickRow(
-                        title = hiddenDisplayLabel(entry),
-                        subtitle = stringResource(R.string.settings_restore_hidden),
+                        title = stringResource(R.string.settings_all_files_access),
+                        subtitle = stringResource(
+                            if (hasAllFilesAccess) {
+                                R.string.settings_all_files_access_on
+                            } else {
+                                R.string.settings_all_files_access_off
+                            },
+                        ),
                         onClick = {
-                            scope.launch {
-                                hiddenVideosStore.unhide(Uri.parse(entry.uri))
-                                onRestoreHidden()
+                            val intent = Intent(
+                                Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                Uri.parse("package:${context.packageName}"),
+                            )
+                            runCatching { context.startActivity(intent) }.onFailure {
+                                context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
                             }
                         },
                     )
                 }
+                if (folderSources.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.settings_no_folders),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = theme.onSurfaceMuted,
+                        modifier = Modifier.padding(horizontal = LumenSpaceMd, vertical = LumenSpaceSm),
+                    )
+                } else {
+                    folderSources.forEach { source ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = LumenSpaceMd, vertical = LumenSpaceSm),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = source.name,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = theme.onBackground,
+                                modifier = Modifier.weight(1f),
+                            )
+                            IconButton(
+                                onClick = {
+                                    runCatching {
+                                        context.contentResolver.releasePersistableUriPermission(
+                                            Uri.parse(source.treeUri),
+                                            Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                                Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                                        )
+                                    }
+                                    scope.launch { folderSourceStore.remove(source.treeUri) }
+                                },
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = stringResource(R.string.settings_remove_folder),
+                                    tint = theme.onSurfaceMuted,
+                                )
+                            }
+                        }
+                    }
+                }
+                TextButton(
+                    onClick = { folderPicker.launch(null) },
+                    modifier = Modifier.padding(horizontal = LumenSpaceXs),
+                ) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = null)
+                    Text(
+                        text = stringResource(R.string.settings_add_folder),
+                        modifier = Modifier.padding(start = LumenSpaceSm),
+                    )
+                }
             }
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), color = theme.surface.copy(alpha = 0.4f))
 
-            SettingsSectionTitle(stringResource(R.string.settings_playback))
-            SettingsClickRow(
-                title = stringResource(R.string.settings_default_speed),
-                subtitle = stringResource(R.string.speed_format, formatSpeed(playerPrefs.defaultSpeed)),
-                onClick = { showSpeedSheet = true },
-            )
-            SettingsClickRow(
-                title = stringResource(R.string.settings_aspect_ratio),
-                subtitle = stringResource(playerPrefs.aspectRatioMode.labelRes()),
-                onClick = { showAspectSheet = true },
-            )
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_repeat_one),
-                checked = playerPrefs.repeatOne,
-                onCheckedChange = { scope.launch { playerPreferencesStore.setRepeatOne(it) } },
-            )
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_use_texture_view),
-                subtitle = stringResource(R.string.settings_use_texture_view_hint),
-                checked = playerPrefs.useTextureView,
-                onCheckedChange = { scope.launch { playerPreferencesStore.setUseTextureView(it) } },
-            )
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), color = theme.surface.copy(alpha = 0.4f))
+            SettingsGlassGroup(title = stringResource(R.string.settings_hidden_videos)) {
+                if (hiddenEntries.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.settings_no_hidden_videos),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = theme.onSurfaceMuted,
+                        modifier = Modifier.padding(horizontal = LumenSpaceMd, vertical = LumenSpaceSm),
+                    )
+                } else {
+                    hiddenEntries.forEach { entry ->
+                        SettingsClickRow(
+                            title = hiddenDisplayLabel(entry),
+                            subtitle = stringResource(R.string.settings_restore_hidden),
+                            onClick = {
+                                scope.launch {
+                                    hiddenVideosStore.unhide(Uri.parse(entry.uri))
+                                    onRestoreHidden()
+                                }
+                            },
+                        )
+                    }
+                }
+            }
 
-            SettingsSectionTitle(stringResource(R.string.settings_gestures))
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_gesture_brightness),
-                checked = playerPrefs.gestureBrightness,
-                onCheckedChange = { scope.launch { playerPreferencesStore.setGestureBrightness(it) } },
-            )
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_gesture_volume),
-                checked = playerPrefs.gestureVolume,
-                onCheckedChange = { scope.launch { playerPreferencesStore.setGestureVolume(it) } },
-            )
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_gesture_seek),
-                checked = playerPrefs.gestureSeek,
-                onCheckedChange = { scope.launch { playerPreferencesStore.setGestureSeek(it) } },
-            )
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_gesture_double_tap),
-                checked = playerPrefs.gestureDoubleTapSeek,
-                onCheckedChange = { scope.launch { playerPreferencesStore.setGestureDoubleTapSeek(it) } },
-            )
-            SettingsSwitchRow(
-                title = stringResource(R.string.settings_gesture_pinch),
-                checked = playerPrefs.gesturePinchZoom,
-                onCheckedChange = { scope.launch { playerPreferencesStore.setGesturePinchZoom(it) } },
-            )
+            SettingsGlassGroup(title = stringResource(R.string.settings_playback)) {
+                SettingsClickRow(
+                    title = stringResource(R.string.settings_default_speed),
+                    subtitle = stringResource(R.string.speed_format, formatSpeed(playerPrefs.defaultSpeed)),
+                    onClick = { showSpeedSheet = true },
+                )
+                SettingsClickRow(
+                    title = stringResource(R.string.settings_aspect_ratio),
+                    subtitle = stringResource(playerPrefs.aspectRatioMode.labelRes()),
+                    onClick = { showAspectSheet = true },
+                )
+                SettingsSwitchRow(
+                    title = stringResource(R.string.settings_repeat_one),
+                    checked = playerPrefs.repeatOne,
+                    onCheckedChange = { scope.launch { playerPreferencesStore.setRepeatOne(it) } },
+                )
+                SettingsSwitchRow(
+                    title = stringResource(R.string.settings_use_texture_view),
+                    subtitle = stringResource(R.string.settings_use_texture_view_hint),
+                    checked = playerPrefs.useTextureView,
+                    onCheckedChange = { scope.launch { playerPreferencesStore.setUseTextureView(it) } },
+                )
+            }
+
+            SettingsGlassGroup(title = stringResource(R.string.settings_gestures)) {
+                SettingsSwitchRow(
+                    title = stringResource(R.string.settings_gesture_brightness),
+                    checked = playerPrefs.gestureBrightness,
+                    onCheckedChange = { scope.launch { playerPreferencesStore.setGestureBrightness(it) } },
+                )
+                SettingsSwitchRow(
+                    title = stringResource(R.string.settings_gesture_volume),
+                    checked = playerPrefs.gestureVolume,
+                    onCheckedChange = { scope.launch { playerPreferencesStore.setGestureVolume(it) } },
+                )
+                SettingsSwitchRow(
+                    title = stringResource(R.string.settings_gesture_seek),
+                    checked = playerPrefs.gestureSeek,
+                    onCheckedChange = { scope.launch { playerPreferencesStore.setGestureSeek(it) } },
+                )
+                SettingsSwitchRow(
+                    title = stringResource(R.string.settings_gesture_double_tap),
+                    checked = playerPrefs.gestureDoubleTapSeek,
+                    onCheckedChange = { scope.launch { playerPreferencesStore.setGestureDoubleTapSeek(it) } },
+                )
+                SettingsSwitchRow(
+                    title = stringResource(R.string.settings_gesture_pinch),
+                    checked = playerPrefs.gesturePinchZoom,
+                    onCheckedChange = { scope.launch { playerPreferencesStore.setGesturePinchZoom(it) } },
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun SettingsSectionTitle(title: String) {
+private fun SettingsGlassGroup(
+    title: String,
+    content: @Composable () -> Unit,
+) {
     val theme = LocalLumenTheme.current
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleSmall,
-        color = theme.onSurfaceMuted,
-        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-    )
+    Column(verticalArrangement = Arrangement.spacedBy(LumenSpaceSm)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            color = theme.onSurfaceMuted,
+            modifier = Modifier.padding(horizontal = LumenSpaceXs),
+        )
+        GlassSurface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(LumenVideoCorner),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = LumenSpaceXs),
+                verticalArrangement = Arrangement.spacedBy(LumenSpaceXs),
+            ) {
+                content()
+            }
+        }
+    }
 }
 
 @Composable
@@ -419,8 +450,8 @@ private fun SettingsClickRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(horizontal = LumenSpaceMd, vertical = LumenSpaceMd),
+        verticalArrangement = Arrangement.spacedBy(LumenSpaceXs),
     ) {
         Text(text = title, style = MaterialTheme.typography.bodyLarge, color = theme.onBackground)
         Text(text = subtitle, style = MaterialTheme.typography.bodyMedium, color = theme.onSurfaceMuted)
@@ -438,7 +469,7 @@ private fun SettingsSwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 8.dp),
+            .padding(horizontal = LumenSpaceMd, vertical = LumenSpaceSm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {

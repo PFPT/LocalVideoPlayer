@@ -22,14 +22,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.pfpt.localvideoplayer.ui.theme.LumenAccentText
 import com.pfpt.localvideoplayer.ui.theme.LumenOnBackground
+import com.pfpt.localvideoplayer.ui.theme.LumenOnVideo
 import com.pfpt.localvideoplayer.util.formatDuration
 import kotlin.math.abs
 
@@ -81,8 +79,7 @@ fun SeekPreviewOverlay(
                     Text(
                         text = deltaText,
                         color = LumenAccentText,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.headlineMedium,
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -91,18 +88,18 @@ fun SeekPreviewOverlay(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = LumenOnVideo,
                         )
                         Text(
                             text = "${formatDuration(previewPositionMs)} / ${formatDuration(durationMs)}",
-                            color = Color.White,
+                            color = LumenOnVideo,
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.padding(horizontal = 12.dp),
                         )
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = LumenOnVideo,
                         )
                     }
                 }

@@ -21,6 +21,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.ui.theme.LumenOnVideo
+import com.pfpt.localvideoplayer.ui.theme.LumenOnVideoMuted
 import com.pfpt.localvideoplayer.model.VideoItem
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenMetadataGradientEnd
@@ -69,7 +71,7 @@ fun PlayerMetadataPanel(
             Text(
                 text = seriesTitle,
                 style = MaterialTheme.typography.headlineMedium,
-                color = Color.White,
+                color = LumenOnVideo,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -78,7 +80,7 @@ fun PlayerMetadataPanel(
                 Text(
                     text = stringResource(R.string.episode_progress, currentIndex + 1, totalEpisodes),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.8f),
+                    color = LumenOnVideoMuted,
                     modifier = Modifier.padding(start = 8.dp, bottom = 4.dp),
                 )
             }
@@ -101,7 +103,7 @@ fun PlayerMetadataPanel(
             Text(
                 text = stringResource(R.string.episode_picker),
                 style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
+                color = LumenOnVideo,
                 modifier = Modifier.padding(top = 20.dp),
             )
             LazyColumn(
@@ -119,8 +121,8 @@ fun PlayerMetadataPanel(
                         episode = episode,
                         isCurrent = index == currentIndex,
                         onClick = { onEpisodeSelected(index) },
-                        titleColor = if (index == currentIndex) theme.accent else Color.White,
-                        durationColor = Color.White.copy(alpha = 0.6f),
+                        titleColor = if (index == currentIndex) theme.accent else LumenOnVideo,
+                        durationColor = LumenOnVideoMuted,
                         checkTint = theme.accent,
                     )
                 }
@@ -130,7 +132,7 @@ fun PlayerMetadataPanel(
                 Text(
                     text = currentEpisode.title,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = LumenOnVideoMuted,
                     modifier = Modifier.padding(top = 16.dp),
                 )
             }
@@ -146,7 +148,7 @@ fun PlayerMetadataPanel(
                 Text(
                     text = metaParts.joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.55f),
+                    color = LumenOnVideoMuted,
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }

@@ -36,16 +36,17 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,7 +58,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
@@ -75,6 +75,12 @@ import com.pfpt.localvideoplayer.ui.components.LumenModalBottomSheet
 import com.pfpt.localvideoplayer.ui.components.RenameDownloadDialog
 import com.pfpt.localvideoplayer.ui.components.SwipeableListItem
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.ui.theme.LumenCardPadding
+import com.pfpt.localvideoplayer.ui.theme.LumenListHorizontalInset
+import com.pfpt.localvideoplayer.ui.theme.LumenListItemGap
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceMd
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceSm
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceXs
 import com.pfpt.localvideoplayer.ui.theme.LumenThumbCorner
 import kotlinx.coroutines.launch
 
@@ -82,8 +88,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun DownloadManagerScreen(
     manager: DownloadManager,
-    initialShareText: String?,
-    onInitialShareConsumed: () -> Unit,
     onOpenCompleted: (DownloadTask) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -124,12 +128,6 @@ fun DownloadManagerScreen(
     fun openAddSheet(shareText: String? = null) {
         sheetShareText = shareText
         showAddSheet = true
-    }
-
-    LaunchedEffect(initialShareText) {
-        if (initialShareText != null) {
-            openAddSheet(initialShareText)
-        }
     }
 
     Column(
@@ -202,8 +200,11 @@ fun DownloadManagerScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(
+                        horizontal = LumenListHorizontalInset,
+                        vertical = LumenSpaceMd,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(LumenListItemGap),
                 ) {
                     if (grouped.active.isNotEmpty()) {
                         item { DownloadSectionHeader(stringResource(R.string.download_section_active)) }
@@ -260,11 +261,9 @@ fun DownloadManagerScreen(
             onDismiss = {
                 showAddSheet = false
                 sheetShareText = null
-                onInitialShareConsumed()
             },
             onSubmitted = {
                 sheetShareText = null
-                onInitialShareConsumed()
             },
         )
     }
@@ -308,12 +307,19 @@ private fun DownloadListControls(
     onClearCompleted: () -> Unit,
     onClearFailed: () -> Unit,
 ) {
+    val theme = LocalLumenTheme.current
+    val chipColors = FilterChipDefaults.filterChipColors(
+        containerColor = theme.glassFill.copy(alpha = 0.04f),
+        labelColor = theme.onSurfaceMuted,
+        selectedContainerColor = theme.glassFill,
+        selectedLabelColor = theme.onBackground,
+    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .padding(top = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = LumenListHorizontalInset)
+            .padding(top = LumenSpaceSm),
+        verticalArrangement = Arrangement.spacedBy(LumenSpaceSm),
     ) {
         OutlinedTextField(
             value = query,
@@ -321,32 +327,47 @@ private fun DownloadListControls(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             placeholder = { Text(stringResource(R.string.download_search_hint)) },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = theme.glassBorder,
+                unfocusedBorderColor = theme.glassBorder.copy(alpha = 0.5f),
+                focusedContainerColor = theme.glassFill.copy(alpha = 0.04f),
+                unfocusedContainerColor = theme.glassFill.copy(alpha = 0.04f),
+                cursorColor = theme.accent,
+                focusedTextColor = theme.onBackground,
+                unfocusedTextColor = theme.onBackground,
+                focusedPlaceholderColor = theme.onSurfaceMuted,
+                unfocusedPlaceholderColor = theme.onSurfaceMuted,
+            ),
         )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(LumenSpaceSm),
         ) {
             FilterChip(
                 selected = statusFilter == DownloadListStatusFilter.All,
                 onClick = { onStatusFilter(DownloadListStatusFilter.All) },
                 label = { Text(stringResource(R.string.download_filter_all)) },
+                colors = chipColors,
             )
             FilterChip(
                 selected = statusFilter == DownloadListStatusFilter.Active,
                 onClick = { onStatusFilter(DownloadListStatusFilter.Active) },
                 label = { Text(stringResource(R.string.download_filter_active)) },
+                colors = chipColors,
             )
             FilterChip(
                 selected = statusFilter == DownloadListStatusFilter.Completed,
                 onClick = { onStatusFilter(DownloadListStatusFilter.Completed) },
                 label = { Text(stringResource(R.string.download_filter_completed)) },
+                colors = chipColors,
             )
             FilterChip(
                 selected = statusFilter == DownloadListStatusFilter.Failed,
                 onClick = { onStatusFilter(DownloadListStatusFilter.Failed) },
                 label = { Text(stringResource(R.string.download_filter_failed)) },
+                colors = chipColors,
             )
         }
         if (canPauseAll || canResumeAll || canClearCompleted || canClearFailed) {
@@ -549,8 +570,8 @@ private fun DownloadTaskCard(
                         Modifier
                     },
                 )
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(LumenCardPadding),
+            verticalArrangement = Arrangement.spacedBy(LumenSpaceMd),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -559,11 +580,10 @@ private fun DownloadTaskCard(
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(LumenSpaceSm),
                 ) {
                     Text(
                         task.fileName,
-                        fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,

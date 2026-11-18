@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.ui.theme.LumenOnVideo
 import com.pfpt.localvideoplayer.ui.theme.LumenCompactMainPlayButtonSize
 import com.pfpt.localvideoplayer.ui.theme.LumenCompactOverlayPlayButtonSize
 import com.pfpt.localvideoplayer.ui.theme.LumenMainPlayButtonSize
@@ -55,7 +56,7 @@ fun PlayerCenterControls(
             Icon(
                 imageVector = Icons.Default.SkipPrevious,
                 contentDescription = stringResource(R.string.previous),
-                tint = if (hasPrevious) Color.White else Color.White.copy(alpha = 0.3f),
+                tint = if (hasPrevious) LumenOnVideo else LumenOnVideo.copy(alpha = 0.3f),
                 modifier = Modifier
                     .align(Alignment.Center)
                     .size(skipIconSize),
@@ -71,7 +72,7 @@ fun PlayerCenterControls(
             Icon(
                 imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                 contentDescription = stringResource(if (isPlaying) R.string.pause else R.string.play),
-                tint = Color.White,
+                tint = LumenOnVideo,
                 modifier = Modifier
                     .align(Alignment.Center)
                     .size(mainIconSize),
@@ -87,7 +88,7 @@ fun PlayerCenterControls(
             Icon(
                 imageVector = Icons.Default.SkipNext,
                 contentDescription = stringResource(R.string.next),
-                tint = if (hasNext) Color.White else Color.White.copy(alpha = 0.3f),
+                tint = if (hasNext) LumenOnVideo else LumenOnVideo.copy(alpha = 0.3f),
                 modifier = Modifier
                     .align(Alignment.Center)
                     .size(skipIconSize),

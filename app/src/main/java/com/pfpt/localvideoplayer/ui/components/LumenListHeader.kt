@@ -23,6 +23,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.ui.theme.LumenHeaderActionSize
+import com.pfpt.localvideoplayer.ui.theme.LumenListHorizontalInset
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceSm
 
 @Composable
 fun LumenListHeader(
@@ -50,13 +53,13 @@ fun LumenListHeader(
                     Modifier.height(56.dp)
                 },
             )
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = LumenListHorizontalInset),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (onBack != null) {
             IconButton(
                 onClick = onBack,
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(LumenHeaderActionSize),
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -67,7 +70,7 @@ fun LumenListHeader(
         } else if (titleContent != null) {
             titleContent()
         } else {
-            Box(modifier = Modifier.size(24.dp))
+            Box(modifier = Modifier.size(LumenHeaderActionSize))
         }
         if (titleContent != null && onBack == null) {
             Spacer(modifier = Modifier.weight(1f))
@@ -75,7 +78,7 @@ fun LumenListHeader(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = LumenSpaceSm),
                 contentAlignment = Alignment.Center,
             ) {
                 if (titleContent != null) {

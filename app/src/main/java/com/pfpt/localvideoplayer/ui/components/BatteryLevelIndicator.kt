@@ -15,10 +15,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.padding
+import com.pfpt.localvideoplayer.ui.theme.LumenOnVideo
 
 @Composable
 fun BatteryLevelIndicator(modifier: Modifier = Modifier) {
@@ -48,7 +48,7 @@ fun BatteryLevelIndicator(modifier: Modifier = Modifier) {
     Text(
         text = "$level%",
         style = MaterialTheme.typography.titleMedium,
-        color = Color.White,
+        color = LumenOnVideo,
         modifier = modifier.padding(end = 12.dp),
     )
 }

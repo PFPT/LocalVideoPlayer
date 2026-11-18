@@ -132,6 +132,11 @@ import com.pfpt.localvideoplayer.ui.components.LumenListHeader
 import com.pfpt.localvideoplayer.ui.components.RecentPlaybackSection
 import com.pfpt.localvideoplayer.ui.components.SelectionTopBar
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.ui.theme.LumenListHorizontalInset
+import com.pfpt.localvideoplayer.ui.theme.LumenListItemGap
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceMd
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceSm
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceXs
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import com.pfpt.localvideoplayer.ui.theme.ThemeMode
@@ -930,12 +935,12 @@ fun VideoListScreen(
                             state = listState,
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(
-                                start = 16.dp,
-                                end = 16.dp,
-                                top = 12.dp,
+                                start = LumenListHorizontalInset,
+                                end = LumenListHorizontalInset,
+                                top = LumenSpaceMd,
                                 bottom = 88.dp,
                             ),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(LumenListItemGap),
                         ) {
                             if (!selectionMode && !isSearching && hasRecentPlayback) {
                                 item(key = "recent-playback") {
@@ -958,7 +963,7 @@ fun VideoListScreen(
                                         contentPadding = PaddingValues(0.dp),
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(bottom = 4.dp)
+                                            .padding(bottom = LumenSpaceXs)
                                             .animateItem(placementSpec = null),
                                     )
                                 }
@@ -1171,7 +1176,7 @@ private fun LibrarySectionHeader(
         text = title,
         style = MaterialTheme.typography.labelLarge,
         color = theme.onSurfaceMuted,
-        modifier = modifier.padding(top = 8.dp, bottom = 4.dp),
+        modifier = modifier.padding(top = LumenSpaceSm, bottom = LumenSpaceXs),
     )
 }
 
@@ -1194,9 +1199,9 @@ private fun SinglesCollapseHeader(
                 animationSpec = spring(stiffness = Spring.StiffnessLow),
             )
             .clickable(onClick = onClick)
-            .padding(top = 8.dp, bottom = 4.dp),
+            .padding(top = LumenSpaceSm, bottom = LumenSpaceXs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(LumenSpaceXs),
     ) {
         Text(
             text = title,

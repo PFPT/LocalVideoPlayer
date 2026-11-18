@@ -23,24 +23,53 @@ object DownloadUrlResolver {
         if (trimmed.isEmpty()) return trimmed
         if (DownloadUrlClassifier.isMagnetUrl(trimmed)) return trimmed
         if (DownloadUrlClassifier.isHlsDownloadUrl(trimmed)) {
-            return DownloadUrlClassifier.extractNestedM3u8Url(trimmed)
-                ?.let(::unwrapProxyUrl)
-                ?: unwrapProxyUrl(trimmed)
+            val nested = DownloadUrlClassifier.extractNestedM3u8Url(trimmed)?.let(::unwrapProxyUrl)
+            if (!nested.isNullOrBlank() && isFetchableNestedUrl(nested)) {
+                return absoluteHttpOrOriginal(trimmed, nested)
+            }
+            return absoluteHttpOrOriginal(trimmed, unwrapProxyUrl(trimmed))
         }
-        return unwrapProxyUrl(trimmed)
+        return absoluteHttpOrOriginal(trimmed, unwrapProxyUrl(trimmed))
     }
 
     fun taskDownloadUrl(url: String): String {
         val trimmed = url.trim()
         if (trimmed.isEmpty()) return trimmed
         if (DownloadUrlClassifier.isLocalProxyUrl(trimmed)) return trimmed
-        return resolveDownloadUrl(trimmed)
+        val resolved = resolveDownloadUrl(trimmed)
+        return if (isAbsoluteHttp(resolved) || DownloadUrlClassifier.isMagnetUrl(resolved)) resolved else trimmed
     }
 
     fun mediaFetchUrl(url: String): String {
         val trimmed = url.trim()
         if (DownloadUrlClassifier.isLocalProxyUrl(trimmed)) return trimmed
-        return unwrapProxyUrl(trimmed)
+        val unwrapped = unwrapProxyUrl(trimmed)
+        if (isAbsoluteHttp(unwrapped) || DownloadUrlClassifier.isMagnetUrl(unwrapped)) return unwrapped
+        return if (isAbsoluteHttp(trimmed)) trimmed else unwrapped
+    }
+
+    fun resolveHttpReference(baseUrl: String, reference: String): String? {
+        val ref = reference.trim()
+        val base = baseUrl.trim()
+        if (ref.isEmpty()) return null
+        if (isAbsoluteHttp(ref)) return ref
+        if (!isAbsoluteHttp(base)) return null
+        if (ref.startsWith("//")) {
+            val withScheme = base.substringBefore(':') + ":" + ref
+            if (isAbsoluteHttp(withScheme)) return withScheme
+        }
+        val direct = runCatching { URI(base).resolve(ref).toString() }.getOrNull()
+        if (direct != null && isAbsoluteHttp(direct)) return direct
+        val noQuery = base.substringBefore('?').substringBefore('#')
+        val slash = noQuery.lastIndexOf('/')
+        if (slash >= 0) {
+            val joined = noQuery.substring(0, slash + 1) + ref
+            if (isAbsoluteHttp(joined)) return joined
+        }
+        val escaped = ref.replace(":", "%3A")
+        if (escaped == ref) return null
+        return runCatching { URI(base).resolve(escaped).toString() }.getOrNull()
+            ?.takeIf(::isAbsoluteHttp)
     }
 
     fun inferHeaders(url: String, userHeaders: Map<String, String>): Map<String, String> {
@@ -112,6 +141,17 @@ object DownloadUrlResolver {
             "$scheme://$host/"
         }
     }.getOrNull()
+
+    private fun absoluteHttpOrOriginal(original: String, candidate: String): String {
+        if (isAbsoluteHttp(candidate) || DownloadUrlClassifier.isMagnetUrl(candidate)) return candidate
+        return resolveHttpReference(original, candidate) ?: original
+    }
+
+    private fun isFetchableNestedUrl(url: String): Boolean =
+        isAbsoluteHttp(url) || url.startsWith("//")
+
+    private fun isAbsoluteHttp(url: String): Boolean =
+        url.startsWith("http://", ignoreCase = true) || url.startsWith("https://", ignoreCase = true)
 
     private fun defaultPort(scheme: String): Int = when (scheme.lowercase()) {
         "http" -> 80

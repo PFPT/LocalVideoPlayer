@@ -28,6 +28,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.ui.theme.LumenOnVideo
+import com.pfpt.localvideoplayer.ui.theme.LumenOverlayPillCorner
+import com.pfpt.localvideoplayer.ui.theme.LumenScrim
 import com.pfpt.localvideoplayer.ui.theme.LumenAccentText
 
 private val BarHeight = 132.dp
@@ -54,7 +57,7 @@ fun BrightnessFeedbackOverlay(
         Icon(
             imageVector = Icons.Default.BrightnessMedium,
             contentDescription = stringResource(R.string.brightness_label),
-            tint = Color.White,
+            tint = LumenOnVideo,
             modifier = Modifier.height(20.dp),
         )
     }
@@ -79,7 +82,7 @@ fun VolumeFeedbackOverlay(
         Icon(
             imageVector = Icons.Default.VolumeUp,
             contentDescription = stringResource(R.string.volume_label),
-            tint = Color.White,
+            tint = LumenOnVideo,
             modifier = Modifier.height(20.dp),
         )
     }
@@ -105,10 +108,10 @@ fun SpeedBoostOverlay(
             Text(
                 text = stringResource(R.string.speed_boost_active),
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White,
+                color = LumenOnVideo,
                 modifier = Modifier
                     .padding(top = 8.dp, end = 56.dp)
-                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+                    .background(LumenScrim, RoundedCornerShape(LumenOverlayPillCorner))
                     .padding(horizontal = 12.dp, vertical = 5.dp),
             )
         }
@@ -153,7 +156,7 @@ private fun EdgeLevelFeedbackOverlay(
                     Text(
                         text = "${(clampedFraction * 100).toInt()}%",
                         style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
+                        color = LumenOnVideo,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(top = 6.dp, bottom = 8.dp),
                     )
@@ -161,7 +164,7 @@ private fun EdgeLevelFeedbackOverlay(
                         modifier = Modifier
                             .width(BarWidth)
                             .height(BarHeight)
-                            .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(3.dp)),
+                            .background(LumenOnVideo.copy(alpha = 0.2f), RoundedCornerShape(3.dp)),
                         contentAlignment = Alignment.BottomCenter,
                     ) {
                         Box(

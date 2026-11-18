@@ -28,7 +28,6 @@ class MainActivity : ComponentActivity() {
 
     var onPipModeChanged: ((Boolean) -> Unit)? = null
     var onPipAction: (() -> Unit)? = null
-    private var sharedDownloadText by mutableStateOf<String?>(null)
     private var downloadsNavigationTick by mutableStateOf(0)
     private var openPlayerTick by mutableStateOf(0)
 
@@ -38,7 +37,6 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
-        sharedDownloadText = extractSharedDownloadText(intent)
         if (intent?.getBooleanExtra(DownloadService.EXTRA_OPEN_DOWNLOADS, false) == true) {
             downloadsNavigationTick++
         }
@@ -53,8 +51,6 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             LocalVideoPlayerApp(
-                sharedDownloadText = sharedDownloadText,
-                onSharedDownloadConsumed = { sharedDownloadText = null },
                 downloadsNavigationTick = downloadsNavigationTick,
                 openPlayerTick = openPlayerTick,
             )
@@ -74,7 +70,6 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        sharedDownloadText = extractSharedDownloadText(intent)
         if (intent.getBooleanExtra(DownloadService.EXTRA_OPEN_DOWNLOADS, false)) {
             downloadsNavigationTick++
         }
@@ -82,22 +77,6 @@ class MainActivity : ComponentActivity() {
             openPlayerTick++
         }
     }
-
-    private fun extractSharedDownloadText(intent: Intent?): String? {
-        if (intent?.action != Intent.ACTION_SEND || intent.type != "text/plain") return null
-        val text = intent.getStringExtra(Intent.EXTRA_TEXT)?.trim().orEmpty()
-        if (text.isBlank()) return null
-        val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)?.trim().orEmpty()
-            .ifBlank { intent.getStringExtra(Intent.EXTRA_TITLE)?.trim().orEmpty() }
-        return if (text.isHttpUrl() && subject.isNotBlank()) {
-            "$subject|$text"
-        } else {
-            text
-        }
-    }
-
-    private fun String.isHttpUrl(): Boolean =
-        startsWith("http://") || startsWith("https://")
 
     fun enterPipMode(
         hasNext: Boolean,

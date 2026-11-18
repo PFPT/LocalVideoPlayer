@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.player.PlayerProgressState
 import com.pfpt.localvideoplayer.ui.PlayerUiState
 
@@ -227,7 +228,7 @@ private fun LandscapePlayerLayoutContent(
                     Icon(
                         imageVector = Icons.Default.Lock,
                         contentDescription = stringResource(R.string.unlock_controls),
-                        tint = Color(0xFFFFD700),
+                        tint = LocalLumenTheme.current.accent,
                         modifier = Modifier.size(22.dp),
                     )
                 }

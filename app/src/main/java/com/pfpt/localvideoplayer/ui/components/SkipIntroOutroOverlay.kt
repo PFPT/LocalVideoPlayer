@@ -18,6 +18,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.ui.theme.LumenOnVideo
+import com.pfpt.localvideoplayer.ui.theme.LumenOverlayPillCorner
 
 @Composable
 fun SkipIntroOutroOverlay(
@@ -39,9 +41,9 @@ fun SkipIntroOutroOverlay(
             Text(
                 text = stringResource(R.string.skip_intro_action),
                 style = MaterialTheme.typography.labelLarge,
-                color = Color.White,
+                color = LumenOnVideo,
                 modifier = Modifier
-                    .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(20.dp))
+                    .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(LumenOverlayPillCorner))
                     .clickable(onClick = onSkipIntro)
                     .padding(horizontal = 16.dp, vertical = 10.dp),
             )
@@ -57,9 +59,9 @@ fun SkipIntroOutroOverlay(
             Text(
                 text = stringResource(R.string.skip_outro_action),
                 style = MaterialTheme.typography.labelLarge,
-                color = Color.White,
+                color = LumenOnVideo,
                 modifier = Modifier
-                    .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(20.dp))
+                    .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(LumenOverlayPillCorner))
                     .clickable(onClick = onSkipOutro)
                     .padding(horizontal = 16.dp, vertical = 10.dp),
             )

@@ -1,7 +1,6 @@
 package com.pfpt.localvideoplayer.download
 
 import java.io.IOException
-import java.net.URI
 import java.security.MessageDigest
 
 internal data class HlsVodPlaylist(
@@ -45,6 +44,7 @@ internal data class HlsEncryption(
 
 internal enum class HlsVodFailure {
     INVALID,
+    EXPIRED,
     LIVE,
     UNSUPPORTED_MASTER,
     UNSUPPORTED_ENCRYPTION,
@@ -80,7 +80,7 @@ internal class HlsVodResolver(
 internal object HlsVodPlaylistParser {
     fun selectVariant(playlistUrl: String, text: String): String? {
         val lines = lines(text)
-        requireHeader(lines)
+        requireHeader(lines, text)
         if (lines.any { it.startsWith("#EXT-X-I-FRAME-STREAM-INF") }) {
             throw HlsVodException(HlsVodFailure.UNSUPPORTED_MASTER)
         }
@@ -112,7 +112,7 @@ internal object HlsVodPlaylistParser {
 
     fun parseMediaPlaylist(playlistUrl: String, text: String): HlsVodPlaylist {
         val lines = lines(text)
-        requireHeader(lines)
+        requireHeader(lines, text)
         if (lines.any { it.startsWith("#EXT-X-STREAM-INF:") || it.startsWith("#EXT-X-I-FRAME-STREAM-INF") }) {
             throw HlsVodException(HlsVodFailure.UNSUPPORTED_MASTER)
         }
@@ -249,15 +249,18 @@ internal object HlsVodPlaylistParser {
         .filter(String::isNotEmpty)
         .toList()
 
-    private fun requireHeader(lines: List<String>) {
-        if (lines.firstOrNull() != "#EXTM3U") throw HlsVodException(HlsVodFailure.INVALID)
-    }
-
-    private fun resolve(baseUrl: String, reference: String): String = try {
-        URI(baseUrl).resolve(reference).toString()
-    } catch (_: IllegalArgumentException) {
+    private fun requireHeader(lines: List<String>, raw: String) {
+        if (lines.firstOrNull() == "#EXTM3U") return
+        if (isExpiredLinkPage(raw)) throw HlsVodException(HlsVodFailure.EXPIRED)
         throw HlsVodException(HlsVodFailure.INVALID)
     }
+
+    private fun isExpiredLinkPage(raw: String): Boolean =
+        raw.contains("链接失效") || raw.contains("<pre>") || raw.contains("<html", ignoreCase = true)
+
+    private fun resolve(baseUrl: String, reference: String): String =
+        DownloadUrlResolver.resolveHttpReference(baseUrl, reference)
+            ?: throw HlsVodException(HlsVodFailure.INVALID)
 
     private fun signature(url: String, text: String): String {
         val bytes = MessageDigest.getInstance("SHA-256").digest((url + "\n" + text).toByteArray())

@@ -7,9 +7,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.pfpt.localvideoplayer.ui.theme.LumenOnVideo
+import com.pfpt.localvideoplayer.ui.theme.LumenOnVideoMuted
 
 @Composable
 fun PlayerTopBar(
@@ -21,7 +22,7 @@ fun PlayerTopBar(
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
-            color = Color.White,
+            color = LumenOnVideo,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -29,7 +30,7 @@ fun PlayerTopBar(
             Text(
                 text = resolution,
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.7f),
+                color = LumenOnVideoMuted,
                 modifier = Modifier.padding(top = 2.dp),
             )
         }

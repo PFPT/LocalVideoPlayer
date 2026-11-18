@@ -24,6 +24,21 @@ class HlsVodPlaylistParserTest {
     }
 
     @Test
+    fun resolvesColonRelativeSegmentAgainstPlaylistHost() {
+        val playlist = HlsVodPlaylistParser.parseMediaPlaylist(
+            "https://cdn.example.com/video/index.m3u8",
+            """
+                #EXTM3U
+                #EXTINF:6,
+                01:seg.ts
+                #EXT-X-ENDLIST
+            """.trimIndent(),
+        )
+
+        assertEquals("https://cdn.example.com/video/01:seg.ts", playlist.segments.single().url)
+    }
+
+    @Test
     fun parsesExplicitAndSequenceDerivedAesIvs() {
         val explicit = HlsVodPlaylistParser.parseIv("0x000102030405060708090a0b0c0d0e0f")
         assertArrayEquals(ByteArray(16) { it.toByte() }, explicit)
@@ -178,5 +193,22 @@ class HlsVodPlaylistParserTest {
         }
 
         assertEquals(HlsVodFailure.UNSUPPORTED_SEGMENT, error.failure)
+    }
+
+    @Test
+    fun rejectsExpiredLinkPage() {
+        val error = assertThrows(HlsVodException::class.java) {
+            HlsVodPlaylistParser.parseMediaPlaylist(
+                "http://111.170.9.52:9090/nby/m3u8/getM3u8?name=jx.91by.top&time=1793156926234&url=NBY-482bf7efe2b945b0778fe77ab447f799.m3u8",
+                """
+                    <pre>
+                    靓仔链接失效了      一天天的气息
+                    请重新获取
+                    </pre>
+                """.trimIndent(),
+            )
+        }
+
+        assertEquals(HlsVodFailure.EXPIRED, error.failure)
     }
 }

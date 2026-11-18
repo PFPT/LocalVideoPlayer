@@ -275,7 +275,7 @@
     <string name="download_clear_failed">清除失败</string>
     <string name="download_copy_link">复制链接</string>
     <string name="download_link_copied">已复制链接</string>
-    <string name="download_invalid_url">请输入 HTTP 或 HTTPS 地址</string>
+    <string name="download_invalid_url">请输入 HTTP、HTTPS 或磁力链接</string>
     <string name="download_invalid_headers">每个请求头必须使用“名称: 值”格式</string>
     <string name="download_default_file_name">download.mp4</string>
     <string name="download_status_queued">等待下载</string>
@@ -317,6 +317,7 @@
     <string name="download_paused">下载已暂停</string>
     <string name="download_output_failed">无法创建下载目标</string>
     <string name="download_hls_invalid">HLS 播放列表格式无效</string>
+    <string name="download_hls_expired">链接已失效，请在来源中重新打开这一集后再分享</string>
     <string name="download_hls_live_unsupported">暂不支持直播 HLS 播放列表</string>
     <string name="download_hls_master_unsupported">HLS 主播放列表格式不受支持</string>
     <string name="download_hls_encrypted_unsupported">HLS 加密方式不受支持</string>

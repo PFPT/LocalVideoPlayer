@@ -52,7 +52,11 @@ import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
 import com.pfpt.localvideoplayer.model.PlaybackRecord
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.ui.theme.LumenCardPadding
 import com.pfpt.localvideoplayer.ui.theme.LumenDelete
+import com.pfpt.localvideoplayer.ui.theme.LumenListItemGap
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceSm
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceXs
 import com.pfpt.localvideoplayer.ui.theme.LumenThumbCorner
 
 @Composable
@@ -66,15 +70,15 @@ fun RecentPlaybackSection(
     )
     if (records.isEmpty()) return
 
-    Column(modifier = modifier.padding(bottom = 8.dp)) {
+    Column(modifier = modifier.padding(bottom = LumenSpaceSm)) {
         Text(
             text = stringResource(R.string.recent_playback),
             style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(vertical = 8.dp),
+            modifier = Modifier.padding(vertical = LumenSpaceSm),
         )
         LazyRow(
             contentPadding = PaddingValues(0.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(LumenListItemGap),
         ) {
             items(records, key = { it.uri.toString() }) { record ->
                 RecentPlaybackCard(
@@ -112,11 +116,11 @@ private fun RecentPlaybackCard(
             .clickable(onClick = onClick)
             .background(theme.glassFill)
             .border(1.dp, theme.glassBorder, cardShape)
-            .padding(8.dp),
+            .padding(LumenCardPadding),
     ) {
         Box(
             modifier = Modifier
-                .width(104.dp)
+                .fillMaxWidth()
                 .height(72.dp)
                 .clip(RoundedCornerShape(LumenThumbCorner)),
         ) {
@@ -124,38 +128,26 @@ private fun RecentPlaybackCard(
                 thumbnailUri = record.uri,
                 modifier = Modifier.fillMaxSize(),
             )
-            if (progress != null && progress > 0.01f) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .background(Color.Black.copy(alpha = 0.4f)),
-                )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth(progress)
-                        .height(3.dp)
-                        .background(theme.accent),
-                )
-            }
+            MediaProgressRail(
+                progress = progress,
+                modifier = Modifier.align(Alignment.BottomStart),
+            )
         }
         Text(
             text = record.title,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyLarge,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 6.dp),
+            modifier = Modifier.padding(top = LumenSpaceSm),
         )
         if (subtitle.isNotBlank()) {
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.bodySmall,
                 color = theme.onSurfaceMuted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp),
+                modifier = Modifier.padding(top = LumenSpaceXs),
             )
         }
     }

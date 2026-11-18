@@ -42,6 +42,33 @@ class DownloadUrlResolverTest {
   }
 
   @Test
+  fun keepsRelativeNestedM3u8OnOuterUrl() {
+    val url = "https://api.example.com/play?url=index.m3u8"
+    assertEquals(url, DownloadUrlResolver.taskDownloadUrl(url))
+  }
+
+  @Test
+  fun keepsGatewayM3u8Query() {
+    val url =
+      "http://111.170.9.52:9090/nby/m3u8/getM3u8?name=jx.91by.top&time=1793156926234&url=NBY-482bf7efe2b945b0778fe77ab447f799.m3u8"
+    assertEquals(url, DownloadUrlResolver.taskDownloadUrl(url))
+  }
+
+  @Test
+  fun resolvesProtocolRelativeNestedM3u8() {
+    val url = "https://api.example.com/play?url=%2F%2Fcdn.example.com%2Fvod%2Findex.m3u8"
+    assertEquals(
+      "https://cdn.example.com/vod/index.m3u8",
+      DownloadUrlResolver.taskDownloadUrl(url),
+    )
+  }
+
+  @Test
+  fun keepsOuterUrlWhenReferenceHasNoHttpBase() {
+    assertEquals(null, DownloadUrlResolver.resolveHttpReference("index.m3u8", "01:seg.ts"))
+  }
+
+  @Test
   fun inferHeadersAddsRefererFromDirectUrl() {
     val url =
         "http://127.0.0.1:9978/m3u8?url=https%3A%2F%2Fcdn.example.com%2Findex.m3u8"

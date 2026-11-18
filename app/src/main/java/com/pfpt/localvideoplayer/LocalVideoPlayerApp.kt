@@ -77,8 +77,6 @@ private const val ROUTE_SETTINGS = "settings"
 
 @Composable
 fun LocalVideoPlayerApp(
-    sharedDownloadText: String? = null,
-    onSharedDownloadConsumed: () -> Unit = {},
     downloadsNavigationTick: Int = 0,
     openPlayerTick: Int = 0,
 ) {
@@ -171,10 +169,6 @@ fun LocalVideoPlayerApp(
             }
             knownCompleted = completed
         }
-    }
-
-    LaunchedEffect(sharedDownloadText) {
-        if (sharedDownloadText != null) navController.navigate(ROUTE_DOWNLOADS)
     }
 
     LaunchedEffect(Unit) {
@@ -342,8 +336,6 @@ fun LocalVideoPlayerApp(
                     composable(ROUTE_DOWNLOADS) {
                         DownloadManagerScreen(
                             manager = downloadManager,
-                            initialShareText = sharedDownloadText,
-                            onInitialShareConsumed = onSharedDownloadConsumed,
                             onOpenCompleted = { task ->
                                 openCompletedDownload(context, task, navController) { playlistState = it }
                             },

@@ -37,6 +37,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.ui.theme.LumenOnVideo
+import com.pfpt.localvideoplayer.ui.theme.LumenOnVideoMuted
+import com.pfpt.localvideoplayer.ui.theme.LumenProgressIntro
+import com.pfpt.localvideoplayer.ui.theme.LumenProgressMark
+import com.pfpt.localvideoplayer.ui.theme.LumenProgressOutro
+import com.pfpt.localvideoplayer.ui.theme.LumenProgressThumb
 import com.pfpt.localvideoplayer.ui.theme.LumenBuffered
 import com.pfpt.localvideoplayer.util.formatDuration
 
@@ -100,7 +106,7 @@ fun PlayerProgressBar(
     } else {
         0f
     }
-    val skipMarkColor = Color(0xFFFFB74D).copy(alpha = 0.75f)
+    val skipMarkColor = LumenProgressMark.copy(alpha = 0.75f)
 
     Column(modifier = modifier) {
         if (!compact) {
@@ -112,12 +118,12 @@ fun PlayerProgressBar(
                 Text(
                     text = formatDuration(displayPositionMs),
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White,
+                    color = LumenOnVideo,
                 )
                 Text(
                     text = formatDuration(durationMs),
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White,
+                    color = LumenOnVideo,
                 )
             }
         }
@@ -129,7 +135,7 @@ fun PlayerProgressBar(
                 Text(
                     text = formatDuration(displayPositionMs),
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White,
+                    color = LumenOnVideo,
                     modifier = Modifier.padding(end = 8.dp),
                 )
             }
@@ -189,26 +195,26 @@ fun PlayerProgressBar(
                         .height(3.dp)
                         .align(Alignment.CenterStart)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(Color.White),
+                        .background(LumenProgressThumb),
                 )
                 val timelineMarks = LocalTimelineMarks.current
                 if (durationMs > 0L) {
                     timelineMarks.bookmarkPositionsMs.forEach { positionMs ->
                         TimelineDot(
                             fraction = positionMs.toFloat() / durationMs.toFloat(),
-                            color = Color(0xFFFFB74D),
+                            color = LumenProgressMark,
                         )
                     }
                     timelineMarks.abPointA?.let { positionMs ->
                         TimelineDot(
                             fraction = positionMs.toFloat() / durationMs.toFloat(),
-                            color = Color(0xFF81C784),
+                            color = LumenProgressIntro,
                         )
                     }
                     timelineMarks.abPointB?.let { positionMs ->
                         TimelineDot(
                             fraction = positionMs.toFloat() / durationMs.toFloat(),
-                            color = Color(0xFFEF5350),
+                            color = LumenProgressOutro,
                         )
                     }
                 }
@@ -232,7 +238,7 @@ fun PlayerProgressBar(
                         }
                     },
                     colors = SliderDefaults.colors(
-                        thumbColor = Color.White,
+                        thumbColor = LumenProgressThumb,
                         activeTrackColor = Color.Transparent,
                         inactiveTrackColor = Color.Transparent,
                     ),
@@ -252,7 +258,7 @@ fun PlayerProgressBar(
                 Text(
                     text = formatDuration(durationMs),
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White,
+                    color = LumenOnVideo,
                     modifier = Modifier.padding(start = 8.dp),
                 )
             }
@@ -266,7 +272,7 @@ fun PlayerProgressBar(
                         contentDescription = stringResource(
                             if (isFullscreen) R.string.exit_fullscreen else R.string.fullscreen,
                         ),
-                        tint = Color.White,
+                        tint = LumenOnVideo,
                         modifier = Modifier.size(20.dp),
                     )
                 }
@@ -312,7 +318,7 @@ private fun SkipMarkChip(
     Text(
         text = label,
         style = MaterialTheme.typography.labelMedium,
-        color = if (marked) Color(0xFFFFB74D) else Color.White.copy(alpha = 0.85f),
+        color = if (marked) LumenProgressMark else LumenOnVideoMuted,
         modifier = modifier
             .clip(RoundedCornerShape(4.dp))
             .pointerInput(onClick, onLongClick) {

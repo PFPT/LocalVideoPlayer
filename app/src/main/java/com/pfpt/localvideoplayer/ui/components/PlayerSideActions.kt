@@ -17,10 +17,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.ui.theme.LumenOnVideo
 
 @Composable
 internal fun PlayerSideActions(
@@ -36,13 +37,14 @@ internal fun PlayerSideActions(
     modifier: Modifier = Modifier,
     showBack: Boolean = true,
 ) {
+    val theme = LocalLumenTheme.current
     val buttons: @Composable () -> Unit = {
         if (showBack) {
             SideRailButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = stringResource(R.string.back),
-                    tint = Color.White,
+                    tint = LumenOnVideo,
                     modifier = Modifier.size(22.dp),
                 )
             }
@@ -53,7 +55,7 @@ internal fun PlayerSideActions(
                 contentDescription = stringResource(
                     if (controlsLocked) R.string.unlock_controls else R.string.lock_controls,
                 ),
-                tint = if (controlsLocked) Color(0xFFFFD700) else Color.White,
+                tint = if (controlsLocked) theme.accent else LumenOnVideo,
                 modifier = Modifier.size(22.dp),
             )
         }
@@ -61,7 +63,7 @@ internal fun PlayerSideActions(
             Icon(
                 imageVector = Icons.Default.ScreenRotation,
                 contentDescription = stringResource(R.string.rotate_screen),
-                tint = Color.White,
+                tint = LumenOnVideo,
                 modifier = Modifier.size(22.dp),
             )
         }
@@ -70,7 +72,7 @@ internal fun PlayerSideActions(
                 Icon(
                     imageVector = Icons.Default.PictureInPictureAlt,
                     contentDescription = stringResource(R.string.picture_in_picture),
-                    tint = Color.White,
+                    tint = LumenOnVideo,
                     modifier = Modifier.size(22.dp),
                 )
             }
@@ -81,7 +83,7 @@ internal fun PlayerSideActions(
                 contentDescription = stringResource(
                     if (isFullscreen) R.string.exit_fullscreen else R.string.fullscreen,
                 ),
-                tint = Color.White,
+                tint = LumenOnVideo,
                 modifier = Modifier.size(22.dp),
             )
         }

@@ -22,11 +22,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
 import com.pfpt.localvideoplayer.model.LibraryTypeTab
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
+import com.pfpt.localvideoplayer.ui.theme.LumenChipCorner
+import com.pfpt.localvideoplayer.ui.theme.LumenListHorizontalInset
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceSm
+import com.pfpt.localvideoplayer.ui.theme.LumenSpaceXs
 
 @Composable
 fun LumenLibraryTabBar(
@@ -34,19 +37,24 @@ fun LumenLibraryTabBar(
     selectedTab: LibraryTypeTab,
     onTabSelected: (LibraryTypeTab) -> Unit,
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp),
+    contentPadding: PaddingValues = PaddingValues(horizontal = LumenListHorizontalInset),
 ) {
     val theme = LocalLumenTheme.current
-    val chipShape = RoundedCornerShape(20.dp)
+    val chipShape = RoundedCornerShape(LumenChipCorner)
     LazyRow(
         modifier = modifier,
         contentPadding = contentPadding,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LumenSpaceSm),
     ) {
         items(tabs, key = { it.name }) { tab ->
             val selected = tab == selectedTab
             val label = tabLabel(tab)
             val textColor = if (selected) theme.onBackground else theme.onSurfaceMuted
+            val textStyle = if (selected) {
+                MaterialTheme.typography.bodyLarge
+            } else {
+                MaterialTheme.typography.bodyMedium
+            }
             val chipModifier = Modifier
                 .clip(chipShape)
                 .then(
@@ -59,12 +67,12 @@ fun LumenLibraryTabBar(
                     },
                 )
                 .clickable { onTabSelected(tab) }
-                .padding(horizontal = 14.dp, vertical = 8.dp)
+                .padding(horizontal = 14.dp, vertical = LumenSpaceSm)
 
             Row(
                 modifier = chipModifier,
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(LumenSpaceXs),
             ) {
                 if (tab == LibraryTypeTab.MARKED) {
                     Icon(
@@ -76,9 +84,7 @@ fun LumenLibraryTabBar(
                 }
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
-                    ),
+                    style = textStyle,
                     color = textColor,
                 )
             }
