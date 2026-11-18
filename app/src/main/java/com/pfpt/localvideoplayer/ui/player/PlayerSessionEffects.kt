@@ -26,7 +26,9 @@ import com.pfpt.localvideoplayer.player.PlaybackSession
 import com.pfpt.localvideoplayer.player.PlayerSession
 import com.pfpt.localvideoplayer.player.PlayerViewModel
 import com.pfpt.localvideoplayer.player.PlayerProgressState
+import com.pfpt.localvideoplayer.player.DecoderRecovery
 import com.pfpt.localvideoplayer.player.abLoopTarget
+import com.pfpt.localvideoplayer.player.decoderRecovery
 import com.pfpt.localvideoplayer.player.isSoftwareDecodeRetryable
 import com.pfpt.localvideoplayer.player.isSourceReadFailure
 import com.pfpt.localvideoplayer.player.showsPauseIcon
@@ -92,27 +94,30 @@ internal fun PlayerSessionEffects(
     }
 
     fun handlePlayerError(error: PlaybackException) {
-        val canRetry = error.isSoftwareDecodeRetryable() &&
-            !ui.appliedSoftDecode &&
-            !ui.softDecodeRetried
-        if (canRetry) {
-            ui.softDecodeRetried = true
-            ui.softDecodeRetryPending = true
-            ui.playbackFailure = null
-            ui.replayPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
-            playbackSession.resumedIndices.remove(ui.currentIndex)
-            scope.launch {
-                runCatching { saveCurrentProgress() }
-                ui.appliedSoftDecode = true
-                ui.softDecodeGeneration += 1
+        when (
+            decoderRecovery(
+                retryable = error.isSoftwareDecodeRetryable(),
+                sourceRead = error.isSourceReadFailure(),
+                appliedSoftDecode = ui.appliedSoftDecode,
+                alreadyRetried = ui.softDecodeRetried,
+                retryPending = ui.softDecodeRetryPending,
+            )
+        ) {
+            DecoderRecovery.RetrySoft -> {
+                ui.softDecodeRetried = true
+                ui.softDecodeRetryPending = true
+                ui.playbackFailure = null
+                ui.replayPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+                playbackSession.resumedIndices.remove(ui.currentIndex)
+                scope.launch {
+                    runCatching { saveCurrentProgress() }
+                    ui.appliedSoftDecode = true
+                    ui.softDecodeGeneration += 1
+                }
             }
-            return
-        }
-        if (ui.softDecodeRetryPending) return
-        ui.playbackFailure = if (error.isSourceReadFailure()) {
-            PlaybackFailure.Read
-        } else {
-            PlaybackFailure.Decode
+            DecoderRecovery.Ignore -> Unit
+            DecoderRecovery.FailRead -> ui.playbackFailure = PlaybackFailure.Read
+            DecoderRecovery.FailDecode -> ui.playbackFailure = PlaybackFailure.Decode
         }
     }
 
