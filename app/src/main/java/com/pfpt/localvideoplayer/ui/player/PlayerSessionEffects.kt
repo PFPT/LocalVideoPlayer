@@ -32,6 +32,9 @@ import com.pfpt.localvideoplayer.player.isSourceReadFailure
 import com.pfpt.localvideoplayer.player.showsPauseIcon
 import com.pfpt.localvideoplayer.player.shouldBackfillDuration
 import com.pfpt.localvideoplayer.player.shouldPublishKnownDuration
+import com.pfpt.localvideoplayer.player.SpeedSnapshot
+import com.pfpt.localvideoplayer.player.speedBoostEnd
+import com.pfpt.localvideoplayer.player.speedToRestoreOnLeave
 import com.pfpt.localvideoplayer.ui.PlaybackFailure
 import com.pfpt.localvideoplayer.ui.PlayerUiState
 import com.pfpt.localvideoplayer.ui.components.displayVideoSize
@@ -260,6 +263,11 @@ internal fun PlayerSessionEffects(
             ui.brightnessHideJob?.cancel()
             ui.volumeHideJob?.cancel()
             castManager?.bindLocalPlayer(null)
+            val leavingSpeed = SpeedSnapshot(
+                playbackSpeed = ui.playbackSpeed,
+                savedPlaybackSpeed = ui.savedPlaybackSpeed,
+                boosted = ui.isSpeedBoosted,
+            )
             val stillOwned = playbackSession.player() === exoPlayer
             if (stillOwned) {
                 val video = playlist.getOrNull(ui.currentIndex)
@@ -273,9 +281,7 @@ internal fun PlayerSessionEffects(
                 PlayerSession.onStateChanged = null
                 PlayerSession.onPlayNext = null
                 exoPlayer.removeListener(listener)
-                if (ui.isSpeedBoosted) {
-                    exoPlayer.setPlaybackSpeed(ui.savedPlaybackSpeed)
-                }
+                speedToRestoreOnLeave(leavingSpeed)?.let { exoPlayer.setPlaybackSpeed(it) }
                 playbackSession.onLeaveScreen(
                     pauseLocal = castingOnLeave.value,
                     save = progressSnapshot == null,
@@ -288,7 +294,10 @@ internal fun PlayerSessionEffects(
             ui.isFullscreen = false
             activity?.window?.colorMode = ActivityInfo.COLOR_MODE_DEFAULT
             restoreSystemBars()
-            ui.resetSpeedBoost()
+            val ended = speedBoostEnd(leavingSpeed)
+            ui.playbackSpeed = ended.playbackSpeed
+            ui.savedPlaybackSpeed = ended.savedPlaybackSpeed
+            ui.isSpeedBoosted = ended.boosted
             orientationController?.lockPortrait()
         }
     }

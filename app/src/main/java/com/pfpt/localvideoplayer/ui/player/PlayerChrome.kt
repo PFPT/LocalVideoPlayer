@@ -4,13 +4,14 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.pfpt.localvideoplayer.cast.CastManager
 import com.pfpt.localvideoplayer.data.PlayerPreferencesStore
 import com.pfpt.localvideoplayer.player.PlayerProgressState
+import com.pfpt.localvideoplayer.player.SpeedChange
+import com.pfpt.localvideoplayer.player.SpeedSnapshot
+import com.pfpt.localvideoplayer.player.speedBoostEnd
+import com.pfpt.localvideoplayer.player.speedBoostStart
 import com.pfpt.localvideoplayer.ui.PlayerUiState
 import com.pfpt.localvideoplayer.util.PlaybackSystemControls
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlin.math.max
-
-private const val MIN_SPEED_BOOST = 2.0f
 
 internal class PlayerChromeActions(
     val onSpeedBoostStart: () -> Unit,
@@ -42,16 +43,38 @@ internal fun playerChromeActions(
 ): PlayerChromeActions {
     return PlayerChromeActions(
         onSpeedBoostStart = {
-            if (!ui.isSpeedBoosted) {
-                ui.savedPlaybackSpeed = ui.playbackSpeed
-                ui.playbackSpeed = max(MIN_SPEED_BOOST, ui.savedPlaybackSpeed)
-                ui.isSpeedBoosted = true
-                if (!exoPlayer.isPlaying) {
-                    exoPlayer.play()
+            val change = speedBoostStart(
+                snapshot = SpeedSnapshot(
+                    playbackSpeed = ui.playbackSpeed,
+                    savedPlaybackSpeed = ui.savedPlaybackSpeed,
+                    boosted = ui.isSpeedBoosted,
+                ),
+                isPlaying = exoPlayer.isPlaying,
+            )
+            when (change) {
+                SpeedChange.Unchanged -> Unit
+                is SpeedChange.Set -> {
+                    ui.savedPlaybackSpeed = change.savedPlaybackSpeed
+                    ui.playbackSpeed = change.playbackSpeed
+                    ui.isSpeedBoosted = change.boosted
+                    if (change.playIfPaused) {
+                        exoPlayer.play()
+                    }
                 }
             }
         },
-        onSpeedBoostEnd = { ui.resetSpeedBoost() },
+        onSpeedBoostEnd = {
+            val next = speedBoostEnd(
+                SpeedSnapshot(
+                    playbackSpeed = ui.playbackSpeed,
+                    savedPlaybackSpeed = ui.savedPlaybackSpeed,
+                    boosted = ui.isSpeedBoosted,
+                ),
+            )
+            ui.playbackSpeed = next.playbackSpeed
+            ui.savedPlaybackSpeed = next.savedPlaybackSpeed
+            ui.isSpeedBoosted = next.boosted
+        },
         onPlayPauseClick = {
             ui.resetControlsTimer()
             togglePlayback()

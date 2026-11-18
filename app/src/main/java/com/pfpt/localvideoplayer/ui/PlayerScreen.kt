@@ -58,9 +58,11 @@ import com.pfpt.localvideoplayer.player.episodeStartPositionMs
 import com.pfpt.localvideoplayer.player.displayDurationMs as playbackDisplayDurationMs
 import com.pfpt.localvideoplayer.player.resolvedDurationMs as playbackResolvedDurationMs
 import com.pfpt.localvideoplayer.player.SeekCommit
+import com.pfpt.localvideoplayer.player.SpeedSnapshot
 import com.pfpt.localvideoplayer.player.seekCommit
 import com.pfpt.localvideoplayer.player.seekTargetMs
 import com.pfpt.localvideoplayer.player.showsPauseIcon
+import com.pfpt.localvideoplayer.player.speedAfterDefault
 import com.pfpt.localvideoplayer.player.rememberPlayerProgressState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.ViewModel
@@ -252,10 +254,17 @@ private fun PlayerScreenContent(
         }
     }
     LaunchedEffect(preferences.defaultSpeed, preferences.aspectRatioMode, preferences.repeatOne) {
-        if (!ui.isSpeedBoosted) {
-            ui.playbackSpeed = preferences.defaultSpeed
-            ui.savedPlaybackSpeed = preferences.defaultSpeed
-        }
+        val next = speedAfterDefault(
+            snapshot = SpeedSnapshot(
+                playbackSpeed = ui.playbackSpeed,
+                savedPlaybackSpeed = ui.savedPlaybackSpeed,
+                boosted = ui.isSpeedBoosted,
+            ),
+            defaultSpeed = preferences.defaultSpeed,
+        )
+        ui.playbackSpeed = next.playbackSpeed
+        ui.savedPlaybackSpeed = next.savedPlaybackSpeed
+        ui.isSpeedBoosted = next.boosted
         ui.aspectRatioMode = preferences.aspectRatioMode
         ui.repeatOne = preferences.repeatOne
     }
