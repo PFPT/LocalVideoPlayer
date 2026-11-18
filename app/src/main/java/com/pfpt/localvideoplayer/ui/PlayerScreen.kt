@@ -57,6 +57,8 @@ import com.pfpt.localvideoplayer.player.PlaylistState
 import com.pfpt.localvideoplayer.player.episodeStartPositionMs
 import com.pfpt.localvideoplayer.player.displayDurationMs as playbackDisplayDurationMs
 import com.pfpt.localvideoplayer.player.resolvedDurationMs as playbackResolvedDurationMs
+import com.pfpt.localvideoplayer.player.SeekCommit
+import com.pfpt.localvideoplayer.player.seekCommit
 import com.pfpt.localvideoplayer.player.seekTargetMs
 import com.pfpt.localvideoplayer.player.showsPauseIcon
 import com.pfpt.localvideoplayer.player.rememberPlayerProgressState
@@ -390,15 +392,22 @@ private fun PlayerScreenContent(
     }
 
     fun commitSeek(targetMs: Long): Boolean {
-        val duration = exoPlayer.duration.takeIf { it > 0 } ?: resolvedDurationMs()
-        val current = exoPlayer.currentPosition.coerceAtLeast(0L)
-        if (duration <= 0L && !exoPlayer.isCurrentMediaItemSeekable && targetMs <= current) {
-            return false
+        val decision = seekCommit(
+            targetMs = targetMs,
+            playerDurationMs = exoPlayer.duration,
+            resolvedDurationMs = resolvedDurationMs(),
+            currentPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L),
+            seekable = exoPlayer.isCurrentMediaItemSeekable,
+        )
+        return when (decision) {
+            SeekCommit.Reject -> false
+            is SeekCommit.Apply -> {
+                exoPlayer.seekTo(decision.positionMs)
+                progress.currentPositionMs = decision.positionMs
+                ui.previewPositionMs = decision.positionMs
+                true
+            }
         }
-        exoPlayer.seekTo(targetMs)
-        progress.currentPositionMs = targetMs
-        ui.previewPositionMs = targetMs
-        return true
     }
 
     fun handleSeekCommitted(position: Long) {
