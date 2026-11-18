@@ -17,3 +17,22 @@ fun shouldBackfillDuration(catalogDurationMs: Long, liveDurationMs: Long): Boole
 fun shouldPublishKnownDuration(displayDurationMs: Long, catalogDurationMs: Long): Boolean {
     return displayDurationMs > 0L && catalogDurationMs <= 0L
 }
+
+sealed interface SeekCommit {
+    data class Apply(val positionMs: Long) : SeekCommit
+    data object Reject : SeekCommit
+}
+
+fun seekCommit(
+    targetMs: Long,
+    playerDurationMs: Long,
+    resolvedDurationMs: Long,
+    currentPositionMs: Long,
+    seekable: Boolean,
+): SeekCommit {
+    val duration = if (playerDurationMs > 0L) playerDurationMs else resolvedDurationMs
+    if (duration <= 0L && !seekable && targetMs <= currentPositionMs) {
+        return SeekCommit.Reject
+    }
+    return SeekCommit.Apply(targetMs)
+}

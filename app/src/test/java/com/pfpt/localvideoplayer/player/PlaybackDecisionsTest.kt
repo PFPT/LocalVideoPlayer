@@ -56,4 +56,80 @@ class PlaybackDecisionsTest {
         assertFalse(shouldPublishKnownDuration(displayDurationMs = 0L, catalogDurationMs = 0L))
         assertFalse(shouldPublishKnownDuration(displayDurationMs = 3_000L, catalogDurationMs = 3_000L))
     }
+
+    @Test
+    fun knownPlayerDurationAlwaysApplies() {
+        assertEquals(
+            SeekCommit.Apply(1_000L),
+            seekCommit(
+                targetMs = 1_000L,
+                playerDurationMs = 9_000L,
+                resolvedDurationMs = 0L,
+                currentPositionMs = 4_000L,
+                seekable = false,
+            ),
+        )
+    }
+
+    @Test
+    fun resolvedDurationAppliesWhenPlayerDurationIsMissing() {
+        assertEquals(
+            SeekCommit.Apply(1_000L),
+            seekCommit(
+                targetMs = 1_000L,
+                playerDurationMs = 0L,
+                resolvedDurationMs = 9_000L,
+                currentPositionMs = 4_000L,
+                seekable = false,
+            ),
+        )
+    }
+
+    @Test
+    fun seekableUnknownDurationAlwaysApplies() {
+        assertEquals(
+            SeekCommit.Apply(500L),
+            seekCommit(
+                targetMs = 500L,
+                playerDurationMs = 0L,
+                resolvedDurationMs = 0L,
+                currentPositionMs = 4_000L,
+                seekable = true,
+            ),
+        )
+    }
+
+    @Test
+    fun unseekableUnknownDurationAppliesOnlyForward() {
+        assertEquals(
+            SeekCommit.Apply(5_000L),
+            seekCommit(
+                targetMs = 5_000L,
+                playerDurationMs = -1L,
+                resolvedDurationMs = 0L,
+                currentPositionMs = 4_000L,
+                seekable = false,
+            ),
+        )
+        assertEquals(
+            SeekCommit.Reject,
+            seekCommit(
+                targetMs = 4_000L,
+                playerDurationMs = 0L,
+                resolvedDurationMs = 0L,
+                currentPositionMs = 4_000L,
+                seekable = false,
+            ),
+        )
+        assertEquals(
+            SeekCommit.Reject,
+            seekCommit(
+                targetMs = 3_000L,
+                playerDurationMs = 0L,
+                resolvedDurationMs = 0L,
+                currentPositionMs = 4_000L,
+                seekable = false,
+            ),
+        )
+    }
 }
