@@ -88,3 +88,24 @@ fun speedToRestoreOnLeave(snapshot: SpeedSnapshot): Float? {
     if (!snapshot.boosted) return null
     return snapshot.savedPlaybackSpeed
 }
+
+enum class DecoderRecovery {
+    RetrySoft,
+    Ignore,
+    FailRead,
+    FailDecode,
+}
+
+fun decoderRecovery(
+    retryable: Boolean,
+    sourceRead: Boolean,
+    appliedSoftDecode: Boolean,
+    alreadyRetried: Boolean,
+    retryPending: Boolean,
+): DecoderRecovery {
+    if (retryable && !appliedSoftDecode && !alreadyRetried) {
+        return DecoderRecovery.RetrySoft
+    }
+    if (retryPending) return DecoderRecovery.Ignore
+    return if (sourceRead) DecoderRecovery.FailRead else DecoderRecovery.FailDecode
+}

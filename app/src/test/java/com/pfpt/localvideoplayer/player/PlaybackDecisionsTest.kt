@@ -238,4 +238,90 @@ class PlaybackDecisionsTest {
             speedToRestoreOnLeave(SpeedSnapshot(playbackSpeed = 1.5f, savedPlaybackSpeed = 1.5f, boosted = false)),
         )
     }
+
+    @Test
+    fun firstRetryableFailureRecoversWithSoftwareDecoder() {
+        assertEquals(
+            DecoderRecovery.RetrySoft,
+            decoderRecovery(
+                retryable = true,
+                sourceRead = false,
+                appliedSoftDecode = false,
+                alreadyRetried = false,
+                retryPending = true,
+            ),
+        )
+    }
+
+    @Test
+    fun retryableFailureAfterSoftwareDecodeWaitsOrFails() {
+        assertEquals(
+            DecoderRecovery.Ignore,
+            decoderRecovery(
+                retryable = true,
+                sourceRead = true,
+                appliedSoftDecode = true,
+                alreadyRetried = false,
+                retryPending = true,
+            ),
+        )
+        assertEquals(
+            DecoderRecovery.FailRead,
+            decoderRecovery(
+                retryable = true,
+                sourceRead = true,
+                appliedSoftDecode = false,
+                alreadyRetried = true,
+                retryPending = false,
+            ),
+        )
+        assertEquals(
+            DecoderRecovery.FailDecode,
+            decoderRecovery(
+                retryable = true,
+                sourceRead = false,
+                appliedSoftDecode = true,
+                alreadyRetried = true,
+                retryPending = false,
+            ),
+        )
+    }
+
+    @Test
+    fun pendingRetryIgnoresFurtherErrors() {
+        assertEquals(
+            DecoderRecovery.Ignore,
+            decoderRecovery(
+                retryable = false,
+                sourceRead = true,
+                appliedSoftDecode = true,
+                alreadyRetried = true,
+                retryPending = true,
+            ),
+        )
+    }
+
+    @Test
+    fun terminalFailureFollowsSourceReadFlag() {
+        assertEquals(
+            DecoderRecovery.FailRead,
+            decoderRecovery(
+                retryable = false,
+                sourceRead = true,
+                appliedSoftDecode = false,
+                alreadyRetried = false,
+                retryPending = false,
+            ),
+        )
+        assertEquals(
+            DecoderRecovery.FailDecode,
+            decoderRecovery(
+                retryable = false,
+                sourceRead = false,
+                appliedSoftDecode = false,
+                alreadyRetried = false,
+                retryPending = false,
+            ),
+        )
+    }
 }
