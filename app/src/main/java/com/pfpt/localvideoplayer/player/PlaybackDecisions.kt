@@ -1,5 +1,7 @@
 package com.pfpt.localvideoplayer.player
 
+import kotlin.math.max
+
 fun resolvedDurationMs(liveDurationMs: Long, catalogDurationMs: Long): Long {
     if (liveDurationMs > 0L) return liveDurationMs
     return catalogDurationMs.coerceAtLeast(0L)
@@ -35,4 +37,54 @@ fun seekCommit(
         return SeekCommit.Reject
     }
     return SeekCommit.Apply(targetMs)
+}
+
+const val MIN_SPEED_BOOST = 2.0f
+
+data class SpeedSnapshot(
+    val playbackSpeed: Float,
+    val savedPlaybackSpeed: Float,
+    val boosted: Boolean,
+)
+
+sealed interface SpeedChange {
+    data class Set(
+        val playbackSpeed: Float,
+        val savedPlaybackSpeed: Float,
+        val boosted: Boolean,
+        val playIfPaused: Boolean,
+    ) : SpeedChange
+    data object Unchanged : SpeedChange
+}
+
+fun speedAfterDefault(snapshot: SpeedSnapshot, defaultSpeed: Float): SpeedSnapshot {
+    if (snapshot.boosted) return snapshot
+    return snapshot.copy(
+        playbackSpeed = defaultSpeed,
+        savedPlaybackSpeed = defaultSpeed,
+    )
+}
+
+fun speedBoostStart(snapshot: SpeedSnapshot, isPlaying: Boolean): SpeedChange {
+    if (snapshot.boosted) return SpeedChange.Unchanged
+    val saved = snapshot.playbackSpeed
+    return SpeedChange.Set(
+        playbackSpeed = max(MIN_SPEED_BOOST, saved),
+        savedPlaybackSpeed = saved,
+        boosted = true,
+        playIfPaused = !isPlaying,
+    )
+}
+
+fun speedBoostEnd(snapshot: SpeedSnapshot): SpeedSnapshot {
+    if (!snapshot.boosted) return snapshot
+    return snapshot.copy(
+        playbackSpeed = snapshot.savedPlaybackSpeed,
+        boosted = false,
+    )
+}
+
+fun speedToRestoreOnLeave(snapshot: SpeedSnapshot): Float? {
+    if (!snapshot.boosted) return null
+    return snapshot.savedPlaybackSpeed
 }

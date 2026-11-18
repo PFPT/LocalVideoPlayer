@@ -2,6 +2,7 @@ package com.pfpt.localvideoplayer.player
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -130,6 +131,111 @@ class PlaybackDecisionsTest {
                 currentPositionMs = 4_000L,
                 seekable = false,
             ),
+        )
+    }
+
+    @Test
+    fun defaultSpeedReplacesBothValuesWhenNotBoosted() {
+        val next = speedAfterDefault(
+            snapshot = SpeedSnapshot(playbackSpeed = 1.5f, savedPlaybackSpeed = 1.5f, boosted = false),
+            defaultSpeed = 1.25f,
+        )
+        assertEquals(1.25f, next.playbackSpeed, 0f)
+        assertEquals(1.25f, next.savedPlaybackSpeed, 0f)
+        assertFalse(next.boosted)
+    }
+
+    @Test
+    fun defaultSpeedLeavesBoostedSnapshotUntouched() {
+        val current = SpeedSnapshot(playbackSpeed = 2f, savedPlaybackSpeed = 1.5f, boosted = true)
+        assertEquals(current, speedAfterDefault(current, defaultSpeed = 1.25f))
+    }
+
+    @Test
+    fun boostFromNormalSpeedUsesFloorAndPlaysWhenPaused() {
+        val change = speedBoostStart(
+            snapshot = SpeedSnapshot(playbackSpeed = 1f, savedPlaybackSpeed = 1f, boosted = false),
+            isPlaying = false,
+        )
+        assertEquals(
+            SpeedChange.Set(
+                playbackSpeed = 2f,
+                savedPlaybackSpeed = 1f,
+                boosted = true,
+                playIfPaused = true,
+            ),
+            change,
+        )
+    }
+
+    @Test
+    fun boostWhileAlreadyPlayingDoesNotRequestPlay() {
+        val change = speedBoostStart(
+            snapshot = SpeedSnapshot(playbackSpeed = 1f, savedPlaybackSpeed = 1f, boosted = false),
+            isPlaying = true,
+        )
+        assertEquals(
+            SpeedChange.Set(
+                playbackSpeed = 2f,
+                savedPlaybackSpeed = 1f,
+                boosted = true,
+                playIfPaused = false,
+            ),
+            change,
+        )
+    }
+
+    @Test
+    fun boostKeepsSpeedAboveFloor() {
+        val change = speedBoostStart(
+            snapshot = SpeedSnapshot(playbackSpeed = 3f, savedPlaybackSpeed = 1f, boosted = false),
+            isPlaying = true,
+        )
+        assertEquals(
+            SpeedChange.Set(
+                playbackSpeed = 3f,
+                savedPlaybackSpeed = 3f,
+                boosted = true,
+                playIfPaused = false,
+            ),
+            change,
+        )
+    }
+
+    @Test
+    fun repeatedBoostIsUnchanged() {
+        assertEquals(
+            SpeedChange.Unchanged,
+            speedBoostStart(
+                snapshot = SpeedSnapshot(playbackSpeed = 2f, savedPlaybackSpeed = 1f, boosted = true),
+                isPlaying = false,
+            ),
+        )
+    }
+
+    @Test
+    fun endingBoostRestoresSavedSpeed() {
+        assertEquals(
+            SpeedSnapshot(playbackSpeed = 1.5f, savedPlaybackSpeed = 1.5f, boosted = false),
+            speedBoostEnd(SpeedSnapshot(playbackSpeed = 2f, savedPlaybackSpeed = 1.5f, boosted = true)),
+        )
+    }
+
+    @Test
+    fun endingBoostWithoutActiveBoostReturnsSnapshot() {
+        val current = SpeedSnapshot(playbackSpeed = 1.25f, savedPlaybackSpeed = 1.25f, boosted = false)
+        assertEquals(current, speedBoostEnd(current))
+    }
+
+    @Test
+    fun leaveRestoresSavedSpeedOnlyWhileBoosted() {
+        assertEquals(
+            1.5f,
+            speedToRestoreOnLeave(SpeedSnapshot(playbackSpeed = 2f, savedPlaybackSpeed = 1.5f, boosted = true))!!,
+            0f,
+        )
+        assertNull(
+            speedToRestoreOnLeave(SpeedSnapshot(playbackSpeed = 1.5f, savedPlaybackSpeed = 1.5f, boosted = false)),
         )
     }
 }
