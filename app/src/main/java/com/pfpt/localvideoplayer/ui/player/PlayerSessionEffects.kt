@@ -30,6 +30,8 @@ import com.pfpt.localvideoplayer.player.abLoopTarget
 import com.pfpt.localvideoplayer.player.isSoftwareDecodeRetryable
 import com.pfpt.localvideoplayer.player.isSourceReadFailure
 import com.pfpt.localvideoplayer.player.showsPauseIcon
+import com.pfpt.localvideoplayer.player.shouldBackfillDuration
+import com.pfpt.localvideoplayer.player.shouldPublishKnownDuration
 import com.pfpt.localvideoplayer.ui.PlaybackFailure
 import com.pfpt.localvideoplayer.ui.PlayerUiState
 import com.pfpt.localvideoplayer.ui.components.displayVideoSize
@@ -318,7 +320,9 @@ internal fun PlayerSessionEffects(
     val durationResolver = remember(context) { context.appDurationResolver() }
     LaunchedEffect(currentVideo?.uri) {
         val video = currentVideo ?: return@LaunchedEffect
-        if (video.durationMs > 0L || progress.durationMs > 0L) return@LaunchedEffect
+        if (!shouldBackfillDuration(catalogDurationMs = video.durationMs, liveDurationMs = progress.durationMs)) {
+            return@LaunchedEffect
+        }
         val duration = withContext(Dispatchers.IO) {
             durationResolver.resolveAll(listOf(video))[video.uri.toString()] ?: 0L
         }
@@ -329,7 +333,9 @@ internal fun PlayerSessionEffects(
     }
     LaunchedEffect(displayDurationMs, currentVideo?.uri) {
         val video = currentVideo ?: return@LaunchedEffect
-        if (displayDurationMs <= 0L || video.durationMs > 0L) return@LaunchedEffect
+        if (!shouldPublishKnownDuration(displayDurationMs = displayDurationMs, catalogDurationMs = video.durationMs)) {
+            return@LaunchedEffect
+        }
         onDurationKnown(video.uri.toString(), displayDurationMs)
     }
 }

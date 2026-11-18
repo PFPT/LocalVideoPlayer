@@ -55,6 +55,8 @@ import com.pfpt.localvideoplayer.player.PlayerViewModel
 import com.pfpt.localvideoplayer.player.PlayerProgressState
 import com.pfpt.localvideoplayer.player.PlaylistState
 import com.pfpt.localvideoplayer.player.episodeStartPositionMs
+import com.pfpt.localvideoplayer.player.displayDurationMs as playbackDisplayDurationMs
+import com.pfpt.localvideoplayer.player.resolvedDurationMs as playbackResolvedDurationMs
 import com.pfpt.localvideoplayer.player.seekTargetMs
 import com.pfpt.localvideoplayer.player.showsPauseIcon
 import com.pfpt.localvideoplayer.player.rememberPlayerProgressState
@@ -269,15 +271,16 @@ private fun PlayerScreenContent(
         castManager?.bindLocalPlayer(exoPlayer)
     }
     fun resolvedDurationMs(): Long {
-        val live = progress.durationMs
-        if (live > 0) return live
-        return playlist.getOrNull(ui.currentIndex)?.durationMs ?: 0L
+        return playbackResolvedDurationMs(
+            liveDurationMs = progress.durationMs,
+            catalogDurationMs = playlist.getOrNull(ui.currentIndex)?.durationMs ?: 0L,
+        )
     }
-    val displayDurationMs = if (isCasting && castDurationMs > 0) {
-        castDurationMs
-    } else {
-        resolvedDurationMs()
-    }
+    val displayDurationMs = playbackDisplayDurationMs(
+        isCasting = isCasting,
+        castDurationMs = castDurationMs,
+        localDurationMs = resolvedDurationMs(),
+    )
     LaunchedEffect(displayDurationMs, isCasting) {
         if (isCasting && displayDurationMs > 0) {
             progress.durationMs = displayDurationMs
