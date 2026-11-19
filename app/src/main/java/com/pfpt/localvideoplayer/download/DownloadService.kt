@@ -19,24 +19,17 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 class DownloadService : Service() {
@@ -50,11 +43,11 @@ class DownloadService : Service() {
     private val activeControls = ConcurrentHashMap<String, TaskControl>()
     private val activeJobs = ConcurrentHashMap<String, Job>()
     private val outputLocks = ConcurrentHashMap<String, Mutex>()
-    private val speedTrackers = ConcurrentHashMap<String, DownloadSpeedTracker>()
+    internal val speedTrackers = ConcurrentHashMap<String, DownloadSpeedTracker>()
     private val lastProgressReportAt = ConcurrentHashMap<String, Long>()
-    private val hlsByteCounters = ConcurrentHashMap<String, AtomicLong>()
-    private val hlsInflightBytes = ConcurrentHashMap<String, AtomicLong>()
-    private val hlsSizeHints = ConcurrentHashMap<String, Long>()
+    internal val hlsByteCounters = ConcurrentHashMap<String, AtomicLong>()
+    internal val hlsInflightBytes = ConcurrentHashMap<String, AtomicLong>()
+    internal val hlsSizeHints = ConcurrentHashMap<String, Long>()
     private val lastProgressDbAt = ConcurrentHashMap<String, Long>()
     private val taskProgressSnapshots = ConcurrentHashMap<String, DownloadTask>()
     private val lastNotificationAt = ConcurrentHashMap<String, Long>()
@@ -268,19 +261,6 @@ class DownloadService : Service() {
         return if (downloadUrl == task.url && headers == task.headers) task else task.copy(url = downloadUrl, headers = headers)
     }
 
-    private fun unwrapPlaylist(playlist: HlsVodPlaylist): HlsVodPlaylist = playlist.copy(
-        url = DownloadUrlResolver.mediaFetchUrl(playlist.url),
-        initSegmentUrl = playlist.initSegmentUrl?.let(DownloadUrlResolver::mediaFetchUrl),
-        segments = playlist.segments.map { segment ->
-            segment.copy(
-                url = DownloadUrlResolver.mediaFetchUrl(segment.url),
-                encryption = segment.encryption?.let { encryption ->
-                    encryption.copy(keyUrl = DownloadUrlResolver.mediaFetchUrl(encryption.keyUrl))
-                },
-            )
-        },
-    )
-
     private suspend fun download(taskId: String, manager: DownloadManager, control: TaskControl) {
         val task = effectiveTask(manager.get(taskId) ?: return)
         if (!task.outputUri.isNullOrBlank()) {
@@ -301,7 +281,7 @@ class DownloadService : Service() {
         if (isHls) {
             val hlsPackage = hlsDir(task.id)
             hlsPackage.mkdirs()
-            downloadHls(task, hlsPackage, manager, control)
+            HlsDownloader.download(this, task, hlsPackage, manager, control)
             if (control.stopped) throw IOException(getString(R.string.download_paused))
             mergeAndPublishHls(task.id, hlsPackage, manager, control)
             return
@@ -417,138 +397,7 @@ class DownloadService : Service() {
         return if (ext.isNotBlank()) "$preferred.$ext" else preferred
     }
 
-    private fun unwrapResolved(result: HlsVodResolveResult): HlsVodResolveResult =
-        result.copy(playlist = unwrapPlaylist(result.playlist))
-
-    private suspend fun downloadHls(task: DownloadTask, hlsPackage: File, manager: DownloadManager, control: TaskControl) {
-        val resolved = resolveHlsSource(task, hlsPackage, control)
-        val playlist = resolved.playlist
-        val resumeState = HlsResume.resolve(task, hlsPackage, playlist) { index ->
-            hlsSegmentFile(hlsPackage, playlist.segmentFormat(), index)
-        }
-        val segmentFormat = playlist.segmentFormat()
-        val completedSegments = resumeState.completedSegments
-        if (resumeState.shouldWipe) hlsPackage.listFiles()?.forEach { it.delete() }
-        File(hlsPackage, HLS_SOURCE_PLAYLIST_NAME).writeText(resolved.mediaText)
-        val initialBytes = if (resumeState.shouldWipe) 0L else directorySize(hlsPackage)
-        hlsByteCounters[task.id] = AtomicLong(initialBytes)
-        manager.update(task.id) {
-            it.copy(
-                hlsCompletedSegments = completedSegments,
-                hlsTotalSegments = playlist.segments.size,
-                hlsPlaylistUrl = playlist.url,
-                hlsPlaylistSignature = playlist.signature,
-                downloadedBytes = initialBytes,
-                totalBytes = estimateHlsTotalBytes(initialBytes, completedSegments, playlist.segments.size, task.id),
-                isMerging = false,
-            )
-        }
-        val completedCounter = AtomicInteger(completedSegments)
-        suspend fun publishSnapshot(forceDb: Boolean) {
-            val done = completedCounter.get().coerceAtMost(playlist.segments.size)
-            val downloaded = currentHlsDownloaded(task.id)
-            val totalBytes = estimateHlsTotalBytes(currentHlsBytes(task.id), done, playlist.segments.size, task.id)
-            val speed = speedTrackers.getOrPut(task.id) { DownloadSpeedTracker() }.markProgress(downloaded)
-            reportTrackedProgress(
-                task = task,
-                manager = manager,
-                downloaded = downloaded,
-                total = totalBytes,
-                completedSegments = done,
-                totalSegments = playlist.segments.size,
-                speed = speed,
-                forceDb = forceDb,
-            )
-        }
-        coroutineScope {
-            val ticker = launch {
-                while (isActive) {
-                    delay(LIVE_PROGRESS_INTERVAL_MS)
-                    publishSnapshot(forceDb = false)
-                }
-            }
-            try {
-                playlist.initSegmentUrl?.let { initUrl ->
-                    val initFile = hlsInitFile(hlsPackage)
-                    if (!initFile.exists()) {
-                        if (control.stopped) throw IOException(getString(R.string.download_paused))
-                        downloadHlsSegmentAtomic(
-                            taskId = task.id,
-                            address = initUrl,
-                            finalFile = initFile,
-                            headers = task.headers,
-                            control = control,
-                            encryption = null,
-                            playlistUrl = playlist.url,
-                        )
-                    }
-                }
-                val keys = ConcurrentHashMap<String, ByteArray>()
-                prefetchHlsKeys(playlist, task.headers, control, keys, playlist.url)
-                val pendingSegments = playlist.segments.drop(completedSegments)
-                val concurrency = DownloadManager.get(this@DownloadService).connectionsPerDownload()
-                val nextWork = AtomicInteger(0)
-                val workers = List(concurrency.coerceAtLeast(1)) {
-                    async {
-                        while (true) {
-                            if (control.stopped) throw IOException(getString(R.string.download_paused))
-                            val offset = nextWork.getAndIncrement()
-                            if (offset >= pendingSegments.size) break
-                            val segment = pendingSegments[offset]
-                            val segmentIndex = completedSegments + offset
-                            val segmentFile = hlsSegmentFile(hlsPackage, segmentFormat, segmentIndex)
-                            if (resolveSegmentFile(hlsPackage, segmentFormat, segmentIndex).exists()) {
-                                completedCounter.incrementAndGet()
-                                continue
-                            }
-                            val encryption = segment.encryption
-                            val keyIv = encryption?.let { enc ->
-                                val key = keys[enc.keyUrl]
-                                    ?: requestHlsBytes(enc.keyUrl, task.headers, control, playlist.url).also {
-                                        if (it.size != AES_128_KEY_BYTES) throw IOException(getString(R.string.download_hls_key_invalid))
-                                        keys[enc.keyUrl] = it
-                                    }
-                                key to enc.iv
-                            }
-                            downloadHlsSegmentAtomic(
-                                taskId = task.id,
-                                address = segment.url,
-                                finalFile = segmentFile,
-                                headers = task.headers,
-                                control = control,
-                                encryption = keyIv,
-                                playlistUrl = playlist.url,
-                            )
-                            completedCounter.incrementAndGet()
-                        }
-                    }
-                }
-                workers.awaitAll()
-            } finally {
-                ticker.cancel()
-                publishSnapshot(forceDb = true)
-            }
-        }
-    }
-
-    private fun prefetchHlsKeys(
-        playlist: HlsVodPlaylist,
-        headers: Map<String, String>,
-        control: TaskControl,
-        keys: ConcurrentHashMap<String, ByteArray>,
-        playlistUrl: String,
-    ) {
-        playlist.segments.mapNotNull { it.encryption?.keyUrl }.toSet().forEach { keyUrl ->
-            if (control.stopped) throw IOException(getString(R.string.download_paused))
-            keys.getOrPut(keyUrl) {
-                requestHlsBytes(keyUrl, headers, control, playlistUrl).also {
-                    if (it.size != AES_128_KEY_BYTES) throw IOException(getString(R.string.download_hls_key_invalid))
-                }
-            }
-        }
-    }
-
-    private suspend fun reportTrackedProgress(
+    internal suspend fun reportTrackedProgress(
         task: DownloadTask,
         manager: DownloadManager,
         downloaded: Long,
@@ -596,163 +445,7 @@ class DownloadService : Service() {
         )
     }
 
-    private fun estimateHlsTotalBytes(
-        completedBytes: Long,
-        completedSegments: Int,
-        totalSegments: Int,
-        taskId: String,
-    ): Long {
-        if (totalSegments <= 0) return -1
-        val average = when {
-            completedSegments > 0 && completedBytes > 0 -> completedBytes / completedSegments
-            else -> hlsSizeHints[taskId] ?: return -1
-        }
-        if (average <= 0) return -1
-        return average * totalSegments
-    }
-
-    private fun requestHlsText(
-        address: String,
-        headers: Map<String, String>,
-        control: TaskControl,
-        playlistUrl: String? = null,
-    ): String = String(requestHlsBytes(address, headers, control, playlistUrl), Charsets.UTF_8)
-
-    private fun requestHlsBytes(
-        address: String,
-        headers: Map<String, String>,
-        control: TaskControl,
-        playlistUrl: String? = null,
-    ): ByteArray {
-        var attempt = 0
-        var lastError: IOException? = null
-        while (attempt < SEGMENT_MAX_RETRIES) {
-            if (control.stopped) throw IOException(getString(R.string.download_paused))
-            try {
-                DownloadRequests.executeHlsRequest(address, headers, playlistUrl).use { response ->
-                    if (response.code !in 200..299) {
-                        throw IOException(getString(R.string.download_hls_request_failed, response.code))
-                    }
-                    val body = response.body ?: throw IOException(getString(R.string.download_failed))
-                    return body.bytes()
-                }
-            } catch (error: IOException) {
-                if (control.stopped || control.canceled) throw error
-                lastError = error
-                val next = nextDownloadAttempt(
-                    stopped = false,
-                    canceled = false,
-                    attempt = attempt,
-                    maxAttempts = SEGMENT_MAX_RETRIES,
-                )
-                if (next == null) break
-                attempt = next
-                Thread.sleep(RETRY_BACKOFF_MS[attempt - 1])
-            }
-        }
-        throw lastError ?: IOException(getString(R.string.download_failed))
-    }
-
-    private fun downloadHlsSegmentAtomic(
-        taskId: String,
-        address: String,
-        finalFile: File,
-        headers: Map<String, String>,
-        control: TaskControl,
-        encryption: Pair<ByteArray, ByteArray>?,
-        playlistUrl: String? = null,
-    ) {
-        var attempt = 0
-        var lastError: IOException? = null
-        val partFile = File(finalFile.parentFile, "${finalFile.name}.part")
-        while (attempt < SEGMENT_MAX_RETRIES) {
-            if (control.stopped) throw IOException(getString(R.string.download_paused))
-            finalFile.parentFile?.mkdirs()
-            if (partFile.exists()) partFile.delete()
-            var written = 0L
-            try {
-                DownloadRequests.executeHlsRequest(address, headers, playlistUrl).use { response ->
-                    if (response.code !in 200..299) {
-                        throw IOException(getString(R.string.download_hls_request_failed, response.code))
-                    }
-                    val body = response.body ?: throw IOException(getString(R.string.download_failed))
-                    val length = body.contentLength()
-                    if (length > 0) hlsSizeHints.putIfAbsent(taskId, length)
-                    FileOutputStream(partFile).use { fileOut ->
-                        BufferedInputStream(body.byteStream(), IO_BUFFER_SIZE).use { source ->
-                            try {
-                                if (encryption != null) {
-                                    val (key, iv) = encryption
-                                    HlsAesDecryptor.decryptingOutputStream(fileOut, key, iv).use { decrypted ->
-                                        written += copyCounted(source, decrypted, control, taskId)
-                                        decrypted.flush()
-                                    }
-                                } else {
-                                    written += copyCounted(source, fileOut, control, taskId)
-                                }
-                            } catch (error: IOException) {
-                                throw error
-                            } catch (error: Exception) {
-                                throw IOException(getString(R.string.download_hls_decryption_failed), error)
-                            }
-                        }
-                    }
-                }
-                if (finalFile.exists()) finalFile.delete()
-                if (!partFile.renameTo(finalFile)) {
-                    partFile.copyTo(finalFile, overwrite = true)
-                    partFile.delete()
-                }
-                if (!finalFile.exists() || finalFile.length() <= 0L) {
-                    throw IOException(getString(R.string.download_failed))
-                }
-                HlsSegmentSniffer.stripDisguise(finalFile)
-                addHlsBytes(taskId, finalFile.length())
-                addHlsInflight(taskId, -written)
-                return
-            } catch (error: IOException) {
-                addHlsInflight(taskId, -written)
-                if (control.stopped || control.canceled) throw error
-                lastError = error
-                partFile.delete()
-                val next = nextDownloadAttempt(
-                    stopped = false,
-                    canceled = false,
-                    attempt = attempt,
-                    maxAttempts = SEGMENT_MAX_RETRIES,
-                )
-                if (next == null) break
-                attempt = next
-                Thread.sleep(RETRY_BACKOFF_MS[attempt - 1])
-            }
-        }
-        throw lastError ?: IOException(getString(R.string.download_failed))
-    }
-
-    private fun copyCounted(
-        source: BufferedInputStream,
-        sink: java.io.OutputStream,
-        control: TaskControl,
-        taskId: String,
-    ): Long {
-        val buffer = ByteArray(IO_BUFFER_SIZE)
-        var written = 0L
-        try {
-            while (true) {
-                if (control.stopped) throw IOException(getString(R.string.download_paused))
-                val count = source.read(buffer)
-                if (count < 0) return written
-                sink.write(buffer, 0, count)
-                written += count
-                addHlsInflight(taskId, count.toLong())
-            }
-        } catch (error: Exception) {
-            addHlsInflight(taskId, -written)
-            throw error
-        }
-    }
-
-    private fun hlsFailureMessage(failure: HlsVodFailure): String = when (failure) {
+    internal fun hlsFailureMessage(failure: HlsVodFailure): String = when (failure) {
         HlsVodFailure.INVALID -> getString(R.string.download_hls_invalid)
         HlsVodFailure.EXPIRED -> getString(R.string.download_hls_expired)
         HlsVodFailure.LIVE -> getString(R.string.download_hls_live_unsupported)
@@ -1033,31 +726,6 @@ class DownloadService : Service() {
         taskProgressSnapshots.keys.toList().forEach { cancelTaskNotification(it) }
     }
 
-    private fun resolveHlsSource(
-        task: DownloadTask,
-        hlsPackage: File,
-        control: TaskControl,
-    ): HlsVodResolveResult {
-        val localPlaylist = File(hlsPackage, HLS_SOURCE_PLAYLIST_NAME)
-        if (localPlaylist.exists()) {
-            val text = localPlaylist.readText()
-            val parsed = try {
-                HlsVodPlaylistParser.parseMediaPlaylist(task.hlsPlaylistUrl ?: task.url, text)
-            } catch (error: HlsVodException) {
-                throw IOException(hlsFailureMessage(error.failure), error)
-            }
-            return HlsVodResolveResult(playlist = unwrapPlaylist(parsed), mediaText = text)
-        }
-        return try {
-            unwrapResolved(
-                HlsVodResolver { address -> requestHlsText(address, task.headers, control) }
-                    .resolveWithMediaText(task.url),
-            )
-        } catch (error: HlsVodException) {
-            throw IOException(hlsFailureMessage(error.failure), error)
-        }
-    }
-
     private fun resolveMergePlaylist(
         task: DownloadTask,
         hlsPackage: File,
@@ -1083,23 +751,6 @@ class DownloadService : Service() {
             getSystemService(NotificationManager::class.java).notify(id, notification)
         } catch (_: SecurityException) {
         }
-    }
-
-    private fun currentHlsBytes(taskId: String): Long = hlsByteCounters[taskId]?.get() ?: 0L
-
-    private fun currentHlsDownloaded(taskId: String): Long {
-        val inflight = hlsInflightBytes[taskId]?.get() ?: 0L
-        return currentHlsBytes(taskId) + inflight.coerceAtLeast(0L)
-    }
-
-    private fun addHlsBytes(taskId: String, bytes: Long) {
-        if (bytes == 0L) return
-        hlsByteCounters.getOrPut(taskId) { AtomicLong(0L) }.addAndGet(bytes)
-    }
-
-    private fun addHlsInflight(taskId: String, bytes: Long) {
-        if (bytes == 0L) return
-        hlsInflightBytes.getOrPut(taskId) { AtomicLong(0L) }.addAndGet(bytes)
     }
 
     private fun buildTaskNotification(task: DownloadTask, merging: Boolean): NotificationCompat.Builder {
@@ -1199,10 +850,10 @@ class DownloadService : Service() {
 
     private fun torrentDir(id: String) = File(filesDir, "torrent_downloads/$id")
 
-    private fun hlsSegmentFile(hlsPackage: File, format: HlsSegmentFormat, index: Int) =
+    internal fun hlsSegmentFile(hlsPackage: File, format: HlsSegmentFormat, index: Int) =
         File(hlsPackage, "seg%05d.${format.segmentExtension()}".format(index))
 
-    private fun resolveSegmentFile(hlsPackage: File, format: HlsSegmentFormat, index: Int): File {
+    internal fun resolveSegmentFile(hlsPackage: File, format: HlsSegmentFormat, index: Int): File {
         val primary = hlsSegmentFile(hlsPackage, format, index)
         if (primary.exists()) return primary
         val legacy = HlsResume.legacySegmentFile(hlsPackage, format, index)
@@ -1210,7 +861,7 @@ class DownloadService : Service() {
         return primary
     }
 
-    private fun hlsInitFile(hlsPackage: File) = File(hlsPackage, "init.mp4")
+    internal fun hlsInitFile(hlsPackage: File) = File(hlsPackage, "init.mp4")
 
     private fun listHlsSegmentFiles(hlsPackage: File, format: HlsSegmentFormat): List<File> {
         val files = mutableListOf<File>()
@@ -1224,7 +875,7 @@ class DownloadService : Service() {
         return files
     }
 
-    private fun directorySize(directory: File): Long =
+    internal fun directorySize(directory: File): Long =
         directory.listFiles()?.sumOf { if (it.isFile) it.length() else 0L } ?: 0L
 
     private fun outputKey(task: DownloadTask) = "${task.saveToMovies}:${task.fileName.lowercase()}"
@@ -1248,10 +899,10 @@ class DownloadService : Service() {
         internal const val PROGRESS_STEP = 512 * 1024L
         internal const val IO_BUFFER_SIZE = 256 * 1024
         internal const val SEGMENT_MAX_RETRIES = 3
-        private const val LIVE_PROGRESS_INTERVAL_MS = 500L
+        internal const val LIVE_PROGRESS_INTERVAL_MS = 500L
         private const val PROGRESS_DB_MS = 5_000L
-        private const val HLS_SOURCE_PLAYLIST_NAME = "source.m3u8"
-        private const val AES_128_KEY_BYTES = 16
+        internal const val HLS_SOURCE_PLAYLIST_NAME = "source.m3u8"
+        internal const val AES_128_KEY_BYTES = 16
         internal val RETRY_BACKOFF_MS = longArrayOf(1_000, 2_000, 4_000)
 
         fun taskNotificationId(taskId: String): Int = NOTIFICATION_ID + (taskId.hashCode() and 0xFFFF)
