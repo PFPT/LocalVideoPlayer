@@ -383,4 +383,25 @@ internal object HlsDownloader {
         if (bytes == 0L) return
         service.hlsInflightBytes.getOrPut(taskId) { AtomicLong(0L) }.addAndGet(bytes)
     }
+
+    suspend fun merge(
+        segmentFiles: List<File>,
+        durationsSec: List<Double>,
+        format: HlsSegmentFormat,
+        initFile: File?,
+        outputFile: File,
+        mergeDispatcher: kotlinx.coroutines.CoroutineDispatcher,
+        onMerging: suspend () -> Unit,
+    ) {
+        onMerging()
+        kotlinx.coroutines.withContext(mergeDispatcher) {
+            HlsMergeEngine.merge(
+                segmentFiles = segmentFiles,
+                durationsSec = durationsSec,
+                format = format,
+                initFile = initFile,
+                outputFile = outputFile,
+            )
+        }
+    }
 }

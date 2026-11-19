@@ -35,11 +35,9 @@ android {
         create("full") {
             dimension = "features"
             isDefault = true
-            buildConfigField("boolean", "HAS_ADVANCED_DOWNLOAD", "true")
         }
         create("lite") {
             dimension = "features"
-            buildConfigField("boolean", "HAS_ADVANCED_DOWNLOAD", "false")
         }
     }
 
@@ -82,7 +80,7 @@ android {
 
     buildFeatures {
         compose = true
-        buildConfig = true
+        buildConfig = false
     }
 }
 
@@ -114,14 +112,14 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
-    implementation(libs.ffmpeg.kit.min)
     implementation(libs.smart.exception.java)
     implementation(libs.okhttp)
-    implementation(libs.libtorrent4j)
-    implementation(libs.libtorrent4j.android.arm)
-    implementation(libs.libtorrent4j.android.arm64)
-    implementation(libs.libtorrent4j.android.x64)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
+    "fullImplementation"(libs.ffmpeg.kit.min)
+    "fullImplementation"(libs.libtorrent4j)
+    "fullImplementation"(libs.libtorrent4j.android.arm)
+    "fullImplementation"(libs.libtorrent4j.android.arm64)
+    "fullImplementation"(libs.libtorrent4j.android.x64)
 }

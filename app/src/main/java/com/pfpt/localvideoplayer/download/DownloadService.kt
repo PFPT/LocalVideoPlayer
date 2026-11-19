@@ -12,7 +12,6 @@ import android.provider.MediaStore
 import androidx.core.app.NotificationCompat
 import com.pfpt.localvideoplayer.MainActivity
 import com.pfpt.localvideoplayer.R
-import com.pfpt.localvideoplayer.download.torrent.TorrentSession
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -24,7 +23,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
@@ -481,33 +479,36 @@ class DownloadService : Service() {
                 ),
             )
         }
-        manager.update(taskId) { it.copy(isMerging = true, downloadSpeedBps = 0) }
-        updateNotification(
-            task = task.copy(isMerging = true, downloadSpeedBps = 0),
-            taskId = task.id,
-            merging = true,
-            force = true,
-        )
         val mergedPart = partFile(task.id)
         val mergedTemp = File(mergedPart.parentFile, "${task.id}.merge.mp4")
         mergedPart.parentFile?.mkdirs()
         try {
-            withContext(mergeDispatcher) {
-                HlsMerger.mergeToMp4(
-                    HlsMerger.MergeInput(
-                        segmentFiles = segmentFiles,
-                        durationsSec = playlist.segments.map { it.durationSec },
-                        format = segmentFormat,
-                        initFile = hlsInitFile(hlsPackage).takeIf { it.exists() },
-                    ),
-                    mergedTemp,
-                )
-            }
+            HlsDownloader.merge(
+                segmentFiles = segmentFiles,
+                durationsSec = playlist.segments.map { it.durationSec },
+                format = segmentFormat,
+                initFile = hlsInitFile(hlsPackage).takeIf { it.exists() },
+                outputFile = mergedTemp,
+                mergeDispatcher = mergeDispatcher,
+                onMerging = {
+                    manager.update(taskId) { it.copy(isMerging = true, downloadSpeedBps = 0) }
+                    updateNotification(
+                        task = task.copy(isMerging = true, downloadSpeedBps = 0),
+                        taskId = task.id,
+                        merging = true,
+                        force = true,
+                    )
+                },
+            )
             mergedPart.delete()
             if (!mergedTemp.renameTo(mergedPart)) {
                 mergedTemp.copyTo(mergedPart, overwrite = true)
                 mergedTemp.delete()
             }
+        } catch (error: AdvancedDownloadUnavailable) {
+            mergedTemp.delete()
+            mergedPart.delete()
+            throw error
         } catch (error: Exception) {
             mergedTemp.delete()
             mergedPart.delete()
@@ -839,7 +840,7 @@ class DownloadService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        TorrentSession.releaseForServiceDestroy()
+        TorrentEngine.releaseForServiceDestroy()
         scope.cancel()
         super.onDestroy()
     }

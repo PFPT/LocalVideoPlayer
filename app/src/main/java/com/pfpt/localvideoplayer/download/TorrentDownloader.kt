@@ -1,6 +1,5 @@
 package com.pfpt.localvideoplayer.download
 
-import com.pfpt.localvideoplayer.download.torrent.TorrentSession
 import java.io.File
 
 internal object TorrentDownloader {
@@ -12,7 +11,7 @@ internal object TorrentDownloader {
         isCanceled: () -> Boolean,
         onName: suspend (String) -> Unit,
         onProgress: suspend (downloaded: Long, total: Long, speedBps: Long) -> Unit,
-    ): File = TorrentSession.downloadMagnet(
+    ): File = TorrentEngine.downloadMagnet(
         taskId = taskId,
         magnetUri = magnetUri,
         saveDir = saveDir,

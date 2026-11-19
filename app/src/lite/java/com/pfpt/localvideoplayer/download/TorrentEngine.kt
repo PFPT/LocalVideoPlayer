@@ -1,0 +1,17 @@
+package com.pfpt.localvideoplayer.download
+
+import java.io.File
+
+internal object TorrentEngine {
+    suspend fun downloadMagnet(
+        taskId: String,
+        magnetUri: String,
+        saveDir: File,
+        shouldStop: () -> Boolean,
+        isCanceled: () -> Boolean,
+        onName: suspend (String) -> Unit,
+        onProgress: suspend (downloaded: Long, total: Long, speedBps: Long) -> Unit,
+    ): File = throw AdvancedDownloadUnavailable()
+
+    fun releaseForServiceDestroy() = Unit
+}
