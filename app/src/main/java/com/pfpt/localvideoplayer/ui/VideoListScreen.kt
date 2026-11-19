@@ -207,6 +207,7 @@ private fun libraryProcessSignature(
 fun VideoListScreen(
     libraryEntries: List<VideoLibraryEntry>,
     isLibraryLoading: Boolean,
+    cacheResolved: Boolean,
     isRefreshing: Boolean,
     hasPermission: Boolean,
     libraryViewModel: LibraryViewModel,
@@ -969,31 +970,41 @@ fun VideoListScreen(
                                 }
                             }
 
-                            if ((isLibraryLoading || isSortingLibrary) && displayLibrary.isEmpty() && libraryEntries.isEmpty()) {
-                                item(key = "library-loading") {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillParentMaxWidth()
-                                            .padding(vertical = 48.dp)
-                                            .animateItem(placementSpec = null),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        CircularProgressIndicator(color = theme.accent)
+                            when (
+                                libraryOpening(
+                                    cacheResolved = cacheResolved,
+                                    entryCount = libraryEntries.size,
+                                    isLibraryLoading = isLibraryLoading,
+                                )
+                            ) {
+                                LibraryOpening.Hold, LibraryOpening.List -> Unit
+                                LibraryOpening.Loading -> {
+                                    item(key = "library-loading") {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillParentMaxWidth()
+                                                .padding(vertical = 48.dp)
+                                                .animateItem(placementSpec = null),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            CircularProgressIndicator(color = theme.accent)
+                                        }
                                     }
                                 }
-                            }
-
-                            if (!isLibraryLoading && !isSortingLibrary && libraryEntries.isEmpty() && !hasRecentPlayback) {
-                                item(key = "empty") {
-                                    LumenEmptyState(
-                                        title = stringResource(R.string.empty_video_list),
-                                        subtitle = stringResource(R.string.empty_video_hint),
-                                        icon = Icons.Default.VideoLibrary,
-                                        modifier = Modifier
-                                            .fillParentMaxSize()
-                                            .padding(24.dp)
-                                            .animateItem(placementSpec = null),
-                                    )
+                                LibraryOpening.Empty -> {
+                                    if (!hasRecentPlayback) {
+                                        item(key = "empty") {
+                                            LumenEmptyState(
+                                                title = stringResource(R.string.empty_video_list),
+                                                subtitle = stringResource(R.string.empty_video_hint),
+                                                icon = Icons.Default.VideoLibrary,
+                                                modifier = Modifier
+                                                    .fillParentMaxSize()
+                                                    .padding(24.dp)
+                                                    .animateItem(placementSpec = null),
+                                            )
+                                        }
+                                    }
                                 }
                             }
 

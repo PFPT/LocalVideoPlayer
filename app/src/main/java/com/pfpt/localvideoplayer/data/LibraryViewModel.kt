@@ -56,6 +56,9 @@ class LibraryViewModel(
     private val _isLibraryLoading = MutableStateFlow(false)
     val isLibraryLoading: StateFlow<Boolean> = _isLibraryLoading.asStateFlow()
 
+    private val _cacheResolved = MutableStateFlow(false)
+    val cacheResolved: StateFlow<Boolean> = _cacheResolved.asStateFlow()
+
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
@@ -139,19 +142,26 @@ class LibraryViewModel(
     }
 
     suspend fun loadFromCache() {
-        val hiddenUris = withContext(Dispatchers.IO) { hiddenVideosStore.getHiddenUris() }
-        val cachedEntries = withContext(Dispatchers.IO) { libraryCacheStore.loadLibraryEntries() }
-        if (cachedEntries.isNotEmpty()) {
-            _libraryEntries.value = cachedEntries.filterNotHidden(hiddenUris)
+        try {
+            val hiddenUris = withContext(Dispatchers.IO) { hiddenVideosStore.getHiddenUris() }
+            val cachedEntries = withContext(Dispatchers.IO) { libraryCacheStore.loadLibraryEntries() }
+            if (cachedEntries.isNotEmpty()) {
+                _libraryEntries.value = cachedEntries.filterNotHidden(hiddenUris)
+                rememberSignatures(flattenVideos(_libraryEntries.value))
+                return
+            }
+            val videos = withContext(Dispatchers.IO) { libraryCacheStore.loadVideos() }
+                .filter { it.uri.toString() !in hiddenUris }
+            if (videos.isEmpty()) return
+            _libraryEntries.value = videos.map { VideoLibraryEntry.Single(it) }
+            applyVideos(videos, emptySet())
             rememberSignatures(flattenVideos(_libraryEntries.value))
-            return
+        } finally {
+            if (_libraryEntries.value.isEmpty()) {
+                _isLibraryLoading.value = true
+            }
+            _cacheResolved.value = true
         }
-        val videos = withContext(Dispatchers.IO) { libraryCacheStore.loadVideos() }
-            .filter { it.uri.toString() !in hiddenUris }
-        if (videos.isEmpty()) return
-        _libraryEntries.value = videos.map { VideoLibraryEntry.Single(it) }
-        applyVideos(videos, emptySet())
-        rememberSignatures(flattenVideos(_libraryEntries.value))
     }
 
     fun refresh(showLoading: Boolean = false, fromPull: Boolean = false, incrementalPreferred: Boolean = false) {

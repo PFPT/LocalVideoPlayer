@@ -100,6 +100,7 @@ fun LocalVideoPlayerApp(
     val themeState by themeStore.themeState.collectAsState(initial = ThemeState())
     val libraryEntries by libraryViewModel.libraryEntries.collectAsState()
     val isLibraryLoading by libraryViewModel.isLibraryLoading.collectAsState()
+    val cacheResolved by libraryViewModel.cacheResolved.collectAsState()
     val isRefreshing by libraryViewModel.isRefreshing.collectAsState()
 
     DisposableEffect(castManager) {
@@ -234,6 +235,7 @@ fun LocalVideoPlayerApp(
                         VideoListScreen(
                             libraryEntries = libraryEntries,
                             isLibraryLoading = isLibraryLoading && libraryEntries.isEmpty(),
+                            cacheResolved = cacheResolved,
                             isRefreshing = isRefreshing,
                             hasPermission = hasPermission,
                             libraryViewModel = libraryViewModel,
