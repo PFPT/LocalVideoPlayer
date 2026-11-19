@@ -145,7 +145,7 @@ internal object ProgressiveDownloader {
                         control = control,
                     ) { written ->
                         inFlight[index] = written
-                        service.scope.launch {
+                        service.launchOnScope {
                             service.reportProgress(task, manager, currentDownloaded(), totalBytes)
                         }
                     }

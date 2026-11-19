@@ -41,7 +41,11 @@ import java.util.concurrent.atomic.AtomicLong
 
 class DownloadService : Service() {
     private val downloadDispatcher = Dispatchers.IO.limitedParallelism(64)
-    internal val scope = CoroutineScope(SupervisorJob() + downloadDispatcher)
+    private val scope = CoroutineScope(SupervisorJob() + downloadDispatcher)
+
+    internal fun launchOnScope(block: suspend () -> Unit) {
+        scope.launch { block() }
+    }
     private val mergeDispatcher = Dispatchers.IO.limitedParallelism(1)
     private val activeControls = ConcurrentHashMap<String, TaskControl>()
     private val activeJobs = ConcurrentHashMap<String, Job>()
