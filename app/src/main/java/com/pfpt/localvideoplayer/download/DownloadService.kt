@@ -29,14 +29,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.Request
-import okhttp3.Response
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
-import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -44,7 +41,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 class DownloadService : Service() {
     private val downloadDispatcher = Dispatchers.IO.limitedParallelism(64)
-    private val scope = CoroutineScope(SupervisorJob() + downloadDispatcher)
+    internal val scope = CoroutineScope(SupervisorJob() + downloadDispatcher)
     private val mergeDispatcher = Dispatchers.IO.limitedParallelism(1)
     private val activeControls = ConcurrentHashMap<String, TaskControl>()
     private val activeJobs = ConcurrentHashMap<String, Job>()
@@ -312,7 +309,13 @@ class DownloadService : Service() {
             publishPart(task.id, part, manager, control)
             return
         }
-        downloadProgressive(task, part, manager, control)
+        ProgressiveDownloader.download(
+            service = this,
+            task = task,
+            part = part,
+            manager = manager,
+            control = control,
+        )
         if (control.stopped) throw IOException(getString(R.string.download_paused))
         publishPart(task.id, part, manager, control)
     }
@@ -408,216 +411,6 @@ class DownloadService : Service() {
         if ('.' in preferredBase) return preferred
         val ext = fallbackFileName.substringAfterLast('.', "")
         return if (ext.isNotBlank()) "$preferred.$ext" else preferred
-    }
-
-    private suspend fun downloadProgressive(task: DownloadTask, part: File, manager: DownloadManager, control: TaskControl) {
-        val connections = DownloadManager.get(this).connectionsPerDownload()
-        val probe = probeProgressive(task.url, task.headers, control)
-        if (probe != null &&
-            probe.acceptsRanges &&
-            ProgressiveRangePlanner.shouldUseMultiRange(probe.totalBytes, connections)
-        ) {
-            downloadProgressiveMultiRange(task, part, probe.totalBytes, connections, manager, control)
-            return
-        }
-        downloadProgressiveSingle(task, part, manager, control)
-    }
-
-    private data class ProgressiveProbe(val totalBytes: Long, val acceptsRanges: Boolean)
-
-    private fun probeProgressive(url: String, headers: Map<String, String>, control: TaskControl): ProgressiveProbe? {
-        if (control.stopped) throw IOException(getString(R.string.download_paused))
-        runCatching {
-            executeRequest(url, headers, rangeHeader = "bytes=0-0").use { response ->
-                when (response.code) {
-                    HttpURLConnection.HTTP_PARTIAL -> {
-                        val total = contentTotalBytes(response, 0).takeIf { it > 0 }
-                        if (total != null) return ProgressiveProbe(total, true)
-                    }
-                    in 200..299 -> {
-                        val total = response.body?.contentLength()?.takeIf { it > 0 }
-                        if (total != null) return ProgressiveProbe(total, false)
-                    }
-                }
-            }
-        }
-        return runCatching {
-            executeRequest(url, headers, method = "HEAD").use { response ->
-                if (response.code !in 200..299) return@runCatching null
-                val total = response.header("Content-Length")?.toLongOrNull()?.takeIf { it > 0 }
-                    ?: return@runCatching null
-                val accepts = response.header("Accept-Ranges")?.contains("bytes", ignoreCase = true) == true
-                if (accepts) return@runCatching ProgressiveProbe(total, true)
-                executeRequest(url, headers, rangeHeader = "bytes=0-0").use { ranged ->
-                    if (ranged.code == HttpURLConnection.HTTP_PARTIAL) {
-                        val rangedTotal = contentTotalBytes(ranged, 0).takeIf { it > 0 } ?: total
-                        return@runCatching ProgressiveProbe(rangedTotal, true)
-                    }
-                }
-                ProgressiveProbe(total, false)
-            }
-        }.getOrNull()
-    }
-
-    private suspend fun downloadProgressiveSingle(task: DownloadTask, part: File, manager: DownloadManager, control: TaskControl) {
-        cleanupRangeParts(task.id)
-        var offset = part.takeIf(File::exists)?.length() ?: 0L
-        var response = executeRequest(task.url, task.headers, rangeStart = offset.takeIf { it > 0 })
-        if (offset > 0 && response.code != HttpURLConnection.HTTP_PARTIAL) {
-            response.close()
-            part.delete()
-            offset = 0
-            manager.update(task.id) { it.copy(downloadedBytes = 0, totalBytes = -1) }
-            response = executeRequest(task.url, task.headers)
-        }
-        try {
-            if (response.code !in 200..299) throw IOException("HTTP ${response.code}")
-            val total = contentTotalBytes(response, offset)
-            val body = response.body ?: throw IOException(getString(R.string.download_failed))
-            FileOutputStream(part, offset > 0).use { destination ->
-                BufferedInputStream(body.byteStream(), IO_BUFFER_SIZE).use { source ->
-                    copyStream(source, destination, offset, total, task, manager, control)
-                }
-            }
-        } finally {
-            response.close()
-        }
-    }
-
-    private suspend fun downloadProgressiveMultiRange(
-        task: DownloadTask,
-        part: File,
-        totalBytes: Long,
-        connections: Int,
-        manager: DownloadManager,
-        control: TaskControl,
-    ) {
-        if (part.exists()) part.delete()
-        val ranges = ProgressiveRangePlanner.plan(totalBytes, connections)
-        val completedBytes = AtomicLong(0)
-        val inFlight = ConcurrentHashMap<Int, Long>()
-        ranges.forEachIndexed { index, range ->
-            val piece = rangePartFile(task.id, index)
-            if (piece.exists() && piece.length() == range.length) {
-                completedBytes.addAndGet(range.length)
-            } else if (piece.exists()) {
-                piece.delete()
-            }
-        }
-        fun currentDownloaded(): Long = completedBytes.get() + inFlight.values.sum()
-        manager.update(task.id) { it.copy(downloadedBytes = currentDownloaded(), totalBytes = totalBytes) }
-        reportProgress(task, manager, currentDownloaded(), totalBytes, force = true)
-        coroutineScope {
-            ranges.mapIndexed { index, range ->
-                async {
-                    val piece = rangePartFile(task.id, index)
-                    if (piece.exists() && piece.length() == range.length) return@async
-                    downloadByteRange(
-                        url = task.url,
-                        headers = task.headers,
-                        range = range,
-                        dest = piece,
-                        control = control,
-                    ) { written ->
-                        inFlight[index] = written
-                        scope.launch {
-                            reportProgress(task, manager, currentDownloaded(), totalBytes)
-                        }
-                    }
-                    inFlight.remove(index)
-                    completedBytes.addAndGet(range.length)
-                    reportProgress(task, manager, currentDownloaded(), totalBytes, force = true)
-                }
-            }.awaitAll()
-        }
-        if (control.stopped) throw IOException(getString(R.string.download_paused))
-        ranges.forEachIndexed { index, range ->
-            val piece = rangePartFile(task.id, index)
-            if (!piece.exists() || piece.length() != range.length) {
-                throw IOException(getString(R.string.download_failed))
-            }
-        }
-        FileOutputStream(part).use { destination ->
-            ranges.indices.forEach { index ->
-                if (control.stopped) throw IOException(getString(R.string.download_paused))
-                val piece = rangePartFile(task.id, index)
-                FileInputStream(piece).use { source ->
-                    source.copyTo(destination, IO_BUFFER_SIZE)
-                }
-            }
-        }
-        if (part.length() != totalBytes) throw IOException(getString(R.string.download_failed))
-        cleanupRangeParts(task.id)
-        reportProgress(task, manager, totalBytes, totalBytes, force = true)
-    }
-
-    private fun downloadByteRange(
-        url: String,
-        headers: Map<String, String>,
-        range: ByteRange,
-        dest: File,
-        control: TaskControl,
-        onProgress: (Long) -> Unit,
-    ) {
-        var attempt = 0
-        var lastError: IOException? = null
-        while (attempt < SEGMENT_MAX_RETRIES) {
-            if (control.stopped) throw IOException(getString(R.string.download_paused))
-            dest.parentFile?.mkdirs()
-            if (dest.exists()) dest.delete()
-            try {
-                executeRequest(
-                    url,
-                    headers,
-                    rangeHeader = "bytes=${range.start}-${range.endInclusive}",
-                ).use { response ->
-                    if (response.code != HttpURLConnection.HTTP_PARTIAL && response.code !in 200..299) {
-                        throw IOException("HTTP ${response.code}")
-                    }
-                    val body = response.body ?: throw IOException(getString(R.string.download_failed))
-                    var written = 0L
-                    FileOutputStream(dest).use { destination ->
-                        BufferedInputStream(body.byteStream(), IO_BUFFER_SIZE).use { source ->
-                            val buffer = ByteArray(IO_BUFFER_SIZE)
-                            while (true) {
-                                if (control.stopped) throw IOException(getString(R.string.download_paused))
-                                val count = source.read(buffer)
-                                if (count < 0) break
-                                destination.write(buffer, 0, count)
-                                written += count
-                                onProgress(written)
-                            }
-                        }
-                    }
-                    if (written != range.length) {
-                        throw IOException(getString(R.string.download_failed))
-                    }
-                }
-                return
-            } catch (error: IOException) {
-                if (control.stopped || control.canceled) throw error
-                lastError = error
-                dest.delete()
-                onProgress(0)
-                val next = nextDownloadAttempt(
-                    stopped = false,
-                    canceled = false,
-                    attempt = attempt,
-                    maxAttempts = SEGMENT_MAX_RETRIES,
-                )
-                if (next == null) break
-                attempt = next
-                Thread.sleep(RETRY_BACKOFF_MS[attempt - 1])
-            }
-        }
-        throw lastError ?: IOException(getString(R.string.download_failed))
-    }
-
-    private fun rangePartFile(taskId: String, index: Int): File =
-        File(cacheDir, "range_$taskId.$index")
-
-    private fun cleanupRangeParts(taskId: String) {
-        cleanupRangeParts(this, taskId)
     }
 
     private fun unwrapResolved(result: HlsVodResolveResult): HlsVodResolveResult =
@@ -832,7 +625,7 @@ class DownloadService : Service() {
         while (attempt < SEGMENT_MAX_RETRIES) {
             if (control.stopped) throw IOException(getString(R.string.download_paused))
             try {
-                executeHlsRequest(address, headers, playlistUrl).use { response ->
+                DownloadRequests.executeHlsRequest(address, headers, playlistUrl).use { response ->
                     if (response.code !in 200..299) {
                         throw IOException(getString(R.string.download_hls_request_failed, response.code))
                     }
@@ -874,7 +667,7 @@ class DownloadService : Service() {
             if (partFile.exists()) partFile.delete()
             var written = 0L
             try {
-                executeHlsRequest(address, headers, playlistUrl).use { response ->
+                DownloadRequests.executeHlsRequest(address, headers, playlistUrl).use { response ->
                     if (response.code !in 200..299) {
                         throw IOException(getString(R.string.download_hls_request_failed, response.code))
                     }
@@ -1053,31 +846,7 @@ class DownloadService : Service() {
         publishPart(taskId, mergedPart, manager, control)
     }
 
-    private suspend fun copyStream(
-        source: BufferedInputStream,
-        destination: FileOutputStream,
-        initialBytes: Long,
-        total: Long,
-        task: DownloadTask,
-        manager: DownloadManager,
-        control: TaskControl,
-    ) {
-        val buffer = ByteArray(IO_BUFFER_SIZE)
-        var downloaded = initialBytes
-        while (true) {
-            if (control.stopped) throw IOException(getString(R.string.download_paused))
-            val count = source.read(buffer)
-            if (count < 0) break
-            destination.write(buffer, 0, count)
-            downloaded += count
-            if (downloaded % PROGRESS_STEP < count) {
-                reportProgress(task, manager, downloaded, total)
-            }
-        }
-        reportProgress(task, manager, downloaded, total, force = true)
-    }
-
-    private suspend fun reportProgress(
+    internal suspend fun reportProgress(
         task: DownloadTask,
         manager: DownloadManager,
         downloaded: Long,
@@ -1165,49 +934,6 @@ class DownloadService : Service() {
             manager.update(task.id) { it.copy(outputUri = null) }
             throw error
         }
-    }
-
-    private fun executeHlsRequest(
-        address: String,
-        headers: Map<String, String>,
-        playlistUrl: String?,
-    ): Response {
-        val prepared = if (playlistUrl.isNullOrBlank()) {
-            DownloadUrlResolver.ensureDownloadHeaders(headers)
-        } else {
-            DownloadUrlResolver.hlsChildHeaders(playlistUrl, headers)
-        }
-        val response = executeRequest(address, prepared)
-        if (response.code != 403) return response
-        val refererKey = prepared.keys.firstOrNull { it.equals("Referer", ignoreCase = true) } ?: return response
-        response.close()
-        return executeRequest(address, prepared.filterKeys { !it.equals(refererKey, ignoreCase = true) })
-    }
-
-    private fun executeRequest(
-        address: String,
-        headers: Map<String, String>,
-        method: String = "GET",
-        rangeStart: Long? = null,
-        rangeHeader: String? = null,
-    ): Response {
-        val builder = Request.Builder().url(address).method(method, null)
-        headers.forEach { (name, value) -> builder.header(name, value) }
-        when {
-            rangeHeader != null -> builder.header("Range", rangeHeader)
-            rangeStart != null -> builder.header("Range", "bytes=$rangeStart-")
-        }
-        if (method == "HEAD") {
-            builder.header("Accept-Encoding", "identity")
-        }
-        return DownloadHttpClient.client.newCall(builder.build()).execute()
-    }
-
-    private fun contentTotalBytes(response: Response, offset: Long): Long {
-        val range = response.header("Content-Range")
-        val rangeTotal = range?.substringAfterLast('/')?.toLongOrNull()
-        val length = response.body?.contentLength()?.takeIf { it >= 0 }
-        return rangeTotal ?: length?.plus(offset) ?: -1
     }
 
     private fun createOutput(task: DownloadTask, displayName: String): Uri {
@@ -1499,7 +1225,7 @@ class DownloadService : Service() {
 
     private fun outputKey(task: DownloadTask) = "${task.saveToMovies}:${task.fileName.lowercase()}"
 
-    private class TaskControl {
+    internal class TaskControl {
         @Volatile var stopped = false
         @Volatile var canceled = false
     }
@@ -1515,14 +1241,14 @@ class DownloadService : Service() {
         private const val NOTIFICATION_GROUP = "downloads"
         private const val NOTIFICATION_ID = 3001
         private const val NOTIFICATION_THROTTLE_MS = 1_000L
-        private const val PROGRESS_STEP = 512 * 1024L
-        private const val IO_BUFFER_SIZE = 256 * 1024
-        private const val SEGMENT_MAX_RETRIES = 3
+        internal const val PROGRESS_STEP = 512 * 1024L
+        internal const val IO_BUFFER_SIZE = 256 * 1024
+        internal const val SEGMENT_MAX_RETRIES = 3
         private const val LIVE_PROGRESS_INTERVAL_MS = 500L
         private const val PROGRESS_DB_MS = 5_000L
         private const val HLS_SOURCE_PLAYLIST_NAME = "source.m3u8"
         private const val AES_128_KEY_BYTES = 16
-        private val RETRY_BACKOFF_MS = longArrayOf(1_000, 2_000, 4_000)
+        internal val RETRY_BACKOFF_MS = longArrayOf(1_000, 2_000, 4_000)
 
         fun taskNotificationId(taskId: String): Int = NOTIFICATION_ID + (taskId.hashCode() and 0xFFFF)
 
