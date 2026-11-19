@@ -253,10 +253,12 @@ class DownloadService : Service() {
     }
 
     private fun failureMessage(error: Exception, @Suppress("UNUSED_PARAMETER") taskUrl: String = ""): String {
-        if (error is SocketTimeoutException || error.cause is SocketTimeoutException) {
-            return getString(R.string.download_timeout_retry)
-        }
-        return error.message?.takeIf { it.isNotBlank() } ?: getString(R.string.download_direct_link_failed)
+        return downloadFailureMessage(
+            error = error,
+            unavailableMessage = getString(R.string.download_requires_full),
+            timeoutMessage = getString(R.string.download_timeout_retry),
+            fallbackMessage = getString(R.string.download_direct_link_failed),
+        )
     }
 
     private fun effectiveTask(task: DownloadTask): DownloadTask {

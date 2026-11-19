@@ -286,6 +286,7 @@
     <string name="download_status_failed">下载失败</string>
     <string name="download_status_merging">正在合并</string>
     <string name="download_timeout_retry">连接超时，点击继续重试</string>
+    <string name="download_requires_full">当前安装包不包含这项下载</string>
     <string name="download_direct_link_failed">无法访问视频直链，请检查分享链接是否有效</string>
     <string name="download_proxy_unwrapped">正在通过本机代理下载，请保持来源应用在后台</string>
     <string name="download_progress_size_unknown">未知</string>
