@@ -309,7 +309,7 @@ class DownloadService : Service() {
         saveDir.mkdirs()
         manager.update(task.id) { it.copy(partialPath = saveDir.absolutePath) }
         val videoFile = try {
-            TorrentSession.downloadMagnet(
+            TorrentDownloader.download(
                 taskId = task.id,
                 magnetUri = task.url,
                 saveDir = saveDir,
@@ -317,7 +317,7 @@ class DownloadService : Service() {
                 isCanceled = { control.canceled },
                 onName = { name ->
                     val sanitized = DownloadNameResolver.sanitizeTitle(name)
-                    if (sanitized.isBlank()) return@downloadMagnet
+                    if (sanitized.isBlank()) return@download
                     val currentName = manager.get(task.id)?.fileName.orEmpty()
                     val looksLikeHash = currentName.length in 32..64 && currentName.all { it.isLetterOrDigit() }
                     if (looksLikeHash || currentName.isBlank() || currentName == getString(R.string.download_default_file_name)) {
