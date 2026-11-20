@@ -75,7 +75,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -360,15 +359,15 @@ fun VideoListScreen(
         }
     }
     val listState = listStates.getValue(selectedTypeTab)
-    val isListScrolling by remember {
+    val isListScrolling by remember(listState) {
         derivedStateOf { listState.isScrollInProgress }
     }
-    val visibleItemKeys by remember {
+    val visibleItemKeys by remember(listState) {
         derivedStateOf {
             listState.layoutInfo.visibleItemsInfo.map { it.key }.toSet()
         }
     }
-    val isListScrolled by remember {
+    val isListScrolled by remember(listState) {
         derivedStateOf {
             listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
         }
@@ -380,20 +379,20 @@ fun VideoListScreen(
             (displayLibrary.isNotEmpty() || hasRecentPlayback) &&
             isListScrolled
 
-    var previousScrollIndex by remember { mutableIntStateOf(0) }
-    var previousScrollOffset by remember { mutableIntStateOf(0) }
     var fabVisible by remember { mutableStateOf(true) }
     LaunchedEffect(listState) {
+        var previousIndex = listState.firstVisibleItemIndex
+        var previousOffset = listState.firstVisibleItemScrollOffset
         snapshotFlow {
             listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
         }.collect { (index, offset) ->
             val scrollingDown =
-                index > previousScrollIndex ||
-                    (index == previousScrollIndex && offset > previousScrollOffset)
+                index > previousIndex ||
+                    (index == previousIndex && offset > previousOffset)
             val atTop = index == 0 && offset == 0
             fabVisible = atTop || !scrollingDown
-            previousScrollIndex = index
-            previousScrollOffset = offset
+            previousIndex = index
+            previousOffset = offset
         }
     }
 
