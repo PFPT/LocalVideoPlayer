@@ -202,7 +202,10 @@ fun MediaThumbnail(
     val theme = LocalLumenTheme.current
     Box(
         modifier = modifier
-            .playerSharedBounds(sharedContentKey)
+            .playerSharedBounds(
+                contentKey = sharedContentKey,
+                restingCorner = LumenThumbCorner,
+            )
             .background(theme.surface),
         contentAlignment = Alignment.Center,
     ) {

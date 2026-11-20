@@ -1,8 +1,11 @@
 package com.pfpt.localvideoplayer.ui
 
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.animateDp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -45,14 +48,24 @@ fun ProvidePlayerSharedTransition(
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun Modifier.playerSharedBounds(contentKey: String?): Modifier {
+fun Modifier.playerSharedBounds(
+    contentKey: String?,
+    restingCorner: Dp = 0.dp,
+): Modifier {
     if (contentKey == null) return this
     val sharedTransitionScope = LocalPlayerSharedTransition.current ?: return this
     val animatedVisibilityScope = LocalPlayerAnimatedVisibility.current ?: return this
+    val corner by animatedVisibilityScope.transition.animateDp { state ->
+        sharedOpenCorner(
+            restingCorner = restingCorner,
+            atRest = state == EnterExitState.Visible,
+        )
+    }
     return with(sharedTransitionScope) {
         sharedBounds(
             sharedContentState = rememberSharedContentState(key = contentKey),
             animatedVisibilityScope = animatedVisibilityScope,
+            clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(corner)),
         )
     }
 }
