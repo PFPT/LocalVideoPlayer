@@ -362,6 +362,11 @@ fun VideoListScreen(
     val isListScrolling by remember {
         derivedStateOf { listState.isScrollInProgress }
     }
+    val visibleItemKeys by remember {
+        derivedStateOf {
+            listState.layoutInfo.visibleItemsInfo.map { it.key }.toSet()
+        }
+    }
     val isListScrolled by remember {
         derivedStateOf {
             listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
@@ -525,12 +530,16 @@ fun VideoListScreen(
     }
 
     @Composable
-    fun LibraryListRow(entry: VideoLibraryEntry) {
+    fun LibraryListRow(entry: VideoLibraryEntry, listKey: Any) {
         AnyLibraryRow(
             entry = entry,
             selectedKeys = selectedKeys,
             selectionMode = selectionMode,
-            isListScrolling = isListScrolling,
+            deferThumbnailLoad = !thumbnailShouldLoad(
+                isScrolling = isListScrolling,
+                itemKey = listKey,
+                visibleKeys = visibleItemKeys,
+            ),
             pinnedKeys = pinnedKeys,
             playbackStore = playbackStore,
             onToggleMark = ::toggleMark,
@@ -1044,7 +1053,10 @@ fun VideoListScreen(
                                     },
                                 ) { entry ->
                                     Box(modifier = Modifier.animateItem(placementSpec = null)) {
-                                        LibraryListRow(entry)
+                                        LibraryListRow(
+                                            entry = entry,
+                                            listKey = "flat-${viewLayout.name}-${entryKey(entry)}",
+                                        )
                                     }
                                 }
                             } else {
@@ -1068,7 +1080,10 @@ fun VideoListScreen(
                                             },
                                         ) { entry ->
                                             Box(modifier = Modifier.animateItem(placementSpec = null)) {
-                                                LibraryListRow(entry)
+                                                LibraryListRow(
+                                                    entry = entry,
+                                                    listKey = "sectioned-${viewLayout.name}-${entryKey(entry)}",
+                                                )
                                             }
                                         }
                                     }
@@ -1086,7 +1101,10 @@ fun VideoListScreen(
                                             contentType = { 0 },
                                         ) { entry ->
                                             Box(modifier = Modifier.animateItem(placementSpec = null)) {
-                                                LibraryListRow(entry)
+                                                LibraryListRow(
+                                                    entry = entry,
+                                                    listKey = entryKey(entry),
+                                                )
                                             }
                                         }
                                     }
@@ -1104,7 +1122,10 @@ fun VideoListScreen(
                                             contentType = { 0 },
                                         ) { entry ->
                                             Box(modifier = Modifier.animateItem(placementSpec = null)) {
-                                                LibraryListRow(entry)
+                                                LibraryListRow(
+                                                    entry = entry,
+                                                    listKey = entryKey(entry),
+                                                )
                                             }
                                         }
                                     }
@@ -1122,7 +1143,10 @@ fun VideoListScreen(
                                             contentType = { 0 },
                                         ) { entry ->
                                             Box(modifier = Modifier.animateItem(placementSpec = null)) {
-                                                LibraryListRow(entry)
+                                                LibraryListRow(
+                                                    entry = entry,
+                                                    listKey = entryKey(entry),
+                                                )
                                             }
                                         }
                                     }
@@ -1157,7 +1181,10 @@ fun VideoListScreen(
                                                     contentType = { 1 },
                                                 ) { entry ->
                                                     Box(modifier = Modifier.animateItem(placementSpec = null)) {
-                                                        LibraryListRow(entry)
+                                                        LibraryListRow(
+                                                            entry = entry,
+                                                            listKey = entryKey(entry),
+                                                        )
                                                     }
                                                 }
                                             }
