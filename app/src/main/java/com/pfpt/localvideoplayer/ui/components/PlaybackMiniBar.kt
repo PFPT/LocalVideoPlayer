@@ -70,6 +70,7 @@ fun PlaybackMiniBar(
                 .fillMaxWidth()
                 .padding(horizontal = LumenListHorizontalInset, vertical = LumenSpaceSm),
             shape = RoundedCornerShape(LumenMiniBarCorner),
+            fill = theme.surface,
         ) {
             Row(
                 modifier = Modifier

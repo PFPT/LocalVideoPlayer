@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -21,11 +22,14 @@ fun GlassSurface(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(LumenVideoCorner),
     fillAlpha: Float? = null,
+    fill: Color? = null,
     borderWidth: Dp = 1.dp,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val theme = LocalLumenTheme.current
-    val resolvedFill = fillAlpha?.let { theme.glassFill.copy(alpha = it) } ?: theme.glassFill
+    val resolvedFill = fill
+        ?: fillAlpha?.let { theme.glassFill.copy(alpha = it) }
+        ?: theme.glassFill
     Box(
         modifier = modifier
             .clip(shape)

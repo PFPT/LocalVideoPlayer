@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenListHorizontalInset
 import com.pfpt.localvideoplayer.ui.theme.LumenMiniBarCorner
 import com.pfpt.localvideoplayer.ui.theme.LumenSpaceMd
@@ -38,6 +39,7 @@ fun CastMiniController(
     onDisconnect: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val theme = LocalLumenTheme.current
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn() + expandVertically(),
@@ -49,6 +51,7 @@ fun CastMiniController(
                 .fillMaxWidth()
                 .padding(horizontal = LumenListHorizontalInset, vertical = LumenSpaceSm),
             shape = RoundedCornerShape(LumenMiniBarCorner),
+            fill = theme.surface,
         ) {
             Row(
                 modifier = Modifier

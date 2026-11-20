@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -384,6 +385,7 @@ fun LocalVideoPlayerApp(
                         onPlayPause = { playbackSession.togglePlayPause() },
                         onClose = { playbackSession.stop() },
                         modifier = Modifier
+                            .zIndex(1f)
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding(),
                     )
