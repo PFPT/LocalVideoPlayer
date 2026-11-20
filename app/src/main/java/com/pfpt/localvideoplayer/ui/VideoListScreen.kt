@@ -93,6 +93,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
 import com.pfpt.localvideoplayer.data.HiddenVideosStore
@@ -159,6 +160,8 @@ private val VIDEO_PICKER_MIME_TYPES = arrayOf(
     "application/vnd.apple.mpegurl",
     "application/x-mpegURL",
 )
+
+private val LibraryRowPlacement = tween<IntOffset>(durationMillis = 200)
 
 private data class LibraryProcessCache(
     val signature: String,
@@ -1052,7 +1055,7 @@ fun VideoListScreen(
                                         }
                                     },
                                 ) { entry ->
-                                    Box(modifier = Modifier.animateItem(placementSpec = null)) {
+                                    Box(modifier = Modifier.animateItem(placementSpec = LibraryRowPlacement)) {
                                         LibraryListRow(
                                             entry = entry,
                                             listKey = "flat-${viewLayout.name}-${entryKey(entry)}",
@@ -1079,7 +1082,7 @@ fun VideoListScreen(
                                                 }
                                             },
                                         ) { entry ->
-                                            Box(modifier = Modifier.animateItem(placementSpec = null)) {
+                                            Box(modifier = Modifier.animateItem(placementSpec = LibraryRowPlacement)) {
                                                 LibraryListRow(
                                                     entry = entry,
                                                     listKey = "sectioned-${viewLayout.name}-${entryKey(entry)}",
@@ -1100,7 +1103,7 @@ fun VideoListScreen(
                                             key = { entry -> entryKey(entry) },
                                             contentType = { 0 },
                                         ) { entry ->
-                                            Box(modifier = Modifier.animateItem(placementSpec = null)) {
+                                            Box(modifier = Modifier.animateItem(placementSpec = LibraryRowPlacement)) {
                                                 LibraryListRow(
                                                     entry = entry,
                                                     listKey = entryKey(entry),
@@ -1121,7 +1124,7 @@ fun VideoListScreen(
                                             key = { entry -> entryKey(entry) },
                                             contentType = { 0 },
                                         ) { entry ->
-                                            Box(modifier = Modifier.animateItem(placementSpec = null)) {
+                                            Box(modifier = Modifier.animateItem(placementSpec = LibraryRowPlacement)) {
                                                 LibraryListRow(
                                                     entry = entry,
                                                     listKey = entryKey(entry),
@@ -1142,7 +1145,7 @@ fun VideoListScreen(
                                             key = { entry -> entryKey(entry) },
                                             contentType = { 0 },
                                         ) { entry ->
-                                            Box(modifier = Modifier.animateItem(placementSpec = null)) {
+                                            Box(modifier = Modifier.animateItem(placementSpec = LibraryRowPlacement)) {
                                                 LibraryListRow(
                                                     entry = entry,
                                                     listKey = entryKey(entry),
@@ -1180,7 +1183,7 @@ fun VideoListScreen(
                                                     key = { entry -> entryKey(entry) },
                                                     contentType = { 1 },
                                                 ) { entry ->
-                                                    Box(modifier = Modifier.animateItem(placementSpec = null)) {
+                                                    Box(modifier = Modifier.animateItem(placementSpec = LibraryRowPlacement)) {
                                                         LibraryListRow(
                                                             entry = entry,
                                                             listKey = entryKey(entry),
