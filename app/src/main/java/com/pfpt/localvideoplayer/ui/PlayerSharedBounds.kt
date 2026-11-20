@@ -12,6 +12,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import com.pfpt.localvideoplayer.ui.theme.LumenThumbCorner
+
+fun sharedOpenCorner(
+    restingCorner: Dp,
+    atRest: Boolean,
+): Dp {
+    if (atRest) return restingCorner
+    return if (restingCorner == 0.dp) LumenThumbCorner else 0.dp
+}
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 private val LocalPlayerSharedTransition = staticCompositionLocalOf<SharedTransitionScope?> { null }
