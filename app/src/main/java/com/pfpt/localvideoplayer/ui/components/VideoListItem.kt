@@ -114,6 +114,7 @@ fun VideoListItem(
     val sharedOpen = rememberPlayerSharedOpen(
         candidateKey = video.uri.toString(),
         opensPlayer = !selectionMode,
+        dateModifiedSeconds = video.dateModified,
         onClick = onClick,
     )
 
@@ -140,6 +141,7 @@ fun VideoListItem(
                 modifier = modifier,
                 trailingContent = markButton,
                 sharedContentKey = sharedOpen.contentKey,
+                onFlightMeasured = sharedOpen.onMeasured,
             )
         }
     }
@@ -255,6 +257,7 @@ fun EpisodeListItem(
     val sharedOpen = rememberPlayerSharedOpen(
         candidateKey = episode.uri.toString(),
         opensPlayer = !selectionMode,
+        dateModifiedSeconds = episode.dateModified,
         onClick = onClick,
     )
 
@@ -280,6 +283,7 @@ fun EpisodeListItem(
                 deferThumbnailLoad = deferThumbnailLoad,
                 modifier = modifier,
                 sharedContentKey = sharedOpen.contentKey,
+                onFlightMeasured = sharedOpen.onMeasured,
             )
         }
     }

@@ -231,6 +231,7 @@ private fun PlayerScreenContent(
     systemControls: PlaybackSystemControls?,
 ) {
     val context = LocalContext.current
+    val flight = currentPlayerFlight()
     val scope = rememberCoroutineScope()
     val bookmarkUri = playlist.getOrNull(ui.currentIndex)?.uri
     val bookmarkFlow = remember(bookmarkUri) {
@@ -500,6 +501,11 @@ private fun PlayerScreenContent(
                 ui.resetSpeedBoost()
                 scope.launch {
                     saveCurrentProgress()
+                    if (!ui.isInPipMode) {
+                        playlist.getOrNull(ui.currentIndex)?.uri?.toString()?.let { uri ->
+                            flight?.beginReturn(uri)
+                        }
+                    }
                     onBack()
                 }
             }
@@ -732,7 +738,7 @@ private fun PlayerScreenContent(
     val currentTitle = currentVideo?.title ?: ""
     val seriesTitle = remember(playlist) { deriveSeriesTitle(playlist, ui.currentIndex) }
     val resolution = if (ui.videoWidth > 0 && ui.videoHeight > 0) {
-        "$ui.videoWidth x $ui.videoHeight"
+        "${ui.videoWidth} x ${ui.videoHeight}"
     } else {
         null
     }

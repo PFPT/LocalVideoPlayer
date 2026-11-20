@@ -24,8 +24,8 @@ import com.pfpt.localvideoplayer.player.PlayerProgressState
 import com.pfpt.localvideoplayer.ui.PlayerUiState
 import com.pfpt.localvideoplayer.ui.hidePlayerPageForTransition
 import com.pfpt.localvideoplayer.ui.hidePlayerSurfaceForTransition
-import com.pfpt.localvideoplayer.ui.playerSharedBounds
 import com.pfpt.localvideoplayer.ui.playerTransitionActive
+import com.pfpt.localvideoplayer.ui.reportFlightTarget
 
 @Composable
 fun PortraitPlayerLayout(
@@ -151,16 +151,11 @@ fun PortraitPlayerLayout(
                         .then(if (hidePage) Modifier else Modifier.background(Color.Black)),
                 ) {
                     Box(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .reportFlightTarget(videoUri != null),
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (!isCasting && videoUri != null) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .playerSharedBounds(videoUri.toString()),
-                            )
-                        }
                         if (!hidePlayerSurfaceForTransition(
                                 useTextureView = useTextureView,
                                 isCasting = isCasting,

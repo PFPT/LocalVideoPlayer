@@ -10,8 +10,6 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,8 +62,9 @@ import com.pfpt.localvideoplayer.player.PlaybackSessionViewModel
 import com.pfpt.localvideoplayer.player.PlaylistState
 import com.pfpt.localvideoplayer.ui.PlayerScreen
 import com.pfpt.localvideoplayer.ui.DownloadManagerScreen
-import com.pfpt.localvideoplayer.ui.ProvidePlayerSharedSource
-import com.pfpt.localvideoplayer.ui.ProvidePlayerSharedTransition
+import com.pfpt.localvideoplayer.ui.PlayerFlightOverlay
+import com.pfpt.localvideoplayer.ui.PlayerFlightState
+import com.pfpt.localvideoplayer.ui.ProvidePlayerFlight
 import com.pfpt.localvideoplayer.ui.SeriesDetailScreen
 import com.pfpt.localvideoplayer.ui.SettingsScreen
 import com.pfpt.localvideoplayer.ui.VideoListScreen
@@ -80,7 +80,6 @@ private const val ROUTE_PLAYER = "player"
 private const val ROUTE_DOWNLOADS = "downloads"
 private const val ROUTE_SETTINGS = "settings"
 
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun LocalVideoPlayerApp(
     downloadsNavigationTick: Int = 0,
@@ -102,6 +101,7 @@ fun LocalVideoPlayerApp(
     val folderSourceStore = remember { FolderSourceStore(context) }
     val libraryViewModel = remember { LibraryViewModel(context) }
     val playbackSession = viewModel<PlaybackSessionViewModel>().session
+    val flight = remember { PlayerFlightState() }
     val castManager = remember { CastManager(context, playbackStore) }
     val themeState by themeStore.themeState.collectAsState(initial = ThemeState())
     val libraryEntries by libraryViewModel.libraryEntries.collectAsState()
@@ -230,20 +230,21 @@ fun LocalVideoPlayerApp(
             !sessionState.onPlayerScreen &&
             navBackStack?.destination?.route != ROUTE_PLAYER &&
             castUi !is CastUiState.Connected
+        LaunchedEffect(navBackStack?.destination?.route) {
+            val route = navBackStack?.destination?.route
+            if (route == null || route == ROUTE_PLAYER) return@LaunchedEffect
+            withFrameNanos { }
+            flight.settleReturnLayout()
+        }
         CompositionLocalProvider(LocalCastManager provides castManager) {
+            ProvidePlayerFlight(flight) {
             Surface(modifier = Modifier.fillMaxSize()) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    SharedTransitionLayout {
-                        ProvidePlayerSharedSource {
                             NavHost(
                                 navController = navController,
                                 startDestination = ROUTE_VIDEO_LIST,
                             ) {
                             composable(ROUTE_VIDEO_LIST) {
-                                ProvidePlayerSharedTransition(
-                                    sharedTransitionScope = this@SharedTransitionLayout,
-                                    animatedVisibilityScope = this@composable,
-                                ) {
                                     VideoListScreen(
                                         libraryEntries = libraryEntries,
                                         isLibraryLoading = isLibraryLoading && libraryEntries.isEmpty(),
@@ -275,7 +276,6 @@ fun LocalVideoPlayerApp(
                                             libraryViewModel.refresh(fromPull = true)
                                         },
                                     )
-                                }
                             }
                             composable(
                                 route = ROUTE_SERIES,
@@ -292,10 +292,6 @@ fun LocalVideoPlayerApp(
                                 if (series == null) {
                                     navController.popBackStack()
                                 } else {
-                                    ProvidePlayerSharedTransition(
-                                        sharedTransitionScope = this@SharedTransitionLayout,
-                                        animatedVisibilityScope = this@composable,
-                                    ) {
                                         SeriesDetailScreen(
                                             series = series,
                                             repository = repository,
@@ -315,7 +311,6 @@ fun LocalVideoPlayerApp(
                                             },
                                             onVideosRemoved = { uris -> libraryViewModel.removeVideos(uris) },
                                         )
-                                    }
                                 }
                             }
                             composable(ROUTE_PLAYER) {
@@ -325,10 +320,6 @@ fun LocalVideoPlayerApp(
                                         navController.popBackStack()
                                     }
                                 } else {
-                                    ProvidePlayerSharedTransition(
-                                        sharedTransitionScope = this@SharedTransitionLayout,
-                                        animatedVisibilityScope = this@composable,
-                                    ) {
                                         PlayerScreen(
                                             playlistState = state,
                                             playbackStore = playbackStore,
@@ -342,7 +333,6 @@ fun LocalVideoPlayerApp(
                                             },
                                             onBack = { navController.popBackStack() },
                                         )
-                                    }
                                 }
                             }
                             composable(ROUTE_SETTINGS) {
@@ -368,8 +358,6 @@ fun LocalVideoPlayerApp(
                                 )
                             }
                             }
-                        }
-                    }
                     PlaybackMiniBar(
                         visible = showPlaybackBar,
                         title = sessionState.title,
@@ -389,7 +377,12 @@ fun LocalVideoPlayerApp(
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding(),
                     )
+                    PlayerFlightOverlay(
+                        flight = flight,
+                        modifier = Modifier.zIndex(2f),
+                    )
                 }
+            }
             }
         }
     }

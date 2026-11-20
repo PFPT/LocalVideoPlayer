@@ -26,6 +26,8 @@ fun PlayerBottomToolbar(
     onLoopClick: () -> Unit,
     onEpisodePickerClick: () -> Unit,
     onMoreClick: (() -> Unit)? = null,
+    contentColor: Color = LumenOnVideo,
+    highlightedColor: Color = LumenAccentText,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -37,22 +39,30 @@ fun PlayerBottomToolbar(
             text = "${formatSpeedLabel(playbackSpeed)}x",
             onClick = onSpeedClick,
             highlighted = true,
+            contentColor = contentColor,
+            highlightedColor = highlightedColor,
         )
         ToolbarItem(
             text = stringResource(R.string.loop),
             onClick = onLoopClick,
             highlighted = repeatOne,
+            contentColor = contentColor,
+            highlightedColor = highlightedColor,
         )
         if (showEpisodePicker) {
             ToolbarItem(
                 text = stringResource(R.string.episode_picker),
                 onClick = onEpisodePickerClick,
+                contentColor = contentColor,
+                highlightedColor = highlightedColor,
             )
         }
         if (onMoreClick != null) {
             ToolbarItem(
                 text = stringResource(R.string.more_options),
                 onClick = onMoreClick,
+                contentColor = contentColor,
+                highlightedColor = highlightedColor,
             )
         }
     }
@@ -62,12 +72,14 @@ fun PlayerBottomToolbar(
 private fun ToolbarItem(
     text: String,
     onClick: () -> Unit,
+    contentColor: Color,
+    highlightedColor: Color,
     highlighted: Boolean = false,
 ) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodyMedium,
-        color = if (highlighted) LumenAccentText else LumenOnVideo.copy(alpha = 0.9f),
+        color = if (highlighted) highlightedColor else contentColor.copy(alpha = 0.9f),
         modifier = Modifier
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 4.dp),

@@ -134,6 +134,7 @@ private fun RecentPlaybackCard(
                 thumbnailUri = record.uri,
                 modifier = Modifier.fillMaxSize(),
                 sharedContentKey = sharedOpen.contentKey,
+                onFlightMeasured = sharedOpen.onMeasured,
             )
             MediaProgressRail(
                 progress = progress,

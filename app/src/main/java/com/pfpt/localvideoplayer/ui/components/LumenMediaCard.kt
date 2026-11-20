@@ -38,7 +38,9 @@ import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.pfpt.localvideoplayer.ui.playerSharedBounds
+import androidx.compose.ui.geometry.Rect
+import com.pfpt.localvideoplayer.ui.flightHidesThumbnail
+import com.pfpt.localvideoplayer.ui.trackFlightSource
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenCardPadding
 import com.pfpt.localvideoplayer.ui.theme.LumenSpaceMd
@@ -61,6 +63,7 @@ fun LumenMediaCard(
     deferThumbnailLoad: Boolean = false,
     trailingContent: (@Composable () -> Unit)? = null,
     sharedContentKey: String? = null,
+    onFlightMeasured: ((Rect) -> Unit)? = null,
 ) {
     val theme = LocalLumenTheme.current
     val cardShape = RoundedCornerShape(LumenThumbCorner)
@@ -102,6 +105,7 @@ fun LumenMediaCard(
                     modifier = Modifier.fillMaxSize(),
                     deferLoad = deferThumbnailLoad,
                     sharedContentKey = sharedContentKey,
+                    onFlightMeasured = onFlightMeasured,
                 )
             } else {
                 Box(
@@ -169,6 +173,7 @@ fun MediaThumbnail(
     dateModifiedSeconds: Long = 0L,
     deferLoad: Boolean = false,
     sharedContentKey: String? = null,
+    onFlightMeasured: ((Rect) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var thumbnail by remember(thumbnailUri, dateModifiedSeconds) {
@@ -200,15 +205,18 @@ fun MediaThumbnail(
     }
 
     val theme = LocalLumenTheme.current
+    val hideImage = flightHidesThumbnail(sharedContentKey)
     Box(
         modifier = modifier
-            .playerSharedBounds(
-                contentKey = sharedContentKey,
-                restingCorner = LumenThumbCorner,
+            .trackFlightSource(
+                uri = sharedContentKey,
+                dateModifiedSeconds = dateModifiedSeconds,
+                onMeasured = onFlightMeasured,
             )
             .background(theme.surface),
         contentAlignment = Alignment.Center,
     ) {
+        if (!hideImage) {
         Crossfade(
             targetState = thumbnail,
             animationSpec = tween(durationMillis = 180),
@@ -236,6 +244,7 @@ fun MediaThumbnail(
                     )
                 }
             }
+        }
         }
     }
 }

@@ -15,18 +15,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
-import com.pfpt.localvideoplayer.ui.theme.LumenOnVideo
-import com.pfpt.localvideoplayer.ui.theme.LumenOnVideoMuted
 import com.pfpt.localvideoplayer.model.VideoItem
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
-import com.pfpt.localvideoplayer.ui.theme.LumenMetadataGradientEnd
-import com.pfpt.localvideoplayer.ui.theme.LumenMetadataGradientStart
 import com.pfpt.localvideoplayer.util.formatDuration
 
 @Composable
@@ -57,11 +51,7 @@ fun PlayerMetadataPanel(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(LumenMetadataGradientStart, LumenMetadataGradientEnd),
-                ),
-            )
+            .background(theme.background)
             .padding(horizontal = 20.dp, vertical = 16.dp),
     ) {
         Row(
@@ -71,7 +61,7 @@ fun PlayerMetadataPanel(
             Text(
                 text = seriesTitle,
                 style = MaterialTheme.typography.headlineMedium,
-                color = LumenOnVideo,
+                color = theme.onBackground,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -80,7 +70,7 @@ fun PlayerMetadataPanel(
                 Text(
                     text = stringResource(R.string.episode_progress, currentIndex + 1, totalEpisodes),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = LumenOnVideoMuted,
+                    color = theme.onSurfaceMuted,
                     modifier = Modifier.padding(start = 8.dp, bottom = 4.dp),
                 )
             }
@@ -94,6 +84,8 @@ fun PlayerMetadataPanel(
             onLoopClick = onLoopClick,
             onEpisodePickerClick = {},
             onMoreClick = onMoreClick,
+            contentColor = theme.onBackground,
+            highlightedColor = theme.accent,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 12.dp),
@@ -103,7 +95,7 @@ fun PlayerMetadataPanel(
             Text(
                 text = stringResource(R.string.episode_picker),
                 style = MaterialTheme.typography.titleMedium,
-                color = LumenOnVideo,
+                color = theme.onBackground,
                 modifier = Modifier.padding(top = 20.dp),
             )
             LazyColumn(
@@ -121,8 +113,8 @@ fun PlayerMetadataPanel(
                         episode = episode,
                         isCurrent = index == currentIndex,
                         onClick = { onEpisodeSelected(index) },
-                        titleColor = if (index == currentIndex) theme.accent else LumenOnVideo,
-                        durationColor = LumenOnVideoMuted,
+                        titleColor = if (index == currentIndex) theme.accent else theme.onBackground,
+                        durationColor = theme.onSurfaceMuted,
                         checkTint = theme.accent,
                     )
                 }
@@ -132,7 +124,7 @@ fun PlayerMetadataPanel(
                 Text(
                     text = currentEpisode.title,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = LumenOnVideoMuted,
+                    color = theme.onSurfaceMuted,
                     modifier = Modifier.padding(top = 16.dp),
                 )
             }
@@ -148,7 +140,7 @@ fun PlayerMetadataPanel(
                 Text(
                     text = metaParts.joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
-                    color = LumenOnVideoMuted,
+                    color = theme.onSurfaceMuted,
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
