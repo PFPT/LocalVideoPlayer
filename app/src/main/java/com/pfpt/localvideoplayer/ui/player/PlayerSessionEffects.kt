@@ -5,7 +5,6 @@ import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.remember
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -68,7 +67,6 @@ internal fun PlayerSessionEffects(
     preferences: PlayerPreferences,
     displayDurationMs: Long,
     onDurationKnown: (uri: String, durationMs: Long) -> Unit,
-    castingOnLeave: MutableState<Boolean>,
     scope: CoroutineScope,
     saveCurrentProgress: suspend () -> Unit,
     onPlayAdjacentEpisode: (Int) -> Unit,
@@ -288,7 +286,7 @@ internal fun PlayerSessionEffects(
                 exoPlayer.removeListener(listener)
                 speedToRestoreOnLeave(leavingSpeed)?.let { exoPlayer.setPlaybackSpeed(it) }
                 playbackSession.onLeaveScreen(
-                    pauseLocal = castingOnLeave.value,
+                    pauseLocal = true,
                     save = progressSnapshot == null,
                 )
                 progressSnapshot?.let { (snapshotVideo, positionMs, durationMs) ->

@@ -20,7 +20,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -238,7 +237,6 @@ private fun PlayerScreenContent(
         bookmarkUri?.let { bookmarkStore.bookmarks(it) } ?: flowOf(emptyList())
     }
     val bookmarks by bookmarkFlow.collectAsStateWithLifecycle(initialValue = emptyList())
-    val castingOnLeave = remember { mutableStateOf(false) }
     val progress = rememberPlayerProgressState(
         player = exoPlayer,
         isSeeking = ui.isSeeking,
@@ -277,7 +275,6 @@ private fun PlayerScreenContent(
     val isCasting by (castManager?.playback?.isCasting ?: idleFalse).collectAsStateWithLifecycle()
     val castDurationMs by (castManager?.playback?.durationMs ?: idleZero).collectAsStateWithLifecycle()
     val castPlaying by (castManager?.playback?.isPlaying ?: idleFalse).collectAsStateWithLifecycle()
-    castingOnLeave.value = isCasting
     val castSheet = rememberCastSheetActions(castManager, exoPlayer)
     LaunchedEffect(exoPlayer, castManager) {
         castManager?.bindLocalPlayer(exoPlayer)
@@ -639,7 +636,6 @@ private fun PlayerScreenContent(
         preferences = preferences,
         displayDurationMs = displayDurationMs,
         onDurationKnown = onDurationKnown,
-        castingOnLeave = castingOnLeave,
         scope = scope,
         saveCurrentProgress = { saveCurrentProgress() },
         onPlayAdjacentEpisode = { playAdjacentEpisode(it) },
