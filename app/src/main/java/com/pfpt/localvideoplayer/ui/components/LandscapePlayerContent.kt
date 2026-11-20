@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.media3.exoplayer.ExoPlayer
 import com.pfpt.localvideoplayer.player.PlayerProgressState
 import com.pfpt.localvideoplayer.ui.PlayerUiState
+import com.pfpt.localvideoplayer.ui.hidePlayerPageForTransition
 import com.pfpt.localvideoplayer.ui.hidePlayerSurfaceForTransition
 import com.pfpt.localvideoplayer.ui.playerSharedBounds
 import com.pfpt.localvideoplayer.ui.playerTransitionActive
@@ -95,14 +96,16 @@ internal fun LandscapePlayerContent(
     seekEnabled: Boolean = true,
     pinchEnabled: Boolean = true,
 ) {
+    val hidePage = hidePlayerPageForTransition(playerTransitionActive())
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .then(if (hidePage) Modifier else Modifier.background(Color.Black)),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .then(if (hidePage) Modifier else Modifier.background(Color.Black))
                 .then(
                     if (!isFullscreen) {
                         Modifier.statusBarsPadding()
@@ -175,6 +178,7 @@ internal fun LandscapePlayerContent(
         }
     }
 
+    if (!hidePage) {
     BrightnessFeedbackOverlay(
         visible = isAdjustingBrightness,
         brightnessFraction = brightnessFraction,
@@ -186,8 +190,10 @@ internal fun LandscapePlayerContent(
     )
 
     SpeedBoostOverlay(visible = isSpeedBoosted)
+    }
         }
 
+    if (!hidePage) {
         LandscapePlayerLayout(
         visible = controlsVisible || isSeeking,
         title = title,
@@ -246,5 +252,6 @@ internal fun LandscapePlayerContent(
             durationMs = durationMs,
             videoUri = videoUri,
         )
+    }
     }
 }

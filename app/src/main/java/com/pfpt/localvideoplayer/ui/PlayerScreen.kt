@@ -770,34 +770,37 @@ private fun PlayerScreenContent(
         }
     }
 
-    PlayerOverlaySheets(
-        ui = ui,
-        exoPlayer = exoPlayer,
-        playlist = playlist,
-        progress = progress,
-        preferences = preferences,
-        scope = scope,
-        playerPreferencesStore = playerPreferencesStore,
-        pinnedItemsStore = pinnedItemsStore,
-        seriesSkipStore = seriesSkipStore,
-        bookmarkStore = bookmarkStore,
-        playbackSession = playbackSession,
-        castManager = castManager,
-        castState = castState,
-        castSheet = castSheet,
-        currentVideo = currentVideo,
-        seriesKey = seriesKey,
-        seriesSkip = seriesSkip,
-        effectiveIntroSeconds = effectiveIntroSeconds,
-        effectiveOutroSeconds = effectiveOutroSeconds,
-        isFavorite = isFavorite,
-        favoriteKey = favoriteKey,
-        bookmarks = bookmarks,
-        resolution = resolution,
-        onEpisodeSelected = ::selectEpisode,
-        onPickSubtitleFile = { subtitlePicker.launch("*/*") },
-        onScreenshot = ::captureScreenshot,
-    )
+    val hidePage = hidePlayerPageForTransition(playerTransitionActive())
+    if (!hidePage) {
+        PlayerOverlaySheets(
+            ui = ui,
+            exoPlayer = exoPlayer,
+            playlist = playlist,
+            progress = progress,
+            preferences = preferences,
+            scope = scope,
+            playerPreferencesStore = playerPreferencesStore,
+            pinnedItemsStore = pinnedItemsStore,
+            seriesSkipStore = seriesSkipStore,
+            bookmarkStore = bookmarkStore,
+            playbackSession = playbackSession,
+            castManager = castManager,
+            castState = castState,
+            castSheet = castSheet,
+            currentVideo = currentVideo,
+            seriesKey = seriesKey,
+            seriesSkip = seriesSkip,
+            effectiveIntroSeconds = effectiveIntroSeconds,
+            effectiveOutroSeconds = effectiveOutroSeconds,
+            isFavorite = isFavorite,
+            favoriteKey = favoriteKey,
+            bookmarks = bookmarks,
+            resolution = resolution,
+            onEpisodeSelected = ::selectEpisode,
+            onPickSubtitleFile = { subtitlePicker.launch("*/*") },
+            onScreenshot = ::captureScreenshot,
+        )
+    }
 
     val chrome = playerChromeActions(
         ui = ui,
@@ -829,7 +832,13 @@ private fun PlayerScreenContent(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .then(
+                if (hidePage) {
+                    Modifier
+                } else {
+                    Modifier.background(MaterialTheme.colorScheme.background)
+                },
+            ),
     ) {
         when {
             ui.isInPipMode -> {
@@ -1014,13 +1023,15 @@ private fun PlayerScreenContent(
             }
         }
 
-        LiveSeekPreview(
-            ui = ui,
-            durationMs = displayDurationMs,
-            forDoubleTap = true,
-        )
+        if (!hidePage) {
+            LiveSeekPreview(
+                ui = ui,
+                durationMs = displayDurationMs,
+                forDoubleTap = true,
+            )
+        }
 
-        if (castManager != null && ui.controlsVisible && !ui.isInPipMode) {
+        if (castManager != null && ui.controlsVisible && !ui.isInPipMode && !hidePage) {
             CastButton(
                 state = castState,
                 onClick = { castSheet.open() },
@@ -1031,7 +1042,7 @@ private fun PlayerScreenContent(
         }
 
         val connected = castState as? CastUiState.Connected
-        if (connected != null && !ui.isInPipMode) {
+        if (connected != null && !ui.isInPipMode && !hidePage) {
             CastMiniController(
                 visible = true,
                 title = connected.title,

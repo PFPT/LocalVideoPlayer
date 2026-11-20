@@ -22,6 +22,7 @@ import android.net.Uri
 import com.pfpt.localvideoplayer.model.VideoItem
 import com.pfpt.localvideoplayer.player.PlayerProgressState
 import com.pfpt.localvideoplayer.ui.PlayerUiState
+import com.pfpt.localvideoplayer.ui.hidePlayerPageForTransition
 import com.pfpt.localvideoplayer.ui.hidePlayerSurfaceForTransition
 import com.pfpt.localvideoplayer.ui.playerSharedBounds
 import com.pfpt.localvideoplayer.ui.playerTransitionActive
@@ -103,12 +104,13 @@ fun PortraitPlayerLayout(
     modifier: Modifier = Modifier,
 ) {
     val showChrome = controlsVisible || isSeeking
+    val hidePage = hidePlayerPageForTransition(playerTransitionActive())
     Column(modifier = modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(0.38f)
-                .background(Color.Black),
+                .then(if (hidePage) Modifier else Modifier.background(Color.Black)),
         ) {
             Box(
                 modifier = Modifier
@@ -146,7 +148,7 @@ fun PortraitPlayerLayout(
                     pinchEnabled = pinchEnabled,
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black),
+                        .then(if (hidePage) Modifier else Modifier.background(Color.Black)),
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -175,6 +177,7 @@ fun PortraitPlayerLayout(
                         }
                     }
                 }
+                if (!hidePage) {
                 androidx.compose.animation.AnimatedVisibility(
                     visible = showChrome,
                     enter = fadeIn(),
@@ -276,25 +279,34 @@ fun PortraitPlayerLayout(
                     durationMs = durationMs,
                     videoUri = videoUri,
                 )
+                }
             }
         }
-        PlayerMetadataPanel(
-            seriesTitle = seriesTitle,
-            currentIndex = currentIndex,
-            totalEpisodes = episodes.size,
-            currentEpisode = episodes[currentIndex],
-            episodes = episodes,
-            playbackSpeed = playbackSpeed,
-            repeatOne = repeatOne,
-            resolution = resolution,
-            onEpisodeSelected = onEpisodeSelected,
-            onSpeedClick = onSpeedClick,
-            onLoopClick = onLoopClick,
-            onMoreClick = onMoreClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(0.62f)
-                .navigationBarsPadding(),
-        )
+        if (hidePage) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.62f),
+            )
+        } else {
+            PlayerMetadataPanel(
+                seriesTitle = seriesTitle,
+                currentIndex = currentIndex,
+                totalEpisodes = episodes.size,
+                currentEpisode = episodes[currentIndex],
+                episodes = episodes,
+                playbackSpeed = playbackSpeed,
+                repeatOne = repeatOne,
+                resolution = resolution,
+                onEpisodeSelected = onEpisodeSelected,
+                onSpeedClick = onSpeedClick,
+                onLoopClick = onLoopClick,
+                onMoreClick = onMoreClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.62f)
+                    .navigationBarsPadding(),
+            )
+        }
     }
 }
