@@ -133,3 +133,7 @@ fun playerTransitionActive(): Boolean {
     val sharedTransitionScope = LocalPlayerSharedTransition.current ?: return false
     return sharedTransitionScope.isTransitionActive
 }
+
+fun hidePlayerPageForTransition(transitionActive: Boolean): Boolean {
+    return transitionActive
+}
