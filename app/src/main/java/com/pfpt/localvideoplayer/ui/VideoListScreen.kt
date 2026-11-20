@@ -351,17 +351,15 @@ fun VideoListScreen(
     val isSortingLibrary = libraryEntries.isNotEmpty() &&
         processedLibrary.isEmpty() &&
         cachedProcessed.isEmpty()
-    val listState = rememberSaveable(saver = LazyListState.Saver) {
-        LazyListState()
-    }
-    var previousTypeTab by rememberSaveable { mutableStateOf(selectedTypeTab) }
-
-    LaunchedEffect(selectedTypeTab) {
-        if (previousTypeTab != selectedTypeTab) {
-            listState.animateScrollToItem(0)
-            previousTypeTab = selectedTypeTab
+    val listStates = LibraryTypeTab.entries.associateWith { tab ->
+        rememberSaveable(
+            saver = LazyListState.Saver,
+            key = "library-scroll-${tab.name}",
+        ) {
+            LazyListState()
         }
     }
+    val listState = listStates.getValue(selectedTypeTab)
     val isListScrolling by remember {
         derivedStateOf { listState.isScrollInProgress }
     }
