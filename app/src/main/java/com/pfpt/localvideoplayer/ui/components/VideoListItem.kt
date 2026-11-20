@@ -24,6 +24,7 @@ import com.pfpt.localvideoplayer.data.PlaybackStore
 import com.pfpt.localvideoplayer.model.SeriesGroupKind
 import com.pfpt.localvideoplayer.model.VideoItem
 import com.pfpt.localvideoplayer.model.VideoSeries
+import com.pfpt.localvideoplayer.ui.rememberPlayerSharedOpen
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.util.formatDuration
 import java.text.SimpleDateFormat
@@ -110,6 +111,11 @@ fun VideoListItem(
     } else {
         null
     }
+    val sharedOpen = rememberPlayerSharedOpen(
+        candidateKey = video.uri.toString(),
+        opensPlayer = !selectionMode,
+        onClick = onClick,
+    )
 
     SwipeableListItem(
         enabled = onSwipeDelete != null && !selectionMode,
@@ -118,7 +124,7 @@ fun VideoListItem(
         SelectableListItem(
             selected = selected,
             selectionMode = selectionMode,
-            onClick = onClick,
+            onClick = sharedOpen.onClick,
             onLongClick = onLongClick,
         ) {
             LumenMediaCard(
@@ -133,7 +139,7 @@ fun VideoListItem(
                 deferThumbnailLoad = deferThumbnailLoad,
                 modifier = modifier,
                 trailingContent = markButton,
-                sharedContentKey = video.uri.toString(),
+                sharedContentKey = sharedOpen.contentKey,
             )
         }
     }
@@ -239,7 +245,6 @@ fun EpisodeListItem(
     onSwipeDelete: (() -> Unit)? = null,
     deferThumbnailLoad: Boolean = false,
     modifier: Modifier = Modifier,
-    sharedContentKey: String? = null,
 ) {
     val title = if (episodeNumber != null) {
         stringResource(R.string.episode_label, episodeNumber) + " · " + episode.title
@@ -247,6 +252,11 @@ fun EpisodeListItem(
         episode.title
     }
     val subtitle = rememberEpisodeSubtitle(episode, progress)
+    val sharedOpen = rememberPlayerSharedOpen(
+        candidateKey = episode.uri.toString(),
+        opensPlayer = !selectionMode,
+        onClick = onClick,
+    )
 
     SwipeableListItem(
         enabled = onSwipeDelete != null && !selectionMode,
@@ -255,7 +265,7 @@ fun EpisodeListItem(
         SelectableListItem(
             selected = selected,
             selectionMode = selectionMode,
-            onClick = onClick,
+            onClick = sharedOpen.onClick,
             onLongClick = onLongClick,
         ) {
             LumenMediaCard(
@@ -269,7 +279,7 @@ fun EpisodeListItem(
                 opaqueBackground = true,
                 deferThumbnailLoad = deferThumbnailLoad,
                 modifier = modifier,
-                sharedContentKey = sharedContentKey,
+                sharedContentKey = sharedOpen.contentKey,
             )
         }
     }

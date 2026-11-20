@@ -62,6 +62,7 @@ import com.pfpt.localvideoplayer.player.PlaybackSessionViewModel
 import com.pfpt.localvideoplayer.player.PlaylistState
 import com.pfpt.localvideoplayer.ui.PlayerScreen
 import com.pfpt.localvideoplayer.ui.DownloadManagerScreen
+import com.pfpt.localvideoplayer.ui.ProvidePlayerSharedSource
 import com.pfpt.localvideoplayer.ui.ProvidePlayerSharedTransition
 import com.pfpt.localvideoplayer.ui.SeriesDetailScreen
 import com.pfpt.localvideoplayer.ui.SettingsScreen
@@ -232,10 +233,11 @@ fun LocalVideoPlayerApp(
             Surface(modifier = Modifier.fillMaxSize()) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     SharedTransitionLayout {
-                        NavHost(
-                            navController = navController,
-                            startDestination = ROUTE_VIDEO_LIST,
-                        ) {
+                        ProvidePlayerSharedSource {
+                            NavHost(
+                                navController = navController,
+                                startDestination = ROUTE_VIDEO_LIST,
+                            ) {
                             composable(ROUTE_VIDEO_LIST) {
                                 ProvidePlayerSharedTransition(
                                     sharedTransitionScope = this@SharedTransitionLayout,
@@ -363,6 +365,7 @@ fun LocalVideoPlayerApp(
                                     },
                                     onBack = { navController.popBackStack() },
                                 )
+                            }
                             }
                         }
                     }

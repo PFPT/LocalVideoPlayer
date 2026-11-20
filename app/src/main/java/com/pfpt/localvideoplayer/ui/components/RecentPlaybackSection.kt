@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
 import com.pfpt.localvideoplayer.model.PlaybackRecord
+import com.pfpt.localvideoplayer.ui.rememberPlayerSharedOpen
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenCardPadding
 import com.pfpt.localvideoplayer.ui.theme.LumenDelete
@@ -97,6 +98,11 @@ private fun RecentPlaybackCard(
     modifier: Modifier = Modifier,
 ) {
     val progress = record.progress
+    val sharedOpen = rememberPlayerSharedOpen(
+        candidateKey = record.uri.toString(),
+        opensPlayer = true,
+        onClick = onClick,
+    )
     val subtitle = buildString {
         if (progress != null && progress > 0.01f) {
             append(stringResource(R.string.watched_percent, (progress * 100).toInt()))
@@ -113,7 +119,7 @@ private fun RecentPlaybackCard(
         modifier = modifier
             .width(120.dp)
             .clip(cardShape)
-            .clickable(onClick = onClick)
+            .clickable(onClick = sharedOpen.onClick)
             .background(theme.glassFill)
             .border(1.dp, theme.glassBorder, cardShape)
             .padding(LumenCardPadding),
@@ -127,7 +133,7 @@ private fun RecentPlaybackCard(
             MediaThumbnail(
                 thumbnailUri = record.uri,
                 modifier = Modifier.fillMaxSize(),
-                sharedContentKey = record.uri.toString(),
+                sharedContentKey = sharedOpen.contentKey,
             )
             MediaProgressRail(
                 progress = progress,

@@ -255,7 +255,6 @@ fun SeriesDetailScreen(
                                 itemKey = uriKey,
                                 visibleKeys = visibleItemKeys,
                             ),
-                            sharedContentKey = episode.uri.toString(),
                             onClick = {
                                 if (selectionMode) {
                                     selectedUris = if (isSelected) {
