@@ -208,6 +208,11 @@ fun SeriesDetailScreen(
         val isListScrolling by remember {
             derivedStateOf { listState.isScrollInProgress }
         }
+        val visibleItemKeys by remember {
+            derivedStateOf {
+                listState.layoutInfo.visibleItemsInfo.map { it.key }.toSet()
+            }
+        }
 
         AnimatedContent(
             targetState = series.id,
@@ -245,7 +250,11 @@ fun SeriesDetailScreen(
                             progress = progress,
                             selectionMode = selectionMode,
                             selected = isSelected,
-                            deferThumbnailLoad = isListScrolling,
+                            deferThumbnailLoad = !thumbnailShouldLoad(
+                                isScrolling = isListScrolling,
+                                itemKey = uriKey,
+                                visibleKeys = visibleItemKeys,
+                            ),
                             onClick = {
                                 if (selectionMode) {
                                     selectedUris = if (isSelected) {
