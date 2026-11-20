@@ -126,3 +126,10 @@ fun hidePlayerSurfaceForTransition(
     if (isCasting) return false
     return transitionActive
 }
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun playerTransitionActive(): Boolean {
+    val sharedTransitionScope = LocalPlayerSharedTransition.current ?: return false
+    return sharedTransitionScope.isTransitionActive
+}

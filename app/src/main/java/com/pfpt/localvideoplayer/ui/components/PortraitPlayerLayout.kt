@@ -22,7 +22,9 @@ import android.net.Uri
 import com.pfpt.localvideoplayer.model.VideoItem
 import com.pfpt.localvideoplayer.player.PlayerProgressState
 import com.pfpt.localvideoplayer.ui.PlayerUiState
+import com.pfpt.localvideoplayer.ui.hidePlayerSurfaceForTransition
 import com.pfpt.localvideoplayer.ui.playerSharedBounds
+import com.pfpt.localvideoplayer.ui.playerTransitionActive
 
 @Composable
 fun PortraitPlayerLayout(
@@ -157,13 +159,20 @@ fun PortraitPlayerLayout(
                                     .playerSharedBounds(videoUri.toString()),
                             )
                         }
-                        FittedPlayerSurface(
-                            player = exoPlayer,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = contentScale,
-                            frameAspectRatio = frameAspectRatio,
-                            useTextureView = useTextureView,
-                        )
+                        if (!hidePlayerSurfaceForTransition(
+                                useTextureView = useTextureView,
+                                isCasting = isCasting,
+                                transitionActive = playerTransitionActive(),
+                            )
+                        ) {
+                            FittedPlayerSurface(
+                                player = exoPlayer,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = contentScale,
+                                frameAspectRatio = frameAspectRatio,
+                                useTextureView = useTextureView,
+                            )
+                        }
                     }
                 }
                 androidx.compose.animation.AnimatedVisibility(
