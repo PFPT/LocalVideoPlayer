@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
@@ -204,7 +204,9 @@ fun SeriesDetailScreen(
             }
         }
 
-        val listState = rememberLazyListState()
+        val listState = rememberSaveable(saver = LazyListState.Saver) {
+            LazyListState()
+        }
         val isListScrolling by remember {
             derivedStateOf { listState.isScrollInProgress }
         }
