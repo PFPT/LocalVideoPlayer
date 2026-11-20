@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.media3.exoplayer.ExoPlayer
 import com.pfpt.localvideoplayer.player.PlayerProgressState
 import com.pfpt.localvideoplayer.ui.PlayerUiState
+import com.pfpt.localvideoplayer.ui.playerSharedBounds
 
 @Composable
 internal fun LandscapePlayerContent(
@@ -148,6 +149,13 @@ internal fun LandscapePlayerContent(
                 .background(Color.Black),
             contentAlignment = Alignment.Center,
         ) {
+            if (!isCasting && videoUri != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .playerSharedBounds(videoUri.toString()),
+                )
+            }
             FittedPlayerSurface(
                 player = exoPlayer,
                 modifier = Modifier.fillMaxSize(),

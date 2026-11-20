@@ -22,6 +22,7 @@ import android.net.Uri
 import com.pfpt.localvideoplayer.model.VideoItem
 import com.pfpt.localvideoplayer.player.PlayerProgressState
 import com.pfpt.localvideoplayer.ui.PlayerUiState
+import com.pfpt.localvideoplayer.ui.playerSharedBounds
 
 @Composable
 fun PortraitPlayerLayout(
@@ -149,6 +150,13 @@ fun PortraitPlayerLayout(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
+                        if (!isCasting && videoUri != null) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .playerSharedBounds(videoUri.toString()),
+                            )
+                        }
                         FittedPlayerSurface(
                             player = exoPlayer,
                             modifier = Modifier.fillMaxSize(),
