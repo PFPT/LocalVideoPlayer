@@ -133,6 +133,7 @@ fun VideoListItem(
                 deferThumbnailLoad = deferThumbnailLoad,
                 modifier = modifier,
                 trailingContent = markButton,
+                sharedContentKey = video.uri.toString(),
             )
         }
     }
@@ -238,6 +239,7 @@ fun EpisodeListItem(
     onSwipeDelete: (() -> Unit)? = null,
     deferThumbnailLoad: Boolean = false,
     modifier: Modifier = Modifier,
+    sharedContentKey: String? = null,
 ) {
     val title = if (episodeNumber != null) {
         stringResource(R.string.episode_label, episodeNumber) + " · " + episode.title
@@ -267,6 +269,7 @@ fun EpisodeListItem(
                 opaqueBackground = true,
                 deferThumbnailLoad = deferThumbnailLoad,
                 modifier = modifier,
+                sharedContentKey = sharedContentKey,
             )
         }
     }

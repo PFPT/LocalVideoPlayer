@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.pfpt.localvideoplayer.ui.playerSharedBounds
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenCardPadding
 import com.pfpt.localvideoplayer.ui.theme.LumenSpaceMd
@@ -59,6 +60,7 @@ fun LumenMediaCard(
     opaqueBackground: Boolean = false,
     deferThumbnailLoad: Boolean = false,
     trailingContent: (@Composable () -> Unit)? = null,
+    sharedContentKey: String? = null,
 ) {
     val theme = LocalLumenTheme.current
     val cardShape = RoundedCornerShape(LumenThumbCorner)
@@ -99,6 +101,7 @@ fun LumenMediaCard(
                     dateModifiedSeconds = thumbnailDateModified,
                     modifier = Modifier.fillMaxSize(),
                     deferLoad = deferThumbnailLoad,
+                    sharedContentKey = sharedContentKey,
                 )
             } else {
                 Box(
@@ -165,6 +168,7 @@ fun MediaThumbnail(
     modifier: Modifier = Modifier,
     dateModifiedSeconds: Long = 0L,
     deferLoad: Boolean = false,
+    sharedContentKey: String? = null,
 ) {
     val context = LocalContext.current
     var thumbnail by remember(thumbnailUri, dateModifiedSeconds) {
@@ -197,7 +201,9 @@ fun MediaThumbnail(
 
     val theme = LocalLumenTheme.current
     Box(
-        modifier = modifier.background(theme.surface),
+        modifier = modifier
+            .playerSharedBounds(sharedContentKey)
+            .background(theme.surface),
         contentAlignment = Alignment.Center,
     ) {
         Crossfade(

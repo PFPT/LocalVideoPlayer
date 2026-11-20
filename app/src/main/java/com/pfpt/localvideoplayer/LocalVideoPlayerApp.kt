@@ -10,6 +10,8 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -60,6 +62,7 @@ import com.pfpt.localvideoplayer.player.PlaybackSessionViewModel
 import com.pfpt.localvideoplayer.player.PlaylistState
 import com.pfpt.localvideoplayer.ui.PlayerScreen
 import com.pfpt.localvideoplayer.ui.DownloadManagerScreen
+import com.pfpt.localvideoplayer.ui.ProvidePlayerSharedTransition
 import com.pfpt.localvideoplayer.ui.SeriesDetailScreen
 import com.pfpt.localvideoplayer.ui.SettingsScreen
 import com.pfpt.localvideoplayer.ui.VideoListScreen
@@ -75,6 +78,7 @@ private const val ROUTE_PLAYER = "player"
 private const val ROUTE_DOWNLOADS = "downloads"
 private const val ROUTE_SETTINGS = "settings"
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun LocalVideoPlayerApp(
     downloadsNavigationTick: Int = 0,
@@ -227,142 +231,159 @@ fun LocalVideoPlayerApp(
         CompositionLocalProvider(LocalCastManager provides castManager) {
             Surface(modifier = Modifier.fillMaxSize()) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                NavHost(
-                    navController = navController,
-                    startDestination = ROUTE_VIDEO_LIST,
-                ) {
-                    composable(ROUTE_VIDEO_LIST) {
-                        VideoListScreen(
-                            libraryEntries = libraryEntries,
-                            isLibraryLoading = isLibraryLoading && libraryEntries.isEmpty(),
-                            cacheResolved = cacheResolved,
-                            isRefreshing = isRefreshing,
-                            hasPermission = hasPermission,
-                            libraryViewModel = libraryViewModel,
-                            hiddenVideosStore = hiddenVideosStore,
-                            playbackStore = playbackStore,
-                            pinnedItemsStore = pinnedItemsStore,
-                            playCountStore = playCountStore,
-                            themeStore = themeStore,
-                            libraryPreferencesStore = libraryPreferencesStore,
-                            themeState = themeState,
-                            onRequestPermission = {
-                                permissionLauncher.launch(Permissions.readVideoPermission)
-                            },
-                            onPlayVideo = { state ->
-                                playlistState = state
-                                navController.navigate(ROUTE_PLAYER)
-                            },
-                            onOpenSeries = { seriesId ->
-                                navController.navigate("series/$seriesId")
-                            },
-                            onOpenDownloads = { navController.navigate(ROUTE_DOWNLOADS) },
-                            onOpenSettings = { navController.navigate(ROUTE_SETTINGS) },
-                            onVideosRemoved = { uris -> libraryViewModel.removeVideos(uris) },
-                            onPullRefresh = {
-                                libraryViewModel.refresh(fromPull = true)
-                            },
-                        )
-                    }
-                    composable(
-                        route = ROUTE_SERIES,
-                        arguments = listOf(
-                            navArgument("seriesId") { type = NavType.StringType },
-                        ),
-                    ) { backStackEntry ->
-                        val seriesId = backStackEntry.arguments?.getString("seriesId")
-                        val series = libraryEntries
-                            .filterIsInstance<VideoLibraryEntry.Series>()
-                            .map { it.series }
-                            .find { it.id == seriesId }
-
-                        if (series == null) {
-                            navController.popBackStack()
-                        } else {
-                            SeriesDetailScreen(
-                                series = series,
-                                repository = repository,
-                                hiddenVideosStore = hiddenVideosStore,
-                                playbackStore = playbackStore,
-                                playCountStore = playCountStore,
-                                onBack = { navController.popBackStack() },
-                                onPlayEpisode = { state ->
-                                    val current = state.items.getOrNull(state.currentIndex)
-                                    playlistState = if (current != null) {
-                                        val resolved = libraryViewModel.playlistStateFor(current)
-                                        if (resolved.items.size > 1) resolved else state
-                                    } else {
-                                        state
-                                    }
-                                    navController.navigate(ROUTE_PLAYER)
-                                },
-                                onVideosRemoved = { uris -> libraryViewModel.removeVideos(uris) },
-                            )
-                        }
-                    }
-                    composable(ROUTE_PLAYER) {
-                        val state = playlistState ?: playbackSession.playlistState()
-                        if (state == null) {
-                            LaunchedEffect(Unit) {
-                                navController.popBackStack()
+                    SharedTransitionLayout {
+                        NavHost(
+                            navController = navController,
+                            startDestination = ROUTE_VIDEO_LIST,
+                        ) {
+                            composable(ROUTE_VIDEO_LIST) {
+                                ProvidePlayerSharedTransition(
+                                    sharedTransitionScope = this@SharedTransitionLayout,
+                                    animatedVisibilityScope = this@composable,
+                                ) {
+                                    VideoListScreen(
+                                        libraryEntries = libraryEntries,
+                                        isLibraryLoading = isLibraryLoading && libraryEntries.isEmpty(),
+                                        cacheResolved = cacheResolved,
+                                        isRefreshing = isRefreshing,
+                                        hasPermission = hasPermission,
+                                        libraryViewModel = libraryViewModel,
+                                        hiddenVideosStore = hiddenVideosStore,
+                                        playbackStore = playbackStore,
+                                        pinnedItemsStore = pinnedItemsStore,
+                                        playCountStore = playCountStore,
+                                        themeStore = themeStore,
+                                        libraryPreferencesStore = libraryPreferencesStore,
+                                        themeState = themeState,
+                                        onRequestPermission = {
+                                            permissionLauncher.launch(Permissions.readVideoPermission)
+                                        },
+                                        onPlayVideo = { state ->
+                                            playlistState = state
+                                            navController.navigate(ROUTE_PLAYER)
+                                        },
+                                        onOpenSeries = { seriesId ->
+                                            navController.navigate("series/$seriesId")
+                                        },
+                                        onOpenDownloads = { navController.navigate(ROUTE_DOWNLOADS) },
+                                        onOpenSettings = { navController.navigate(ROUTE_SETTINGS) },
+                                        onVideosRemoved = { uris -> libraryViewModel.removeVideos(uris) },
+                                        onPullRefresh = {
+                                            libraryViewModel.refresh(fromPull = true)
+                                        },
+                                    )
+                                }
                             }
-                        } else {
-                            PlayerScreen(
-                                playlistState = state,
-                                playbackStore = playbackStore,
-                                playerPreferencesStore = playerPreferencesStore,
-                                pinnedItemsStore = pinnedItemsStore,
-                                seriesSkipStore = seriesSkipStore,
-                                bookmarkStore = bookmarkStore,
-                                playbackSession = playbackSession,
-                                onDurationKnown = { uri, durationMs ->
-                                    libraryViewModel.applyKnownDurations(mapOf(uri to durationMs))
-                                },
-                                onBack = { navController.popBackStack() },
-                            )
+                            composable(
+                                route = ROUTE_SERIES,
+                                arguments = listOf(
+                                    navArgument("seriesId") { type = NavType.StringType },
+                                ),
+                            ) { backStackEntry ->
+                                val seriesId = backStackEntry.arguments?.getString("seriesId")
+                                val series = libraryEntries
+                                    .filterIsInstance<VideoLibraryEntry.Series>()
+                                    .map { it.series }
+                                    .find { it.id == seriesId }
+
+                                if (series == null) {
+                                    navController.popBackStack()
+                                } else {
+                                    ProvidePlayerSharedTransition(
+                                        sharedTransitionScope = this@SharedTransitionLayout,
+                                        animatedVisibilityScope = this@composable,
+                                    ) {
+                                        SeriesDetailScreen(
+                                            series = series,
+                                            repository = repository,
+                                            hiddenVideosStore = hiddenVideosStore,
+                                            playbackStore = playbackStore,
+                                            playCountStore = playCountStore,
+                                            onBack = { navController.popBackStack() },
+                                            onPlayEpisode = { state ->
+                                                val current = state.items.getOrNull(state.currentIndex)
+                                                playlistState = if (current != null) {
+                                                    val resolved = libraryViewModel.playlistStateFor(current)
+                                                    if (resolved.items.size > 1) resolved else state
+                                                } else {
+                                                    state
+                                                }
+                                                navController.navigate(ROUTE_PLAYER)
+                                            },
+                                            onVideosRemoved = { uris -> libraryViewModel.removeVideos(uris) },
+                                        )
+                                    }
+                                }
+                            }
+                            composable(ROUTE_PLAYER) {
+                                val state = playlistState ?: playbackSession.playlistState()
+                                if (state == null) {
+                                    LaunchedEffect(Unit) {
+                                        navController.popBackStack()
+                                    }
+                                } else {
+                                    ProvidePlayerSharedTransition(
+                                        sharedTransitionScope = this@SharedTransitionLayout,
+                                        animatedVisibilityScope = this@composable,
+                                    ) {
+                                        PlayerScreen(
+                                            playlistState = state,
+                                            playbackStore = playbackStore,
+                                            playerPreferencesStore = playerPreferencesStore,
+                                            pinnedItemsStore = pinnedItemsStore,
+                                            seriesSkipStore = seriesSkipStore,
+                                            bookmarkStore = bookmarkStore,
+                                            playbackSession = playbackSession,
+                                            onDurationKnown = { uri, durationMs ->
+                                                libraryViewModel.applyKnownDurations(mapOf(uri to durationMs))
+                                            },
+                                            onBack = { navController.popBackStack() },
+                                        )
+                                    }
+                                }
+                            }
+                            composable(ROUTE_SETTINGS) {
+                                SettingsScreen(
+                                    themeStore = themeStore,
+                                    themeState = themeState,
+                                    libraryPreferencesStore = libraryPreferencesStore,
+                                    playerPreferencesStore = playerPreferencesStore,
+                                    folderSourceStore = folderSourceStore,
+                                    hiddenVideosStore = hiddenVideosStore,
+                                    onRestoreHidden = { libraryViewModel.refresh(fromPull = true) },
+                                    onLibraryRefresh = { libraryViewModel.refresh(fromPull = true) },
+                                    onBack = { navController.popBackStack() },
+                                )
+                            }
+                            composable(ROUTE_DOWNLOADS) {
+                                DownloadManagerScreen(
+                                    manager = downloadManager,
+                                    onOpenCompleted = { task ->
+                                        openCompletedDownload(context, task, navController) { playlistState = it }
+                                    },
+                                    onBack = { navController.popBackStack() },
+                                )
+                            }
                         }
                     }
-                    composable(ROUTE_SETTINGS) {
-                        SettingsScreen(
-                            themeStore = themeStore,
-                            themeState = themeState,
-                            libraryPreferencesStore = libraryPreferencesStore,
-                            playerPreferencesStore = playerPreferencesStore,
-                            folderSourceStore = folderSourceStore,
-                            hiddenVideosStore = hiddenVideosStore,
-                            onRestoreHidden = { libraryViewModel.refresh(fromPull = true) },
-                            onLibraryRefresh = { libraryViewModel.refresh(fromPull = true) },
-                            onBack = { navController.popBackStack() },
-                        )
-                    }
-                    composable(ROUTE_DOWNLOADS) {
-                        DownloadManagerScreen(
-                            manager = downloadManager,
-                            onOpenCompleted = { task ->
-                                openCompletedDownload(context, task, navController) { playlistState = it }
-                            },
-                            onBack = { navController.popBackStack() },
-                        )
-                    }
-                }
-                PlaybackMiniBar(
-                    visible = showPlaybackBar,
-                    title = sessionState.title,
-                    sleepChoice = sessionState.sleepChoice,
-                    sleepRemaining = playbackSession.sleepRemainingMs,
-                    isPlaying = sessionState.isPlaying,
-                    onOpen = {
-                        playbackSession.markReturnToExisting()
-                        navController.navigate(ROUTE_PLAYER) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onPlayPause = { playbackSession.togglePlayPause() },
-                    onClose = { playbackSession.stop() },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding(),
-                )
+                    PlaybackMiniBar(
+                        visible = showPlaybackBar,
+                        title = sessionState.title,
+                        sleepChoice = sessionState.sleepChoice,
+                        sleepRemaining = playbackSession.sleepRemainingMs,
+                        isPlaying = sessionState.isPlaying,
+                        onOpen = {
+                            playbackSession.markReturnToExisting()
+                            navController.navigate(ROUTE_PLAYER) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onPlayPause = { playbackSession.togglePlayPause() },
+                        onClose = { playbackSession.stop() },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding(),
+                    )
                 }
             }
         }

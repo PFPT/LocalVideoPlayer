@@ -127,6 +127,7 @@ private fun RecentPlaybackCard(
             MediaThumbnail(
                 thumbnailUri = record.uri,
                 modifier = Modifier.fillMaxSize(),
+                sharedContentKey = record.uri.toString(),
             )
             MediaProgressRail(
                 progress = progress,
