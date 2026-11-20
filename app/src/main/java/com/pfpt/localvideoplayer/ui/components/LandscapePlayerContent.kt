@@ -105,7 +105,6 @@ internal fun LandscapePlayerContent(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (hidePage) Modifier else Modifier.background(Color.Black))
                 .then(
                     if (!isFullscreen) {
                         Modifier.statusBarsPadding()
@@ -151,7 +150,7 @@ internal fun LandscapePlayerContent(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black),
+                .then(if (hidePage) Modifier else Modifier.background(Color.Black)),
             contentAlignment = Alignment.Center,
         ) {
             if (!isCasting && videoUri != null) {
