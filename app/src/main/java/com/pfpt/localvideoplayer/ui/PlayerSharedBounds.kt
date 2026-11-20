@@ -116,3 +116,13 @@ fun rememberPlayerSharedOpen(
     }
     return PlayerSharedOpen(contentKey, click)
 }
+
+fun hidePlayerSurfaceForTransition(
+    useTextureView: Boolean,
+    isCasting: Boolean,
+    transitionActive: Boolean,
+): Boolean {
+    if (useTextureView) return false
+    if (isCasting) return false
+    return transitionActive
+}
