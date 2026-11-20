@@ -2,6 +2,8 @@ package com.pfpt.localvideoplayer.ui
 
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.animateDp
@@ -65,6 +67,8 @@ fun Modifier.playerSharedBounds(
         sharedBounds(
             sharedContentState = rememberSharedContentState(key = contentKey),
             animatedVisibilityScope = animatedVisibilityScope,
+            enter = EnterTransition.None,
+            exit = ExitTransition.None,
             clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(corner)),
         )
     }
