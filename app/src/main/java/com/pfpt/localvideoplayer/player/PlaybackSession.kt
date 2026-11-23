@@ -69,7 +69,14 @@ class PlaybackSession(
     private var tickJob: Job? = null
     private var progressJob: Job? = null
     private var preloadJob: Job? = null
+    private var seriesTextOff: Boolean = false
     private var listener: Player.Listener? = null
+
+    fun setSeriesTextOff(off: Boolean) {
+        seriesTextOff = off
+    }
+
+    fun peekExternalSubtitle(video: VideoItem): String? = resolveSubtitle(video)
 
     fun player(): ExoPlayer? = player
 
@@ -379,7 +386,8 @@ class PlaybackSession(
 
     private fun resolveSubtitle(video: VideoItem): String? {
         val sidecar = findSidecarSubtitle(appContext, video)?.toString()
-        return subtitleForVideo(video.uri.toString(), manualSubtitles, sidecar)
+        val manual = manualSubtitles[video.uri.toString()]
+        return externalSubtitleTarget(manual, sidecar, seriesTextOff)
     }
 
     private fun applySubtitle(index: Int, desired: String?, allowCurrent: Boolean) {
