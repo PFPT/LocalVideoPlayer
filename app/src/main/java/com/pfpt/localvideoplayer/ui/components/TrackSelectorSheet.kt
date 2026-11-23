@@ -26,6 +26,7 @@ data class TrackOption(
     val id: String,
     val label: String,
     val selected: Boolean,
+    val language: String? = null,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)

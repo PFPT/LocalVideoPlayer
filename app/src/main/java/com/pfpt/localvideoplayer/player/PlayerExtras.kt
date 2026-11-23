@@ -144,6 +144,7 @@ fun ExoPlayer.trackOptions(
                     id = "$groupIndex:$i",
                     label = label,
                     selected = selected && hasExplicitOverride(type),
+                    language = format.language,
                 ),
             )
         }
@@ -182,6 +183,31 @@ fun ExoPlayer.applyTrackSelection(type: @C.TrackType Int, optionId: String) {
                 .build()
         }
     }
+}
+
+fun ExoPlayer.applySeriesTrackDirective(directive: SeriesTrackDirective) {
+    val builder = trackSelectionParameters
+        .buildUpon()
+        .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+        .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+    when (val audio = directive.audio) {
+        SeriesAudioDirective.Auto -> builder.setPreferredAudioLanguage(null)
+        is SeriesAudioDirective.Language -> builder.setPreferredAudioLanguage(audio.code)
+    }
+    when (val text = directive.text) {
+        SeriesTextDirective.Auto,
+        SeriesTextDirective.External,
+        -> builder
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            .setPreferredTextLanguage(null)
+        SeriesTextDirective.Off -> builder
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+            .setPreferredTextLanguage(null)
+        is SeriesTextDirective.Language -> builder
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            .setPreferredTextLanguage(text.code)
+    }
+    trackSelectionParameters = builder.build()
 }
 
 fun Tracks.hasType(type: @C.TrackType Int): Boolean {
