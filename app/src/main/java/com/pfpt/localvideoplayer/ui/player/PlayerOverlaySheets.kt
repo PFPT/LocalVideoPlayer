@@ -11,8 +11,10 @@ import com.pfpt.localvideoplayer.data.BookmarkStore
 import com.pfpt.localvideoplayer.data.PinnedItemsStore
 import com.pfpt.localvideoplayer.data.PlayerPreferences
 import com.pfpt.localvideoplayer.data.PlayerPreferencesStore
+import com.pfpt.localvideoplayer.data.SeriesPlaybackStore
 import com.pfpt.localvideoplayer.data.SeriesSkipSettings
 import com.pfpt.localvideoplayer.data.SeriesSkipStore
+import com.pfpt.localvideoplayer.player.SeriesPlaybackSettings
 import com.pfpt.localvideoplayer.model.VideoItem
 import com.pfpt.localvideoplayer.player.PlaybackSession
 import com.pfpt.localvideoplayer.player.PlayerProgressState
@@ -41,6 +43,7 @@ internal fun PlayerOverlaySheets(
     playerPreferencesStore: PlayerPreferencesStore,
     pinnedItemsStore: PinnedItemsStore,
     seriesSkipStore: SeriesSkipStore,
+    seriesPlaybackStore: SeriesPlaybackStore,
     bookmarkStore: BookmarkStore,
     playbackSession: PlaybackSession,
     castManager: CastManager?,
@@ -49,6 +52,7 @@ internal fun PlayerOverlaySheets(
     currentVideo: VideoItem?,
     seriesKey: String?,
     seriesSkip: SeriesSkipSettings,
+    seriesPlayback: SeriesPlaybackSettings,
     effectiveIntroSeconds: Int,
     effectiveOutroSeconds: Int,
     isFavorite: Boolean,
@@ -63,11 +67,18 @@ internal fun PlayerOverlaySheets(
     if (ui.showSpeedSheet) {
         SpeedSelectorSheet(
             currentSpeed = ui.playbackSpeed,
-            onSpeedSelected = {
-                ui.playbackSpeed = it
-                ui.savedPlaybackSpeed = it
+            onSpeedSelected = { speed ->
+                ui.playbackSpeed = speed
+                ui.savedPlaybackSpeed = speed
                 ui.resetControlsTimer()
-                scope.launch { playerPreferencesStore.setDefaultSpeed(it) }
+                scope.launch {
+                    val key = seriesKey
+                    if (key.isNullOrBlank()) {
+                        playerPreferencesStore.setDefaultSpeed(speed)
+                    } else {
+                        seriesPlaybackStore.setSpeed(key, speed)
+                    }
+                }
             },
             onDismiss = { ui.showSpeedSheet = false },
         )

@@ -46,8 +46,11 @@ import com.pfpt.localvideoplayer.data.PlaybackStore
 import com.pfpt.localvideoplayer.data.PinnedItemsStore
 import com.pfpt.localvideoplayer.data.PlayerPreferences
 import com.pfpt.localvideoplayer.data.PlayerPreferencesStore
+import com.pfpt.localvideoplayer.data.SeriesPlaybackStore
 import com.pfpt.localvideoplayer.data.SeriesSkipSettings
 import com.pfpt.localvideoplayer.data.SeriesSkipStore
+import com.pfpt.localvideoplayer.player.SeriesPlaybackSettings
+import com.pfpt.localvideoplayer.player.effectivePlaybackSpeed
 import com.pfpt.localvideoplayer.model.VideoItem
 import com.pfpt.localvideoplayer.player.PlaybackSession
 import com.pfpt.localvideoplayer.player.PlayerViewModel
@@ -103,6 +106,7 @@ fun PlayerScreen(
     playerPreferencesStore: PlayerPreferencesStore,
     pinnedItemsStore: PinnedItemsStore,
     seriesSkipStore: SeriesSkipStore,
+    seriesPlaybackStore: SeriesPlaybackStore,
     bookmarkStore: BookmarkStore,
     playbackSession: PlaybackSession,
     onDurationKnown: (uri: String, durationMs: Long) -> Unit = { _, _ -> },
@@ -182,6 +186,7 @@ fun PlayerScreen(
             playerPreferencesStore = playerPreferencesStore,
             pinnedItemsStore = pinnedItemsStore,
             seriesSkipStore = seriesSkipStore,
+            seriesPlaybackStore = seriesPlaybackStore,
             bookmarkStore = bookmarkStore,
             playbackSession = playbackSession,
             onDurationKnown = onDurationKnown,
@@ -211,6 +216,7 @@ private fun PlayerScreenContent(
     playerPreferencesStore: PlayerPreferencesStore,
     pinnedItemsStore: PinnedItemsStore,
     seriesSkipStore: SeriesSkipStore,
+    seriesPlaybackStore: SeriesPlaybackStore,
     bookmarkStore: BookmarkStore,
     playbackSession: PlaybackSession,
     onDurationKnown: (uri: String, durationMs: Long) -> Unit,
@@ -252,18 +258,7 @@ private fun PlayerScreenContent(
             scope.launch { playbackSession.attachSubtitle(index) }
         }
     }
-    LaunchedEffect(preferences.defaultSpeed, preferences.aspectRatioMode, preferences.repeatOne) {
-        val next = speedAfterDefault(
-            snapshot = SpeedSnapshot(
-                playbackSpeed = ui.playbackSpeed,
-                savedPlaybackSpeed = ui.savedPlaybackSpeed,
-                boosted = ui.isSpeedBoosted,
-            ),
-            defaultSpeed = preferences.defaultSpeed,
-        )
-        ui.playbackSpeed = next.playbackSpeed
-        ui.savedPlaybackSpeed = next.savedPlaybackSpeed
-        ui.isSpeedBoosted = next.boosted
+    LaunchedEffect(preferences.aspectRatioMode, preferences.repeatOne) {
         ui.aspectRatioMode = preferences.aspectRatioMode
         ui.repeatOne = preferences.repeatOne
     }
@@ -620,6 +615,25 @@ private fun PlayerScreenContent(
 
     BackHandler { handleBack() }
 
+    val seriesKey = playlist.getOrNull(ui.currentIndex)?.seriesKey
+    val seriesPlayback by seriesPlaybackStore.observe(seriesKey).collectAsStateWithLifecycle(
+        initialValue = SeriesPlaybackSettings(),
+    )
+    val effectiveSpeed = effectivePlaybackSpeed(seriesPlayback.speed, preferences.defaultSpeed)
+    LaunchedEffect(effectiveSpeed) {
+        val next = speedAfterDefault(
+            snapshot = SpeedSnapshot(
+                playbackSpeed = ui.playbackSpeed,
+                savedPlaybackSpeed = ui.savedPlaybackSpeed,
+                boosted = ui.isSpeedBoosted,
+            ),
+            defaultSpeed = effectiveSpeed,
+        )
+        ui.playbackSpeed = next.playbackSpeed
+        ui.savedPlaybackSpeed = next.savedPlaybackSpeed
+        ui.isSpeedBoosted = next.boosted
+    }
+
     PlayerSessionEffects(
         exoPlayer = exoPlayer,
         playlist = playlist,
@@ -642,12 +656,13 @@ private fun PlayerScreenContent(
         restoreSystemBars = { restoreSystemBars() },
         updateFullscreenSystemBars = { updateFullscreenSystemBars() },
         currentPipAspectRatio = { currentPipAspectRatio() },
+        seriesKey = seriesKey,
+        seriesPlayback = seriesPlayback,
     )
 
     val hasPrevious = ui.currentIndex > 0
     val hasNext = ui.currentIndex < playlist.lastIndex
     val currentVideo = playlist.getOrNull(ui.currentIndex)
-    val seriesKey = currentVideo?.seriesKey
     val seriesSkip by seriesSkipStore.observe(seriesKey).collectAsStateWithLifecycle(initialValue = SeriesSkipSettings())
     val effectiveIntroSeconds = seriesSkip.introSeconds ?: preferences.skipIntroSeconds
     val effectiveOutroSeconds = seriesSkip.outroSeconds ?: preferences.skipOutroSeconds
@@ -784,6 +799,7 @@ private fun PlayerScreenContent(
             playerPreferencesStore = playerPreferencesStore,
             pinnedItemsStore = pinnedItemsStore,
             seriesSkipStore = seriesSkipStore,
+            seriesPlaybackStore = seriesPlaybackStore,
             bookmarkStore = bookmarkStore,
             playbackSession = playbackSession,
             castManager = castManager,
@@ -792,6 +808,7 @@ private fun PlayerScreenContent(
             currentVideo = currentVideo,
             seriesKey = seriesKey,
             seriesSkip = seriesSkip,
+            seriesPlayback = seriesPlayback,
             effectiveIntroSeconds = effectiveIntroSeconds,
             effectiveOutroSeconds = effectiveOutroSeconds,
             isFavorite = isFavorite,

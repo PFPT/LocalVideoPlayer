@@ -51,6 +51,7 @@ import com.pfpt.localvideoplayer.data.PinnedItemsStore
 import com.pfpt.localvideoplayer.data.PlayCountStore
 import com.pfpt.localvideoplayer.data.HiddenVideosStore
 import com.pfpt.localvideoplayer.data.FolderSourceStore
+import com.pfpt.localvideoplayer.data.SeriesPlaybackStore
 import com.pfpt.localvideoplayer.data.SeriesSkipStore
 import com.pfpt.localvideoplayer.data.ThemePreferencesStore
 import com.pfpt.localvideoplayer.data.VideoRepository
@@ -93,6 +94,7 @@ fun LocalVideoPlayerApp(
     val bookmarkStore = remember { BookmarkStore(context) }
     val playerPreferencesStore = remember { PlayerPreferencesStore(context) }
     val seriesSkipStore = remember { SeriesSkipStore(context) }
+    val seriesPlaybackStore = remember { SeriesPlaybackStore(context) }
     val hiddenVideosStore = remember { HiddenVideosStore(context) }
     val pinnedItemsStore = remember { PinnedItemsStore(context) }
     val playCountStore = remember { PlayCountStore(context) }
@@ -326,6 +328,7 @@ fun LocalVideoPlayerApp(
                                             playerPreferencesStore = playerPreferencesStore,
                                             pinnedItemsStore = pinnedItemsStore,
                                             seriesSkipStore = seriesSkipStore,
+                                            seriesPlaybackStore = seriesPlaybackStore,
                                             bookmarkStore = bookmarkStore,
                                             playbackSession = playbackSession,
                                             onDurationKnown = { uri, durationMs ->

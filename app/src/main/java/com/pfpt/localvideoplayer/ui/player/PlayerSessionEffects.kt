@@ -26,6 +26,7 @@ import com.pfpt.localvideoplayer.player.PlayerSession
 import com.pfpt.localvideoplayer.player.PlayerViewModel
 import com.pfpt.localvideoplayer.player.PlayerProgressState
 import com.pfpt.localvideoplayer.player.DecoderRecovery
+import com.pfpt.localvideoplayer.player.SeriesPlaybackSettings
 import com.pfpt.localvideoplayer.player.abLoopTarget
 import com.pfpt.localvideoplayer.player.decoderRecovery
 import com.pfpt.localvideoplayer.player.isSoftwareDecodeRetryable
@@ -73,6 +74,8 @@ internal fun PlayerSessionEffects(
     restoreSystemBars: () -> Unit,
     updateFullscreenSystemBars: () -> Unit,
     currentPipAspectRatio: () -> android.util.Rational,
+    seriesKey: String?,
+    seriesPlayback: SeriesPlaybackSettings,
 ) {
     val context = LocalContext.current
 
