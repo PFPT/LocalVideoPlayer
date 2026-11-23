@@ -109,6 +109,17 @@ fun VideoItem.toMediaItemWithSubtitle(context: Context, subtitleUri: Uri): Media
         .build()
 }
 
+fun playingTrackFallback(
+    preferredLanguage: String?,
+    hasOverride: Boolean,
+    trackDisabled: Boolean,
+    selectedLanguages: List<String?>,
+): Boolean {
+    if (preferredLanguage == null || hasOverride || trackDisabled) return false
+    if (selectedLanguages.isEmpty()) return false
+    return selectedLanguages.none { sameTrackLanguage(preferredLanguage, it) }
+}
+
 fun trackChoiceSelected(
     choice: String,
     trackSelected: Boolean,
@@ -116,12 +127,15 @@ fun trackChoiceSelected(
     trackDisabled: Boolean,
     preferredLanguage: String?,
     trackLanguage: String?,
+    playingFallback: Boolean = false,
 ): Boolean {
     return when (choice) {
         "auto" -> preferredLanguage == null && !trackDisabled && !hasOverride
         "off" -> trackDisabled
         else -> trackSelected && (
-            hasOverride || sameTrackLanguage(preferredLanguage, trackLanguage)
+            hasOverride ||
+                sameTrackLanguage(preferredLanguage, trackLanguage) ||
+                playingFallback
         )
     }
 }
@@ -140,6 +154,20 @@ fun ExoPlayer.trackOptions(
     val disabled = trackSelectionParameters.disabledTrackTypes.contains(type)
     val override = hasExplicitOverride(type)
     val preferred = preferredTrackLanguage(type)
+    val selectedLanguages = mutableListOf<String?>()
+    tracks.groups.forEach { group ->
+        if (group.type != type) return@forEach
+        for (i in 0 until group.length) {
+            if (!group.isTrackSupported(i) || !group.isTrackSelected(i)) continue
+            selectedLanguages.add(group.getTrackFormat(i).language)
+        }
+    }
+    val playingFallback = playingTrackFallback(
+        preferredLanguage = preferred,
+        hasOverride = override,
+        trackDisabled = disabled,
+        selectedLanguages = selectedLanguages,
+    )
     val options = mutableListOf(
         TrackOption(
             id = "auto",
@@ -151,6 +179,7 @@ fun ExoPlayer.trackOptions(
                 trackDisabled = disabled,
                 preferredLanguage = preferred,
                 trackLanguage = null,
+                playingFallback = playingFallback,
             ),
         ),
     )
@@ -166,6 +195,7 @@ fun ExoPlayer.trackOptions(
                     trackDisabled = disabled,
                     preferredLanguage = preferred,
                     trackLanguage = null,
+                    playingFallback = playingFallback,
                 ),
             ),
         )
@@ -189,6 +219,7 @@ fun ExoPlayer.trackOptions(
                         trackDisabled = disabled,
                         preferredLanguage = preferred,
                         trackLanguage = format.language,
+                        playingFallback = playingFallback,
                     ),
                     language = format.language,
                 ),

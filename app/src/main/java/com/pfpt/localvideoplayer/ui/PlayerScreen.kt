@@ -52,7 +52,7 @@ import com.pfpt.localvideoplayer.data.SeriesPlaybackStore
 import com.pfpt.localvideoplayer.data.SeriesSkipSettings
 import com.pfpt.localvideoplayer.data.SeriesSkipStore
 import com.pfpt.localvideoplayer.player.SeriesPlaybackSettings
-import com.pfpt.localvideoplayer.player.effectivePlaybackSpeed
+import com.pfpt.localvideoplayer.player.playbackSpeedAfterSeriesLoad
 import com.pfpt.localvideoplayer.model.VideoItem
 import com.pfpt.localvideoplayer.player.PlaybackSession
 import com.pfpt.localvideoplayer.player.PlayerViewModel
@@ -625,8 +625,9 @@ private fun PlayerScreenContent(
         seriesPlaybackStore.observe(seriesKey).collect { loadedSeriesPlayback = it }
     }
     val seriesPlayback = loadedSeriesPlayback ?: SeriesPlaybackSettings()
-    val effectiveSpeed = effectivePlaybackSpeed(seriesPlayback.speed, preferences.defaultSpeed)
-    LaunchedEffect(effectiveSpeed) {
+    val loadedSpeed = playbackSpeedAfterSeriesLoad(loadedSeriesPlayback, preferences.defaultSpeed)
+    LaunchedEffect(loadedSpeed) {
+        val effectiveSpeed = loadedSpeed ?: return@LaunchedEffect
         val next = speedAfterDefault(
             snapshot = SpeedSnapshot(
                 playbackSpeed = ui.playbackSpeed,

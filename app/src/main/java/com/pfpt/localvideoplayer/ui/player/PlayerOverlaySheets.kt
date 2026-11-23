@@ -26,6 +26,7 @@ import com.pfpt.localvideoplayer.player.SeriesTrackHold
 import com.pfpt.localvideoplayer.player.TrackMemoryUpdate
 import com.pfpt.localvideoplayer.player.applyTrackSelection
 import com.pfpt.localvideoplayer.player.audioMemoryUpdate
+import com.pfpt.localvideoplayer.player.seriesMemoryWriteOnTap
 import com.pfpt.localvideoplayer.player.seriesTextOffForApply
 import com.pfpt.localvideoplayer.player.textMemoryUpdate
 import com.pfpt.localvideoplayer.player.trackOptions
@@ -297,6 +298,15 @@ internal fun PlayerOverlaySheets(
                 } else {
                     textMemoryUpdate(optionId, language)
                 }
+                val storedLanguage = if (type == C.TRACK_TYPE_AUDIO) {
+                    seriesPlayback.audioLanguage
+                } else {
+                    (seriesPlayback.text as? SeriesTextMemory.Language)?.code
+                }
+                val alreadySelected = options.firstOrNull { it.id == optionId }?.selected == true
+                if (!seriesMemoryWriteOnTap(alreadySelected, storedLanguage, language)) {
+                    return@TrackSelectorSheet
+                }
                 if (type == C.TRACK_TYPE_TEXT) {
                     when (update) {
                         TrackMemoryUpdate.Clear -> {
@@ -319,6 +329,8 @@ internal fun PlayerOverlaySheets(
                         TrackMemoryUpdate.Leave -> Unit
                     }
                     playbackSession.setSeriesTextOff(
+                        seriesKey,
+                        currentVideo?.uri?.toString().orEmpty(),
                         seriesTextOffForApply(
                             seriesPlayback.text,
                             ui.pendingSeriesText,

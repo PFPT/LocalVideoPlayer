@@ -380,7 +380,11 @@ internal fun PlayerSessionEffects(
             ui.currentIndex,
             seriesKey,
         )
-        playbackSession.setSeriesTextOff(textOff)
+        playbackSession.setSeriesTextOff(
+            seriesKey,
+            playlist.getOrNull(ui.currentIndex)?.uri?.toString().orEmpty(),
+            textOff,
+        )
         if (
             seriesHeldRestorePending.value &&
             seriesTracksReady(
@@ -424,6 +428,12 @@ internal fun PlayerSessionEffects(
             playbackSession.attachSubtitle(ui.currentIndex)
         }
         if (!commitNow()) {
+            seriesHeldRestorePending.value = !restoreHeldTrackSelection(
+                exoPlayer,
+                ui.seriesTrackHold,
+                ui.currentIndex,
+                seriesKey,
+            )
             return@LaunchedEffect
         }
         exoPlayer.applySeriesTrackDirective(

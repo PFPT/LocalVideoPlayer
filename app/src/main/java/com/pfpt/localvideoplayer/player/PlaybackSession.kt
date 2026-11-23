@@ -10,6 +10,7 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.pfpt.localvideoplayer.data.PlaybackStore
+import com.pfpt.localvideoplayer.data.SeriesPlaybackStore
 import com.pfpt.localvideoplayer.model.VideoItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,12 +27,29 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 class PlaybackSessionViewModel(application: Application) : AndroidViewModel(application) {
-    val session = PlaybackSession(application, PlaybackStore(application))
+    val session = PlaybackSession(
+        application,
+        PlaybackStore(application),
+        SeriesPlaybackStore(application),
+    )
 
     override fun onCleared() {
         session.stop()
     }
 }
+
+private data class SubtitleOffOverride(
+    val key: String,
+    val off: Boolean,
+)
+
+private data class ScannedSubtitle(
+    val manual: String?,
+    val sidecar: String?,
+    val storedOff: Boolean,
+    val seriesKey: String?,
+    val videoUri: String,
+)
 
 data class PlaybackBarState(
     val active: Boolean = false,
@@ -44,6 +62,7 @@ data class PlaybackBarState(
 class PlaybackSession(
     context: Context,
     private val playbackStore: PlaybackStore,
+    private val seriesPlaybackStore: SeriesPlaybackStore,
 ) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -69,14 +88,22 @@ class PlaybackSession(
     private var tickJob: Job? = null
     private var progressJob: Job? = null
     private var preloadJob: Job? = null
-    private var seriesTextOff: Boolean = false
+    private val subtitleGate = Mutex()
+    @Volatile
+    private var subtitleOffOverride: SubtitleOffOverride? = null
     private var listener: Player.Listener? = null
 
-    fun setSeriesTextOff(off: Boolean) {
-        seriesTextOff = off
+    fun setSeriesTextOff(seriesKey: String?, videoUri: String, off: Boolean) {
+        subtitleOffOverride = SubtitleOffOverride(
+            key = textOffOverrideKey(seriesKey, videoUri),
+            off = off,
+        )
     }
 
-    fun peekExternalSubtitle(video: VideoItem): String? = resolveSubtitle(video)
+    suspend fun peekExternalSubtitle(video: VideoItem): String? {
+        val scanned = withContext(Dispatchers.IO) { scanSubtitle(video) }
+        return currentAttached(scanned).target
+    }
 
     fun player(): ExoPlayer? = player
 
@@ -121,17 +148,24 @@ class PlaybackSession(
         }
         returnToExisting = false
         val video = items[safeIndex]
-        val subtitle = withContext(Dispatchers.IO) { resolveSubtitle(video) }
+        val scanned = withContext(Dispatchers.IO) { scanSubtitle(video) }
         val startMs = startPositionMs ?: playbackStore.getResumePositionMs(video.uri, video.durationMs)
         teardown(save = true)
+        val subtitle = currentAttached(scanned)
         val created = buildExoPlayer(
             context = appContext,
             playlist = items,
             startIndex = safeIndex,
             softDecode = requestedSoftDecode,
-            subtitleUri = subtitle?.let(Uri::parse),
+            subtitleUri = subtitle.target?.let(Uri::parse),
             startPositionMs = startMs.coerceAtLeast(0L),
         )
+        if (subtitle.textOff) {
+            created.trackSelectionParameters = created.trackSelectionParameters
+                .buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                .build()
+        }
         playlist = items
         playlistKey = requestedKey
         softDecode = requestedSoftDecode
@@ -247,9 +281,17 @@ class PlaybackSession(
 
     suspend fun attachSubtitle(index: Int) {
         val video = playlist.getOrNull(index) ?: return
-        val desired = withContext(Dispatchers.IO) { resolveSubtitle(video) }
-        withContext(Dispatchers.Main.immediate) {
-            applySubtitle(index, desired, allowCurrent = true)
+        val scanned = withContext(Dispatchers.IO) { scanSubtitle(video) }
+        subtitleGate.withLock {
+            withContext(Dispatchers.Main.immediate) {
+                val attached = currentAttached(scanned)
+                applySubtitle(
+                    index,
+                    attached.target,
+                    allowCurrent = true,
+                    textOff = attached.textOff,
+                )
+            }
         }
     }
 
@@ -367,30 +409,61 @@ class PlaybackSession(
         preloadJob = scope.launch {
             val indices = indicesToPreload(current, items.size)
             val desired = withContext(Dispatchers.IO) {
-                indices.associateWith { index ->
-                    items.getOrNull(index)?.let { resolveSubtitle(it) }
+                val map = mutableMapOf<Int, ScannedSubtitle>()
+                for (index in indices) {
+                    val video = items.getOrNull(index) ?: continue
+                    map[index] = scanSubtitle(video)
                 }
+                map
             }
-            withContext(Dispatchers.Main.immediate) {
-                val currentPlayer = player ?: return@withContext
-                val now = currentPlayer.currentMediaItemIndex
-                desired.forEach { (index, subtitle) ->
-                    val existing = configuredSubtitle(currentPlayer, index)
-                    if (shouldPreloadSubtitle(index, now, existing, subtitle)) {
-                        applySubtitle(index, subtitle, allowCurrent = false)
+            subtitleGate.withLock {
+                withContext(Dispatchers.Main.immediate) {
+                    val currentPlayer = player ?: return@withContext
+                    val now = currentPlayer.currentMediaItemIndex
+                    desired.forEach { (index, scanned) ->
+                        val attached = currentAttached(scanned)
+                        val existing = configuredSubtitle(currentPlayer, index)
+                        if (shouldPreloadSubtitle(index, now, existing, attached.target)) {
+                            applySubtitle(
+                                index,
+                                attached.target,
+                                allowCurrent = false,
+                                textOff = attached.textOff,
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
-    private fun resolveSubtitle(video: VideoItem): String? {
+    private suspend fun scanSubtitle(video: VideoItem): ScannedSubtitle {
         val sidecar = findSidecarSubtitle(appContext, video)?.toString()
         val manual = manualSubtitles[video.uri.toString()]
-        return externalSubtitleTarget(manual, sidecar, seriesTextOff)
+        val storedOff = seriesPlaybackStore.get(video.seriesKey).text is SeriesTextMemory.Off
+        return ScannedSubtitle(
+            manual = manual,
+            sidecar = sidecar,
+            storedOff = storedOff,
+            seriesKey = video.seriesKey,
+            videoUri = video.uri.toString(),
+        )
     }
 
-    private fun applySubtitle(index: Int, desired: String?, allowCurrent: Boolean) {
+    private fun currentAttached(scanned: ScannedSubtitle): AttachedSubtitle {
+        val override = subtitleOffOverride
+        return attachedSubtitle(
+            manual = scanned.manual,
+            sidecar = scanned.sidecar,
+            storedOff = scanned.storedOff,
+            videoSeriesKey = scanned.seriesKey,
+            videoUri = scanned.videoUri,
+            overrideKey = override?.key,
+            overrideOff = override?.off == true,
+        )
+    }
+
+    private fun applySubtitle(index: Int, desired: String?, allowCurrent: Boolean, textOff: Boolean) {
         val current = player ?: return
         if (desired == null) return
         val existing = configuredSubtitle(current, index)
@@ -403,12 +476,19 @@ class PlaybackSession(
         if (!attach) return
         val video = playlist.getOrNull(index) ?: return
         val textDisabled = current.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)
+        val disableText = subtitleTrackStaysOff(textOff, textDisabled, isCurrent)
         val position = if (isCurrent) current.currentPosition.coerceAtLeast(0L) else 0L
+        if (disableText) {
+            current.trackSelectionParameters = current.trackSelectionParameters
+                .buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                .build()
+        }
         current.replaceMediaItem(index, video.toMediaItemWithSubtitle(appContext, Uri.parse(desired)))
         if (isCurrent && position > 0L) {
             current.seekTo(index, position)
         }
-        if (textDisabled) {
+        if (disableText) {
             current.trackSelectionParameters = current.trackSelectionParameters
                 .buildUpon()
                 .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)

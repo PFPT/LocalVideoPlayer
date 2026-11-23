@@ -13,6 +13,7 @@ import com.pfpt.localvideoplayer.player.normalizeSeriesSpeed
 import com.pfpt.localvideoplayer.player.textMemoryFromStorage
 import com.pfpt.localvideoplayer.player.usableTrackLanguage
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.seriesPlaybackDataStore: DataStore<Preferences> by preferencesDataStore(
@@ -29,6 +30,11 @@ class SeriesPlaybackStore(private val context: Context) {
                 prefs.toSettings(seriesKey)
             }
         }
+    }
+
+    suspend fun get(seriesKey: String?): SeriesPlaybackSettings {
+        if (seriesKey.isNullOrBlank()) return SeriesPlaybackSettings()
+        return context.seriesPlaybackDataStore.data.first().toSettings(seriesKey)
     }
 
     suspend fun setAudioLanguage(seriesKey: String, language: String) {

@@ -39,6 +39,15 @@ fun textMemoryUpdate(optionId: String, language: String?): TrackMemoryUpdate {
     return TrackMemoryUpdate.SaveLanguage(code)
 }
 
+fun seriesMemoryWriteOnTap(
+    alreadySelected: Boolean,
+    storedLanguage: String?,
+    trackLanguage: String?,
+): Boolean {
+    if (!alreadySelected) return true
+    return sameTrackLanguage(storedLanguage, trackLanguage)
+}
+
 fun textMemoryFromStorage(value: String?): SeriesTextMemory? {
     if (value == null || value == SERIES_TEXT_OFF) {
         return if (value == SERIES_TEXT_OFF) SeriesTextMemory.Off else null
@@ -51,6 +60,11 @@ fun normalizeSeriesSpeed(speed: Float): Float = speed.coerceIn(0.5f, 5.0f)
 
 fun effectivePlaybackSpeed(seriesSpeed: Float?, defaultSpeed: Float): Float {
     return seriesSpeed ?: defaultSpeed
+}
+
+fun playbackSpeedAfterSeriesLoad(loaded: SeriesPlaybackSettings?, defaultSpeed: Float): Float? {
+    loaded ?: return null
+    return effectivePlaybackSpeed(loaded.speed, defaultSpeed)
 }
 
 fun externalSubtitleTarget(manual: String?, sidecar: String?, textOff: Boolean): String? {
@@ -211,6 +225,49 @@ fun shouldCommitSeriesTrackApply(
 fun holdEpisodeChanged(holdAtStart: SeriesTrackHold?, holdNow: SeriesTrackHold?): Boolean {
     if (holdAtStart == null || holdNow == null) return false
     return holdAtStart.index != holdNow.index || holdAtStart.seriesKey != holdNow.seriesKey
+}
+
+fun textOffOverrideKey(seriesKey: String?, videoUri: String): String {
+    return seriesKey?.takeIf { it.isNotBlank() } ?: videoUri
+}
+
+fun seriesTextOffForVideo(
+    videoSeriesKey: String?,
+    videoUri: String,
+    overrideKey: String?,
+    overrideOff: Boolean,
+    storedOff: Boolean,
+): Boolean {
+    val key = textOffOverrideKey(videoSeriesKey, videoUri)
+    if (overrideKey != null && overrideKey == key) return overrideOff
+    return storedOff
+}
+
+data class AttachedSubtitle(
+    val target: String?,
+    val textOff: Boolean,
+)
+
+fun attachedSubtitle(
+    manual: String?,
+    sidecar: String?,
+    storedOff: Boolean,
+    videoSeriesKey: String?,
+    videoUri: String,
+    overrideKey: String?,
+    overrideOff: Boolean,
+): AttachedSubtitle {
+    val textOff = seriesTextOffForVideo(
+        videoSeriesKey = videoSeriesKey,
+        videoUri = videoUri,
+        overrideKey = overrideKey,
+        overrideOff = overrideOff,
+        storedOff = storedOff,
+    )
+    return AttachedSubtitle(
+        target = externalSubtitleTarget(manual, sidecar, textOff),
+        textOff = textOff,
+    )
 }
 
 fun seriesTextOffForApply(

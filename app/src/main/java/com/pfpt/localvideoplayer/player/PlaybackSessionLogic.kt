@@ -74,6 +74,10 @@ fun shouldAttachOnArrival(
     return existingSubtitle != desiredSubtitle
 }
 
+fun subtitleTrackStaysOff(textOff: Boolean, alreadyDisabled: Boolean, isCurrent: Boolean): Boolean {
+    return alreadyDisabled || (isCurrent && textOff)
+}
+
 fun sleepDeadlineElapsed(choice: SleepChoice, nowElapsedMs: Long): Long? {
     return when (choice) {
         SleepChoice.Off,

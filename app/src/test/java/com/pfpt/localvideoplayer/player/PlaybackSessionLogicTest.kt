@@ -127,6 +127,10 @@ class PlaybackSessionLogicTest {
         assertTrue(shouldAttachOnArrival(existingSubtitle = null, desiredSubtitle = "content://ep.srt"))
         assertFalse(shouldAttachOnArrival(existingSubtitle = "content://ep.srt", desiredSubtitle = "content://ep.srt"))
         assertFalse(shouldAttachOnArrival(existingSubtitle = null, desiredSubtitle = null))
+        assertTrue(subtitleTrackStaysOff(textOff = true, alreadyDisabled = false, isCurrent = true))
+        assertFalse(subtitleTrackStaysOff(textOff = true, alreadyDisabled = false, isCurrent = false))
+        assertTrue(subtitleTrackStaysOff(textOff = false, alreadyDisabled = true, isCurrent = false))
+        assertFalse(subtitleTrackStaysOff(textOff = false, alreadyDisabled = false, isCurrent = true))
     }
 
     @Test

@@ -38,6 +38,31 @@ class SeriesPlaybackLogicTest {
     }
 
     @Test
+    fun selectedDifferentLanguageDoesNotRewriteSeriesMemory() {
+        assertTrue(
+            seriesMemoryWriteOnTap(
+                alreadySelected = false,
+                storedLanguage = "eng",
+                trackLanguage = "jpn",
+            ),
+        )
+        assertTrue(
+            seriesMemoryWriteOnTap(
+                alreadySelected = true,
+                storedLanguage = "jpn",
+                trackLanguage = " jpn ",
+            ),
+        )
+        assertFalse(
+            seriesMemoryWriteOnTap(
+                alreadySelected = true,
+                storedLanguage = "eng",
+                trackLanguage = "jpn",
+            ),
+        )
+    }
+
+    @Test
     fun storedTextOffUndAndBlankReadAsSpecified() {
         assertNull(textMemoryFromStorage(null))
         assertEquals(SeriesTextMemory.Off, textMemoryFromStorage(SERIES_TEXT_OFF))
@@ -50,6 +75,24 @@ class SeriesPlaybackLogicTest {
     fun seriesSpeedOverridesDefault() {
         assertEquals(1.5f, effectivePlaybackSpeed(seriesSpeed = 1.5f, defaultSpeed = 1f), 0f)
         assertEquals(1.25f, effectivePlaybackSpeed(seriesSpeed = null, defaultSpeed = 1.25f), 0f)
+    }
+
+    @Test
+    fun playbackSpeedWaitsUntilSeriesSettingsArrive() {
+        assertNull(playbackSpeedAfterSeriesLoad(loaded = null, defaultSpeed = 1f))
+        assertEquals(
+            1.25f,
+            playbackSpeedAfterSeriesLoad(loaded = SeriesPlaybackSettings(), defaultSpeed = 1.25f)!!,
+            0f,
+        )
+        assertEquals(
+            1.5f,
+            playbackSpeedAfterSeriesLoad(
+                loaded = SeriesPlaybackSettings(speed = 1.5f),
+                defaultSpeed = 1f,
+            )!!,
+            0f,
+        )
     }
 
     @Test
@@ -719,6 +762,152 @@ class SeriesPlaybackLogicTest {
                 trackDisabled = false,
                 preferredLanguage = "jpn",
                 trackLanguage = "jpn",
+            ),
+        )
+    }
+
+    @Test
+    fun playingFallbackMarksTheTrackThatIsActuallyPlaying() {
+        assertFalse(
+            playingTrackFallback(
+                preferredLanguage = null,
+                hasOverride = false,
+                trackDisabled = false,
+                selectedLanguages = listOf("jpn"),
+            ),
+        )
+        assertFalse(
+            playingTrackFallback(
+                preferredLanguage = "jpn",
+                hasOverride = true,
+                trackDisabled = false,
+                selectedLanguages = listOf("eng"),
+            ),
+        )
+        assertFalse(
+            playingTrackFallback(
+                preferredLanguage = "jpn",
+                hasOverride = false,
+                trackDisabled = false,
+                selectedLanguages = listOf("jpn"),
+            ),
+        )
+        assertTrue(
+            playingTrackFallback(
+                preferredLanguage = "eng",
+                hasOverride = false,
+                trackDisabled = false,
+                selectedLanguages = listOf("jpn"),
+            ),
+        )
+        assertTrue(
+            trackChoiceSelected(
+                choice = "0:1",
+                trackSelected = true,
+                hasOverride = false,
+                trackDisabled = false,
+                preferredLanguage = "eng",
+                trackLanguage = "jpn",
+                playingFallback = true,
+            ),
+        )
+        assertFalse(
+            trackChoiceSelected(
+                choice = "auto",
+                trackSelected = false,
+                hasOverride = false,
+                trackDisabled = false,
+                preferredLanguage = "eng",
+                trackLanguage = null,
+                playingFallback = true,
+            ),
+        )
+        assertFalse(
+            trackChoiceSelected(
+                choice = "0:0",
+                trackSelected = false,
+                hasOverride = false,
+                trackDisabled = false,
+                preferredLanguage = "eng",
+                trackLanguage = "eng",
+                playingFallback = true,
+            ),
+        )
+    }
+
+    @Test
+    fun attachedSubtitleUsesTheOffStateAtAttachTime() {
+        val closed = attachedSubtitle(
+            manual = null,
+            sidecar = "side.srt",
+            storedOff = false,
+            videoSeriesKey = "name:show",
+            videoUri = "content://ep",
+            overrideKey = "name:show",
+            overrideOff = true,
+        )
+        assertNull(closed.target)
+        assertTrue(closed.textOff)
+        val reopened = attachedSubtitle(
+            manual = null,
+            sidecar = "side.srt",
+            storedOff = true,
+            videoSeriesKey = "name:show",
+            videoUri = "content://ep",
+            overrideKey = "name:show",
+            overrideOff = false,
+        )
+        assertEquals("side.srt", reopened.target)
+        assertFalse(reopened.textOff)
+        val manualWhileOff = attachedSubtitle(
+            manual = "manual.srt",
+            sidecar = "side.srt",
+            storedOff = false,
+            videoSeriesKey = "name:show",
+            videoUri = "content://ep",
+            overrideKey = "name:show",
+            overrideOff = true,
+        )
+        assertEquals("manual.srt", manualWhileOff.target)
+        assertTrue(manualWhileOff.textOff)
+    }
+
+    @Test
+    fun seriesTextOffForAnotherSeriesReadsStoredValue() {
+        assertTrue(
+            seriesTextOffForVideo(
+                videoSeriesKey = "name:next",
+                videoUri = "content://next",
+                overrideKey = "name:current",
+                overrideOff = false,
+                storedOff = true,
+            ),
+        )
+        assertFalse(
+            seriesTextOffForVideo(
+                videoSeriesKey = "name:next",
+                videoUri = "content://next",
+                overrideKey = "name:current",
+                overrideOff = true,
+                storedOff = false,
+            ),
+        )
+        assertTrue(
+            seriesTextOffForVideo(
+                videoSeriesKey = "name:current",
+                videoUri = "content://current",
+                overrideKey = "name:current",
+                overrideOff = true,
+                storedOff = false,
+            ),
+        )
+        assertFalse(
+            seriesTextOffForVideo(
+                videoSeriesKey = null,
+                videoUri = "content://loose",
+                overrideKey = "content://other",
+                overrideOff = true,
+                storedOff = false,
             ),
         )
     }
