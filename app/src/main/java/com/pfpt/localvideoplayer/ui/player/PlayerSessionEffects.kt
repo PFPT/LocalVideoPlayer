@@ -31,6 +31,7 @@ import com.pfpt.localvideoplayer.player.SeriesPlaybackSettings
 import com.pfpt.localvideoplayer.player.SeriesTrackApplyRequest
 import com.pfpt.localvideoplayer.player.abLoopTarget
 import com.pfpt.localvideoplayer.player.applySeriesTrackDirective
+import com.pfpt.localvideoplayer.player.clearedSeriesTrackHold
 import com.pfpt.localvideoplayer.player.decoderRecovery
 import com.pfpt.localvideoplayer.player.isSoftwareDecodeRetryable
 import com.pfpt.localvideoplayer.player.isSourceReadFailure
@@ -355,6 +356,7 @@ internal fun PlayerSessionEffects(
             audioLanguage = seriesPlayback.audioLanguage,
             text = seriesPlayback.text,
         )
+        ui.seriesTrackHold = clearedSeriesTrackHold(ui.seriesTrackHold, ui.currentIndex, seriesKey)
         val holdAtStart = ui.seriesTrackHold
         if (!shouldCommitSeriesTrackApply(
                 request = request,

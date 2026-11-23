@@ -118,6 +118,16 @@ data class SeriesTrackHold(
     val seriesKey: String?,
 )
 
+fun clearedSeriesTrackHold(
+    hold: SeriesTrackHold?,
+    indexNow: Int,
+    seriesKey: String?,
+): SeriesTrackHold? {
+    if (hold == null) return null
+    if (hold.index == indexNow && hold.seriesKey == seriesKey) return hold
+    return null
+}
+
 data class PendingSeriesText(
     val index: Int,
     val seriesKey: String?,

@@ -3,6 +3,7 @@ package com.pfpt.localvideoplayer.player
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -360,6 +361,32 @@ class SeriesPlaybackLogicTest {
                 seriesKey = "name:show",
             ),
         )
+    }
+
+    @Test
+    fun clearedSeriesTrackHoldStaysNull() {
+        assertNull(clearedSeriesTrackHold(hold = null, indexNow = 0, seriesKey = "name:show"))
+    }
+
+    @Test
+    fun clearedSeriesTrackHoldKeepsMatchingHold() {
+        val hold = SeriesTrackHold(index = 2, seriesKey = "name:show")
+        assertSame(
+            hold,
+            clearedSeriesTrackHold(hold = hold, indexNow = 2, seriesKey = "name:show"),
+        )
+    }
+
+    @Test
+    fun clearedSeriesTrackHoldClearsWhenIndexDiffers() {
+        val hold = SeriesTrackHold(index = 2, seriesKey = "name:show")
+        assertNull(clearedSeriesTrackHold(hold = hold, indexNow = 3, seriesKey = "name:show"))
+    }
+
+    @Test
+    fun clearedSeriesTrackHoldClearsWhenSeriesKeyDiffers() {
+        val hold = SeriesTrackHold(index = 2, seriesKey = "name:show")
+        assertNull(clearedSeriesTrackHold(hold = hold, indexNow = 2, seriesKey = "name:other"))
     }
 
     private fun seriesTrackRequest(): SeriesTrackApplyRequest {
