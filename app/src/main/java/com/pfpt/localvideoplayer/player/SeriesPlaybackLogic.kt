@@ -190,9 +190,10 @@ fun shouldCommitSeriesTrackApply(
 ): Boolean {
     if (!tracksReady) return false
     if (indexNow != request.index) return false
-    if (holdNow != holdAtStart) return false
+    if (holdEpisodeChanged(holdAtStart, holdNow)) return false
     if (
         !allowHeldApply &&
+        applied != null &&
         holdNow != null &&
         holdNow.index == request.index &&
         holdNow.seriesKey == request.seriesKey
@@ -201,6 +202,11 @@ fun shouldCommitSeriesTrackApply(
     }
     if (request == applied) return false
     return true
+}
+
+fun holdEpisodeChanged(holdAtStart: SeriesTrackHold?, holdNow: SeriesTrackHold?): Boolean {
+    if (holdAtStart == null || holdNow == null) return false
+    return holdAtStart.index != holdNow.index || holdAtStart.seriesKey != holdNow.seriesKey
 }
 
 fun seriesTextOffForApply(

@@ -208,7 +208,7 @@ class SeriesPlaybackLogicTest {
     }
 
     @Test
-    fun doNotCommitWhenHoldNowDiffersFromHoldAtStart() {
+    fun doNotCommitWhenHoldMovesToAnotherEpisode() {
         val request = seriesTrackRequest()
         val holdAtStart = SeriesTrackHold(index = request.index, seriesKey = request.seriesKey)
         assertFalse(
@@ -217,6 +217,22 @@ class SeriesPlaybackLogicTest {
                 indexNow = request.index,
                 holdAtStart = holdAtStart,
                 holdNow = SeriesTrackHold(index = request.index + 1, seriesKey = request.seriesKey),
+                applied = null,
+                tracksReady = true,
+            ),
+        )
+    }
+
+    @Test
+    fun commitWhenHoldOptionChangesOnThisEpisodeBeforeApply() {
+        val request = seriesTrackRequest()
+        val holdAtStart = SeriesTrackHold(index = request.index, seriesKey = request.seriesKey)
+        assertTrue(
+            shouldCommitSeriesTrackApply(
+                request = request,
+                indexNow = request.index,
+                holdAtStart = holdAtStart,
+                holdNow = holdAtStart.copy(audioOptionId = "0:1"),
                 applied = null,
                 tracksReady = true,
             ),
@@ -239,8 +255,29 @@ class SeriesPlaybackLogicTest {
     }
 
     @Test
-    fun doNotCommitWhenHoldMatchesRequestIndexAndSeries() {
+    fun commitWhenHoldMatchesAndNothingIsAppliedYet() {
         val request = seriesTrackRequest()
+        val hold = SeriesTrackHold(
+            index = request.index,
+            seriesKey = request.seriesKey,
+            audioOptionId = "0:1",
+        )
+        assertTrue(
+            shouldCommitSeriesTrackApply(
+                request = request,
+                indexNow = request.index,
+                holdAtStart = hold,
+                holdNow = hold,
+                applied = null,
+                tracksReady = true,
+            ),
+        )
+    }
+
+    @Test
+    fun doNotCommitWhenHoldMatchesAnEarlierApply() {
+        val request = seriesTrackRequest().copy(audioLanguage = "eng")
+        val applied = seriesTrackRequest()
         val hold = SeriesTrackHold(
             index = request.index,
             seriesKey = request.seriesKey,
@@ -252,7 +289,7 @@ class SeriesPlaybackLogicTest {
                 indexNow = request.index,
                 holdAtStart = hold,
                 holdNow = hold,
-                applied = null,
+                applied = applied,
                 tracksReady = true,
             ),
         )
