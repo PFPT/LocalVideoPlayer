@@ -1,6 +1,8 @@
 package com.pfpt.localvideoplayer.ui.player
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.media3.common.C
 import androidx.media3.exoplayer.ExoPlayer
@@ -36,6 +38,8 @@ import com.pfpt.localvideoplayer.ui.components.TrackSelectorSheet
 import com.pfpt.localvideoplayer.ui.components.VideoInfoDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 @Composable
 internal fun PlayerOverlaySheets(
@@ -69,6 +73,8 @@ internal fun PlayerOverlaySheets(
     onScreenshot: () -> Unit,
 ) {
     val context = LocalContext.current
+    val seriesTrackWriteMutex = remember { Mutex() }
+    val seriesTrackWriteTicket = remember { mutableIntStateOf(0) }
     if (ui.showSpeedSheet) {
         SpeedSelectorSheet(
             currentSpeed = ui.playbackSpeed,
@@ -285,26 +291,34 @@ internal fun PlayerOverlaySheets(
                     update is TrackMemoryUpdate.SaveLanguage -> SeriesTextMemory.Language(update.code)
                     else -> seriesPlayback.text
                 }
+                val ticket = seriesTrackWriteTicket.intValue + 1
+                seriesTrackWriteTicket.intValue = ticket
                 ui.skippedSeriesTracks = SeriesTrackApplyRequest(
                     index = ui.currentIndex,
                     seriesKey = key,
                     audioLanguage = nextAudio,
                     text = nextText,
                 )
+                if (type == C.TRACK_TYPE_TEXT) {
+                    playbackSession.setSeriesTextOff(nextText is SeriesTextMemory.Off)
+                }
                 scope.launch {
-                    when (update) {
-                        TrackMemoryUpdate.Clear -> if (type == C.TRACK_TYPE_AUDIO) {
-                            seriesPlaybackStore.clearAudioLanguage(key)
-                        } else {
-                            seriesPlaybackStore.clearText(key)
+                    seriesTrackWriteMutex.withLock {
+                        if (seriesTrackWriteTicket.intValue != ticket) return@withLock
+                        when (update) {
+                            TrackMemoryUpdate.Clear -> if (type == C.TRACK_TYPE_AUDIO) {
+                                seriesPlaybackStore.clearAudioLanguage(key)
+                            } else {
+                                seriesPlaybackStore.clearText(key)
+                            }
+                            is TrackMemoryUpdate.SaveLanguage -> if (type == C.TRACK_TYPE_AUDIO) {
+                                seriesPlaybackStore.setAudioLanguage(key, update.code)
+                            } else {
+                                seriesPlaybackStore.setTextLanguage(key, update.code)
+                            }
+                            TrackMemoryUpdate.SaveOff -> seriesPlaybackStore.setTextOff(key)
+                            TrackMemoryUpdate.Leave -> Unit
                         }
-                        is TrackMemoryUpdate.SaveLanguage -> if (type == C.TRACK_TYPE_AUDIO) {
-                            seriesPlaybackStore.setAudioLanguage(key, update.code)
-                        } else {
-                            seriesPlaybackStore.setTextLanguage(key, update.code)
-                        }
-                        TrackMemoryUpdate.SaveOff -> seriesPlaybackStore.setTextOff(key)
-                        TrackMemoryUpdate.Leave -> Unit
                     }
                 }
             },

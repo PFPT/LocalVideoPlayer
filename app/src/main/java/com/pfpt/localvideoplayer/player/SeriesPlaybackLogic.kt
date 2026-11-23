@@ -112,3 +112,20 @@ fun shouldApplySeriesTracks(
     if (request == applied || request == skipped) return false
     return true
 }
+
+fun shouldCommitSeriesTrackApply(
+    request: SeriesTrackApplyRequest,
+    indexNow: Int,
+    applied: SeriesTrackApplyRequest?,
+    skippedNow: SeriesTrackApplyRequest?,
+    tracksReady: Boolean,
+): Boolean {
+    if (indexNow != request.index) return false
+    if (skippedNow != null && skippedNow != request) return false
+    return shouldApplySeriesTracks(
+        tracksReady = tracksReady,
+        request = request,
+        applied = applied,
+        skipped = skippedNow,
+    )
+}

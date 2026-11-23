@@ -37,6 +37,7 @@ import com.pfpt.localvideoplayer.player.isSoftwareDecodeRetryable
 import com.pfpt.localvideoplayer.player.isSourceReadFailure
 import com.pfpt.localvideoplayer.player.seriesTrackDirective
 import com.pfpt.localvideoplayer.player.shouldApplySeriesTracks
+import com.pfpt.localvideoplayer.player.shouldCommitSeriesTrackApply
 import com.pfpt.localvideoplayer.player.showsPauseIcon
 import com.pfpt.localvideoplayer.player.shouldBackfillDuration
 import com.pfpt.localvideoplayer.player.shouldPublishKnownDuration
@@ -355,7 +356,16 @@ internal fun PlayerSessionEffects(
         } else {
             withContext(Dispatchers.IO) { playbackSession.peekExternalSubtitle(video) }
         }
-        if (ui.currentIndex != request.index) return@LaunchedEffect
+        if (!shouldCommitSeriesTrackApply(
+                request = request,
+                indexNow = ui.currentIndex,
+                applied = ui.appliedSeriesTracks,
+                skippedNow = ui.skippedSeriesTracks,
+                tracksReady = exoPlayer.currentTracks.groups.isNotEmpty(),
+            )
+        ) {
+            return@LaunchedEffect
+        }
         exoPlayer.applySeriesTrackDirective(
             seriesTrackDirective(
                 audioLanguage = request.audioLanguage,

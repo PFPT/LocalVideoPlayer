@@ -160,4 +160,84 @@ class SeriesPlaybackLogicTest {
             ),
         )
     }
+
+    @Test
+    fun commitWhenTracksReadySameIndexSkippedNullAndNotApplied() {
+        val request = seriesTrackRequest()
+        assertTrue(
+            shouldCommitSeriesTrackApply(
+                request = request,
+                indexNow = request.index,
+                applied = null,
+                skippedNow = null,
+                tracksReady = true,
+            ),
+        )
+    }
+
+    @Test
+    fun doNotCommitWhenSameRequestAlreadyApplied() {
+        val request = seriesTrackRequest()
+        assertFalse(
+            shouldCommitSeriesTrackApply(
+                request = request,
+                indexNow = request.index,
+                applied = request,
+                skippedNow = null,
+                tracksReady = true,
+            ),
+        )
+    }
+
+    @Test
+    fun doNotCommitWhenSkippedNowIsADifferentRequest() {
+        val request = seriesTrackRequest()
+        val skipped = request.copy(text = SeriesTextMemory.Language("chi"))
+        assertFalse(
+            shouldCommitSeriesTrackApply(
+                request = request,
+                indexNow = request.index,
+                applied = null,
+                skippedNow = skipped,
+                tracksReady = true,
+            ),
+        )
+    }
+
+    @Test
+    fun doNotCommitWhenIndexNowDiffersFromRequest() {
+        val request = seriesTrackRequest()
+        assertFalse(
+            shouldCommitSeriesTrackApply(
+                request = request,
+                indexNow = request.index + 1,
+                applied = null,
+                skippedNow = null,
+                tracksReady = true,
+            ),
+        )
+    }
+
+    @Test
+    fun doNotCommitWhenSkippedNowEqualsRequest() {
+        val request = seriesTrackRequest()
+        assertFalse(
+            shouldCommitSeriesTrackApply(
+                request = request,
+                indexNow = request.index,
+                applied = null,
+                skippedNow = request,
+                tracksReady = true,
+            ),
+        )
+    }
+
+    private fun seriesTrackRequest(): SeriesTrackApplyRequest {
+        return SeriesTrackApplyRequest(
+            index = 0,
+            seriesKey = "name:show",
+            audioLanguage = "jpn",
+            text = null,
+        )
+    }
 }
