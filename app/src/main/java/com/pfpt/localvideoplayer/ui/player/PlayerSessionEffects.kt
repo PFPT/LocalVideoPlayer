@@ -264,6 +264,9 @@ internal fun PlayerSessionEffects(
         ui.softDecodeRetryPending = false
         ui.isPlaying = showsPauseIcon(exoPlayer.playWhenReady, exoPlayer.playbackState)
         exoPlayer.addListener(listener)
+        if (exoPlayer.currentTracks.groups.isNotEmpty()) {
+            ui.tracksReadyIndex = exoPlayer.currentMediaItemIndex
+        }
         exoPlayer.playerError?.let(::handlePlayerError)
         progress.syncFromPlayer(exoPlayer)
 
