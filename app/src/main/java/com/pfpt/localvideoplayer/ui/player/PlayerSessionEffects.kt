@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
+import androidx.media3.common.C
 import androidx.media3.common.ColorInfo
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -32,6 +33,8 @@ import com.pfpt.localvideoplayer.player.SeriesPlaybackSettings
 import com.pfpt.localvideoplayer.player.SeriesTrackApplyRequest
 import com.pfpt.localvideoplayer.player.abLoopTarget
 import com.pfpt.localvideoplayer.player.applySeriesTrackDirective
+import com.pfpt.localvideoplayer.player.applyTrackSelection
+import com.pfpt.localvideoplayer.player.heldTrackSelection
 import com.pfpt.localvideoplayer.player.clearedAppliedSeriesTracks
 import com.pfpt.localvideoplayer.player.clearedPendingSeriesText
 import com.pfpt.localvideoplayer.player.clearedSeriesTrackHold
@@ -335,6 +338,7 @@ internal fun PlayerSessionEffects(
     }
 
     val seriesLatchPlayer = remember { mutableStateOf<ExoPlayer?>(null) }
+    val seriesHoldRestored = remember { mutableStateOf(false) }
     LaunchedEffect(
         exoPlayer,
         ui.currentIndex,
@@ -345,8 +349,8 @@ internal fun PlayerSessionEffects(
     ) {
         if (seriesLatchPlayer.value !== exoPlayer) {
             ui.appliedSeriesTracks = null
-            ui.seriesTrackHold = null
             seriesLatchPlayer.value = exoPlayer
+            seriesHoldRestored.value = false
         }
         val pending = ui.pendingSeriesText
         if (
@@ -374,6 +378,20 @@ internal fun PlayerSessionEffects(
         ui.seriesTrackHold = clearedSeriesTrackHold(ui.seriesTrackHold, ui.currentIndex, seriesKey)
         ui.appliedSeriesTracks = clearedAppliedSeriesTracks(ui.appliedSeriesTracks, ui.currentIndex, seriesKey)
         ui.pendingSeriesText = clearedPendingSeriesText(ui.pendingSeriesText, ui.currentIndex, seriesKey)
+        val held = heldTrackSelection(ui.seriesTrackHold, ui.currentIndex, seriesKey)
+        if (
+            held != null &&
+            !seriesHoldRestored.value &&
+            seriesTracksReady(
+                exoPlayer.currentTracks.groups.isNotEmpty(),
+                ui.tracksReadyIndex,
+                ui.currentIndex,
+            )
+        ) {
+            seriesHoldRestored.value = true
+            held.audioOptionId?.let { exoPlayer.applyTrackSelection(C.TRACK_TYPE_AUDIO, it) }
+            held.textOptionId?.let { exoPlayer.applyTrackSelection(C.TRACK_TYPE_TEXT, it) }
+        }
         val holdAtStart = ui.seriesTrackHold
         if (!shouldCommitSeriesTrackApply(
                 request = request,

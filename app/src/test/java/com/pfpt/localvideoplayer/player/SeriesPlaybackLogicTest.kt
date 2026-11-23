@@ -526,6 +526,33 @@ class SeriesPlaybackLogicTest {
         )
     }
 
+    @Test
+    fun heldTrackSelectionNullWhenHoldMissingOrEpisodeDiffers() {
+        assertNull(heldTrackSelection(hold = null, indexNow = 0, seriesKey = "name:show"))
+        val hold = SeriesTrackHold(
+            index = 2,
+            seriesKey = "name:show",
+            audioOptionId = "0:1",
+            textOptionId = "off",
+        )
+        assertNull(heldTrackSelection(hold = hold, indexNow = 3, seriesKey = "name:show"))
+        assertNull(heldTrackSelection(hold = hold, indexNow = 2, seriesKey = "name:other"))
+    }
+
+    @Test
+    fun heldTrackSelectionKeepsOptionIdsForThisEpisode() {
+        val hold = SeriesTrackHold(
+            index = 2,
+            seriesKey = null,
+            audioOptionId = "1:0",
+            textOptionId = null,
+        )
+        assertEquals(
+            HeldTrackSelection(audioOptionId = "1:0", textOptionId = null),
+            heldTrackSelection(hold = hold, indexNow = 2, seriesKey = null),
+        )
+    }
+
     private fun seriesTrackRequest(): SeriesTrackApplyRequest {
         return SeriesTrackApplyRequest(
             index = 0,

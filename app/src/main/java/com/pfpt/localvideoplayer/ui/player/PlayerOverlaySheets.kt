@@ -273,7 +273,24 @@ internal fun PlayerOverlaySheets(
             onOptionSelected = { optionId ->
                 exoPlayer.applyTrackSelection(type, optionId)
                 if (type != C.TRACK_TYPE_AUDIO && type != C.TRACK_TYPE_TEXT) return@TrackSelectorSheet
-                ui.seriesTrackHold = SeriesTrackHold(ui.currentIndex, seriesKey)
+                val previousHold = ui.seriesTrackHold?.takeIf {
+                    it.index == ui.currentIndex && it.seriesKey == seriesKey
+                }
+                ui.seriesTrackHold = if (type == C.TRACK_TYPE_AUDIO) {
+                    SeriesTrackHold(
+                        index = ui.currentIndex,
+                        seriesKey = seriesKey,
+                        audioOptionId = optionId,
+                        textOptionId = previousHold?.textOptionId,
+                    )
+                } else {
+                    SeriesTrackHold(
+                        index = ui.currentIndex,
+                        seriesKey = seriesKey,
+                        audioOptionId = previousHold?.audioOptionId,
+                        textOptionId = optionId,
+                    )
+                }
                 val language = options.firstOrNull { it.id == optionId }?.language
                 val update = if (type == C.TRACK_TYPE_AUDIO) {
                     audioMemoryUpdate(optionId, language)

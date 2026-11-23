@@ -116,7 +116,24 @@ fun shouldApplySeriesTracks(
 data class SeriesTrackHold(
     val index: Int,
     val seriesKey: String?,
+    val audioOptionId: String? = null,
+    val textOptionId: String? = null,
 )
+
+data class HeldTrackSelection(
+    val audioOptionId: String?,
+    val textOptionId: String?,
+)
+
+fun heldTrackSelection(
+    hold: SeriesTrackHold?,
+    indexNow: Int,
+    seriesKey: String?,
+): HeldTrackSelection? {
+    if (hold == null) return null
+    if (hold.index != indexNow || hold.seriesKey != seriesKey) return null
+    return HeldTrackSelection(hold.audioOptionId, hold.textOptionId)
+}
 
 fun clearedSeriesTrackHold(
     hold: SeriesTrackHold?,
