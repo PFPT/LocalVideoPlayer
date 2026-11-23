@@ -18,7 +18,12 @@ import com.pfpt.localvideoplayer.player.SeriesPlaybackSettings
 import com.pfpt.localvideoplayer.model.VideoItem
 import com.pfpt.localvideoplayer.player.PlaybackSession
 import com.pfpt.localvideoplayer.player.PlayerProgressState
+import com.pfpt.localvideoplayer.player.SeriesTextMemory
+import com.pfpt.localvideoplayer.player.SeriesTrackApplyRequest
+import com.pfpt.localvideoplayer.player.TrackMemoryUpdate
 import com.pfpt.localvideoplayer.player.applyTrackSelection
+import com.pfpt.localvideoplayer.player.audioMemoryUpdate
+import com.pfpt.localvideoplayer.player.textMemoryUpdate
 import com.pfpt.localvideoplayer.player.trackOptions
 import com.pfpt.localvideoplayer.ui.PlayerUiState
 import com.pfpt.localvideoplayer.ui.components.AspectRatioSheet
@@ -248,14 +253,61 @@ internal fun PlayerOverlaySheets(
     }
 
     ui.showTrackSheet?.let { type ->
+        val options = exoPlayer.trackOptions(context, type)
         TrackSelectorSheet(
             title = when (type) {
                 C.TRACK_TYPE_AUDIO -> context.getString(R.string.audio_track)
                 C.TRACK_TYPE_VIDEO -> context.getString(R.string.video_track)
                 else -> context.getString(R.string.subtitles)
             },
-            options = exoPlayer.trackOptions(context, type),
-            onOptionSelected = { optionId -> exoPlayer.applyTrackSelection(type, optionId) },
+            options = options,
+            onOptionSelected = { optionId ->
+                exoPlayer.applyTrackSelection(type, optionId)
+                val key = seriesKey
+                if (key.isNullOrBlank()) return@TrackSelectorSheet
+                if (type != C.TRACK_TYPE_AUDIO && type != C.TRACK_TYPE_TEXT) return@TrackSelectorSheet
+                val language = options.firstOrNull { it.id == optionId }?.language
+                val update = if (type == C.TRACK_TYPE_AUDIO) {
+                    audioMemoryUpdate(optionId, language)
+                } else {
+                    textMemoryUpdate(optionId, language)
+                }
+                val nextAudio = when {
+                    type != C.TRACK_TYPE_AUDIO -> seriesPlayback.audioLanguage
+                    update is TrackMemoryUpdate.Clear -> null
+                    update is TrackMemoryUpdate.SaveLanguage -> update.code
+                    else -> seriesPlayback.audioLanguage
+                }
+                val nextText = when {
+                    type != C.TRACK_TYPE_TEXT -> seriesPlayback.text
+                    update is TrackMemoryUpdate.Clear -> null
+                    update is TrackMemoryUpdate.SaveOff -> SeriesTextMemory.Off
+                    update is TrackMemoryUpdate.SaveLanguage -> SeriesTextMemory.Language(update.code)
+                    else -> seriesPlayback.text
+                }
+                ui.skippedSeriesTracks = SeriesTrackApplyRequest(
+                    index = ui.currentIndex,
+                    seriesKey = key,
+                    audioLanguage = nextAudio,
+                    text = nextText,
+                )
+                scope.launch {
+                    when (update) {
+                        TrackMemoryUpdate.Clear -> if (type == C.TRACK_TYPE_AUDIO) {
+                            seriesPlaybackStore.clearAudioLanguage(key)
+                        } else {
+                            seriesPlaybackStore.clearText(key)
+                        }
+                        is TrackMemoryUpdate.SaveLanguage -> if (type == C.TRACK_TYPE_AUDIO) {
+                            seriesPlaybackStore.setAudioLanguage(key, update.code)
+                        } else {
+                            seriesPlaybackStore.setTextLanguage(key, update.code)
+                        }
+                        TrackMemoryUpdate.SaveOff -> seriesPlaybackStore.setTextOff(key)
+                        TrackMemoryUpdate.Leave -> Unit
+                    }
+                }
+            },
             onDismiss = { ui.showTrackSheet = null },
         )
     }

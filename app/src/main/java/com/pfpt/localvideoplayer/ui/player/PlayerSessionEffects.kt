@@ -14,6 +14,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import com.pfpt.localvideoplayer.MainActivity
@@ -27,10 +28,15 @@ import com.pfpt.localvideoplayer.player.PlayerViewModel
 import com.pfpt.localvideoplayer.player.PlayerProgressState
 import com.pfpt.localvideoplayer.player.DecoderRecovery
 import com.pfpt.localvideoplayer.player.SeriesPlaybackSettings
+import com.pfpt.localvideoplayer.player.SeriesTextMemory
+import com.pfpt.localvideoplayer.player.SeriesTrackApplyRequest
 import com.pfpt.localvideoplayer.player.abLoopTarget
+import com.pfpt.localvideoplayer.player.applySeriesTrackDirective
 import com.pfpt.localvideoplayer.player.decoderRecovery
 import com.pfpt.localvideoplayer.player.isSoftwareDecodeRetryable
 import com.pfpt.localvideoplayer.player.isSourceReadFailure
+import com.pfpt.localvideoplayer.player.seriesTrackDirective
+import com.pfpt.localvideoplayer.player.shouldApplySeriesTracks
 import com.pfpt.localvideoplayer.player.showsPauseIcon
 import com.pfpt.localvideoplayer.player.shouldBackfillDuration
 import com.pfpt.localvideoplayer.player.shouldPublishKnownDuration
@@ -245,6 +251,10 @@ internal fun PlayerSessionEffects(
             override fun onVideoSizeChanged(videoSize: VideoSize) {
                 updateVideoFormat()
             }
+
+            override fun onTracksChanged(tracks: Tracks) {
+                ui.tracksRevision += 1
+            }
         }
         ui.softDecodeRetryPending = false
         ui.isPlaying = showsPauseIcon(exoPlayer.playWhenReady, exoPlayer.playbackState)
@@ -315,10 +325,50 @@ internal fun PlayerSessionEffects(
         }
     }
 
+    LaunchedEffect(
+        ui.currentIndex,
+        seriesKey,
+        seriesPlayback.audioLanguage,
+        seriesPlayback.text,
+        ui.tracksRevision,
+    ) {
+        playbackSession.setSeriesTextOff(seriesPlayback.text is SeriesTextMemory.Off)
+        val request = SeriesTrackApplyRequest(
+            index = ui.currentIndex,
+            seriesKey = seriesKey,
+            audioLanguage = seriesPlayback.audioLanguage,
+            text = seriesPlayback.text,
+        )
+        val tracksReady = exoPlayer.currentTracks.groups.isNotEmpty()
+        if (!shouldApplySeriesTracks(
+                tracksReady = tracksReady,
+                request = request,
+                applied = ui.appliedSeriesTracks,
+                skipped = ui.skippedSeriesTracks,
+            )
+        ) {
+            return@LaunchedEffect
+        }
+        val video = playlist.getOrNull(ui.currentIndex)
+        val external = if (video == null) {
+            null
+        } else {
+            withContext(Dispatchers.IO) { playbackSession.peekExternalSubtitle(video) }
+        }
+        if (ui.currentIndex != request.index) return@LaunchedEffect
+        exoPlayer.applySeriesTrackDirective(
+            seriesTrackDirective(
+                audioLanguage = request.audioLanguage,
+                text = request.text,
+                hasExternalSubtitle = external != null,
+            ),
+        )
+        ui.appliedSeriesTracks = request
+    }
+
     LaunchedEffect(ui.playbackSpeed) {
         exoPlayer.playbackParameters = PlaybackParameters(ui.playbackSpeed, 1f)
     }
-
     LaunchedEffect(ui.repeatOne) {
         exoPlayer.repeatMode = if (ui.repeatOne) {
             Player.REPEAT_MODE_ONE

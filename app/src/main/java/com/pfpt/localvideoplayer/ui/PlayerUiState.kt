@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.pfpt.localvideoplayer.model.AspectRatioMode
+import com.pfpt.localvideoplayer.player.SeriesTrackApplyRequest
 import kotlinx.coroutines.Job
 
 enum class PlaybackFailure {
@@ -70,6 +71,9 @@ class PlayerUiState(
     var playbackFailure by mutableStateOf<PlaybackFailure?>(null)
     var abPointA by mutableStateOf<Long?>(null)
     var abPointB by mutableStateOf<Long?>(null)
+    var tracksRevision by mutableIntStateOf(0)
+    var appliedSeriesTracks by mutableStateOf<SeriesTrackApplyRequest?>(null)
+    var skippedSeriesTracks by mutableStateOf<SeriesTrackApplyRequest?>(null)
 
     fun resetSpeedBoost() {
         if (isSpeedBoosted) {
