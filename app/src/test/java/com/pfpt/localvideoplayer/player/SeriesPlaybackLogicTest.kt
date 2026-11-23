@@ -274,7 +274,45 @@ class SeriesPlaybackLogicTest {
         assertTrue(
             seriesTextOffForApply(
                 stored = SeriesTextMemory.Language("jpn"),
-                pending = PendingSeriesText(SeriesTextMemory.Off),
+                pending = PendingSeriesText(
+                    index = 2,
+                    seriesKey = "name:show",
+                    value = SeriesTextMemory.Off,
+                ),
+                indexNow = 2,
+                seriesKey = "name:show",
+            ),
+        )
+    }
+
+    @Test
+    fun seriesTextOffFalseWhenPendingOffIsPreviousIndex() {
+        assertFalse(
+            seriesTextOffForApply(
+                stored = null,
+                pending = PendingSeriesText(
+                    index = 1,
+                    seriesKey = "name:show",
+                    value = SeriesTextMemory.Off,
+                ),
+                indexNow = 2,
+                seriesKey = "name:show",
+            ),
+        )
+    }
+
+    @Test
+    fun seriesTextOffFalseWhenPendingAutoAndStoredOff() {
+        assertFalse(
+            seriesTextOffForApply(
+                stored = SeriesTextMemory.Off,
+                pending = PendingSeriesText(
+                    index = 2,
+                    seriesKey = "name:show",
+                    value = null,
+                ),
+                indexNow = 2,
+                seriesKey = "name:show",
             ),
         )
     }
@@ -285,16 +323,24 @@ class SeriesPlaybackLogicTest {
             seriesTextOffForApply(
                 stored = SeriesTextMemory.Off,
                 pending = null,
+                indexNow = 2,
+                seriesKey = "name:show",
             ),
         )
     }
 
     @Test
-    fun seriesTextOffFalseWhenPendingAutoAndStoredOff() {
+    fun seriesTextOffFalseWhenPendingOffKeylessOnDifferentEpisode() {
         assertFalse(
             seriesTextOffForApply(
-                stored = SeriesTextMemory.Off,
-                pending = PendingSeriesText(null),
+                stored = null,
+                pending = PendingSeriesText(
+                    index = 1,
+                    seriesKey = null,
+                    value = SeriesTextMemory.Off,
+                ),
+                indexNow = 2,
+                seriesKey = null,
             ),
         )
     }
@@ -305,7 +351,13 @@ class SeriesPlaybackLogicTest {
         assertFalse(
             seriesTextOffForApply(
                 stored = stored,
-                pending = PendingSeriesText(stored),
+                pending = PendingSeriesText(
+                    index = 2,
+                    seriesKey = "name:show",
+                    value = stored,
+                ),
+                indexNow = 2,
+                seriesKey = "name:show",
             ),
         )
     }

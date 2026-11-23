@@ -332,11 +332,22 @@ internal fun PlayerSessionEffects(
         seriesPlayback.text,
         ui.tracksRevision,
     ) {
-        if (ui.pendingSeriesText != null && ui.pendingSeriesText?.value == seriesPlayback.text) {
+        val pending = ui.pendingSeriesText
+        if (
+            pending != null &&
+            pending.index == ui.currentIndex &&
+            pending.seriesKey == seriesKey &&
+            pending.value == seriesPlayback.text
+        ) {
             ui.pendingSeriesText = null
         }
         playbackSession.setSeriesTextOff(
-            seriesTextOffForApply(seriesPlayback.text, ui.pendingSeriesText),
+            seriesTextOffForApply(
+                seriesPlayback.text,
+                ui.pendingSeriesText,
+                ui.currentIndex,
+                seriesKey,
+            ),
         )
         val request = SeriesTrackApplyRequest(
             index = ui.currentIndex,

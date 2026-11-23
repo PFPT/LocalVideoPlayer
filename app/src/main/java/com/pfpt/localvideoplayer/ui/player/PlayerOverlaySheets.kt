@@ -282,17 +282,32 @@ internal fun PlayerOverlaySheets(
                 }
                 if (type == C.TRACK_TYPE_TEXT) {
                     when (update) {
-                        TrackMemoryUpdate.Clear -> ui.pendingSeriesText = PendingSeriesText(null)
+                        TrackMemoryUpdate.Clear -> {
+                            ui.pendingSeriesText = PendingSeriesText(ui.currentIndex, seriesKey, null)
+                        }
                         TrackMemoryUpdate.SaveOff -> {
-                            ui.pendingSeriesText = PendingSeriesText(SeriesTextMemory.Off)
+                            ui.pendingSeriesText = PendingSeriesText(
+                                ui.currentIndex,
+                                seriesKey,
+                                SeriesTextMemory.Off,
+                            )
                         }
                         is TrackMemoryUpdate.SaveLanguage -> {
-                            ui.pendingSeriesText = PendingSeriesText(SeriesTextMemory.Language(update.code))
+                            ui.pendingSeriesText = PendingSeriesText(
+                                ui.currentIndex,
+                                seriesKey,
+                                SeriesTextMemory.Language(update.code),
+                            )
                         }
                         TrackMemoryUpdate.Leave -> Unit
                     }
                     playbackSession.setSeriesTextOff(
-                        seriesTextOffForApply(seriesPlayback.text, ui.pendingSeriesText),
+                        seriesTextOffForApply(
+                            seriesPlayback.text,
+                            ui.pendingSeriesText,
+                            ui.currentIndex,
+                            seriesKey,
+                        ),
                     )
                 }
                 val key = seriesKey

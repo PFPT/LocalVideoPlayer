@@ -119,6 +119,8 @@ data class SeriesTrackHold(
 )
 
 data class PendingSeriesText(
+    val index: Int,
+    val seriesKey: String?,
     val value: SeriesTextMemory?,
 )
 
@@ -143,7 +145,17 @@ fun shouldCommitSeriesTrackApply(
 fun seriesTextOffForApply(
     stored: SeriesTextMemory?,
     pending: PendingSeriesText?,
+    indexNow: Int,
+    seriesKey: String?,
 ): Boolean {
-    val text = if (pending != null) pending.value else stored
+    val text = if (
+        pending != null &&
+        pending.index == indexNow &&
+        pending.seriesKey == seriesKey
+    ) {
+        pending.value
+    } else {
+        stored
+    }
     return text is SeriesTextMemory.Off
 }
