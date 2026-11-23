@@ -92,7 +92,7 @@ internal fun PlayerSessionEffects(
     updateFullscreenSystemBars: () -> Unit,
     currentPipAspectRatio: () -> android.util.Rational,
     seriesKey: String?,
-    seriesPlayback: SeriesPlaybackSettings,
+    seriesPlayback: SeriesPlaybackSettings?,
 ) {
     val context = LocalContext.current
 
@@ -347,10 +347,10 @@ internal fun PlayerSessionEffects(
         exoPlayer,
         ui.currentIndex,
         seriesKey,
-        seriesPlayback.audioLanguage,
-        seriesPlayback.text,
+        seriesPlayback,
         ui.tracksRevision,
     ) {
+        val playback = seriesPlayback ?: return@LaunchedEffect
         if (seriesLatchPlayer.value !== exoPlayer) {
             ui.appliedSeriesTracks = null
             seriesLatchPlayer.value = exoPlayer
@@ -361,21 +361,21 @@ internal fun PlayerSessionEffects(
             pending != null &&
             pending.index == ui.currentIndex &&
             pending.seriesKey == seriesKey &&
-            pending.value == seriesPlayback.text
+            pending.value == playback.text
         ) {
             ui.pendingSeriesText = null
         }
         val request = SeriesTrackApplyRequest(
             index = ui.currentIndex,
             seriesKey = seriesKey,
-            audioLanguage = seriesPlayback.audioLanguage,
-            text = seriesPlayback.text,
+            audioLanguage = playback.audioLanguage,
+            text = playback.text,
         )
         ui.seriesTrackHold = clearedSeriesTrackHold(ui.seriesTrackHold, ui.currentIndex, seriesKey)
         ui.appliedSeriesTracks = clearedAppliedSeriesTracks(ui.appliedSeriesTracks, ui.currentIndex, seriesKey)
         ui.pendingSeriesText = clearedPendingSeriesText(ui.pendingSeriesText, ui.currentIndex, seriesKey)
         val textOff = seriesTextOffForApply(
-            seriesPlayback.text,
+            playback.text,
             ui.pendingSeriesText,
             ui.currentIndex,
             seriesKey,

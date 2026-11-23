@@ -21,8 +21,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -93,6 +95,7 @@ import com.pfpt.localvideoplayer.ui.components.rememberCastSheetActions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -616,9 +619,12 @@ private fun PlayerScreenContent(
     BackHandler { handleBack() }
 
     val seriesKey = playlist.getOrNull(ui.currentIndex)?.seriesKey
-    val seriesPlayback by seriesPlaybackStore.observe(seriesKey).collectAsStateWithLifecycle(
-        initialValue = SeriesPlaybackSettings(),
-    )
+    var loadedSeriesPlayback by remember { mutableStateOf<SeriesPlaybackSettings?>(null) }
+    LaunchedEffect(seriesPlaybackStore, seriesKey) {
+        loadedSeriesPlayback = null
+        seriesPlaybackStore.observe(seriesKey).collect { loadedSeriesPlayback = it }
+    }
+    val seriesPlayback = loadedSeriesPlayback ?: SeriesPlaybackSettings()
     val effectiveSpeed = effectivePlaybackSpeed(seriesPlayback.speed, preferences.defaultSpeed)
     LaunchedEffect(effectiveSpeed) {
         val next = speedAfterDefault(
@@ -657,7 +663,7 @@ private fun PlayerScreenContent(
         updateFullscreenSystemBars = { updateFullscreenSystemBars() },
         currentPipAspectRatio = { currentPipAspectRatio() },
         seriesKey = seriesKey,
-        seriesPlayback = seriesPlayback,
+        seriesPlayback = loadedSeriesPlayback,
     )
 
     val hasPrevious = ui.currentIndex > 0
