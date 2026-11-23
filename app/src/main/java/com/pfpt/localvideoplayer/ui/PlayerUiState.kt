@@ -74,6 +74,7 @@ class PlayerUiState(
     var abPointA by mutableStateOf<Long?>(null)
     var abPointB by mutableStateOf<Long?>(null)
     var tracksRevision by mutableIntStateOf(0)
+    var tracksReadyIndex by mutableIntStateOf(-1)
     var appliedSeriesTracks by mutableStateOf<SeriesTrackApplyRequest?>(null)
     var seriesTrackHold by mutableStateOf<SeriesTrackHold?>(null)
     var pendingSeriesText by mutableStateOf<PendingSeriesText?>(null)

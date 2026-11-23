@@ -493,6 +493,39 @@ class SeriesPlaybackLogicTest {
         )
     }
 
+    @Test
+    fun seriesTracksReadyFalseWhenGroupsEmptyAndIndexesMatch() {
+        assertFalse(
+            seriesTracksReady(
+                groupsNonEmpty = false,
+                tracksIndex = 2,
+                requestIndex = 2,
+            ),
+        )
+    }
+
+    @Test
+    fun seriesTracksReadyFalseWhenIndexesDiffer() {
+        assertFalse(
+            seriesTracksReady(
+                groupsNonEmpty = true,
+                tracksIndex = 1,
+                requestIndex = 2,
+            ),
+        )
+    }
+
+    @Test
+    fun seriesTracksReadyTrueWhenGroupsNonEmptyAndIndexesMatch() {
+        assertTrue(
+            seriesTracksReady(
+                groupsNonEmpty = true,
+                tracksIndex = 2,
+                requestIndex = 2,
+            ),
+        )
+    }
+
     private fun seriesTrackRequest(): SeriesTrackApplyRequest {
         return SeriesTrackApplyRequest(
             index = 0,

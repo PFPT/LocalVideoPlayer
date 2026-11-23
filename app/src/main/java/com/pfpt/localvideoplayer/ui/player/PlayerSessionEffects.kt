@@ -38,6 +38,7 @@ import com.pfpt.localvideoplayer.player.decoderRecovery
 import com.pfpt.localvideoplayer.player.isSoftwareDecodeRetryable
 import com.pfpt.localvideoplayer.player.isSourceReadFailure
 import com.pfpt.localvideoplayer.player.seriesTextOffForApply
+import com.pfpt.localvideoplayer.player.seriesTracksReady
 import com.pfpt.localvideoplayer.player.seriesTrackDirective
 import com.pfpt.localvideoplayer.player.shouldCommitSeriesTrackApply
 import com.pfpt.localvideoplayer.player.showsPauseIcon
@@ -256,6 +257,7 @@ internal fun PlayerSessionEffects(
             }
 
             override fun onTracksChanged(tracks: Tracks) {
+                ui.tracksReadyIndex = exoPlayer.currentMediaItemIndex
                 ui.tracksRevision += 1
             }
         }
@@ -368,7 +370,11 @@ internal fun PlayerSessionEffects(
                 holdAtStart = holdAtStart,
                 holdNow = ui.seriesTrackHold,
                 applied = ui.appliedSeriesTracks,
-                tracksReady = exoPlayer.currentTracks.groups.isNotEmpty(),
+                tracksReady = seriesTracksReady(
+                    exoPlayer.currentTracks.groups.isNotEmpty(),
+                    ui.tracksReadyIndex,
+                    ui.currentIndex,
+                ),
             )
         ) {
             return@LaunchedEffect
@@ -385,7 +391,11 @@ internal fun PlayerSessionEffects(
                 holdAtStart = holdAtStart,
                 holdNow = ui.seriesTrackHold,
                 applied = ui.appliedSeriesTracks,
-                tracksReady = exoPlayer.currentTracks.groups.isNotEmpty(),
+                tracksReady = seriesTracksReady(
+                    exoPlayer.currentTracks.groups.isNotEmpty(),
+                    ui.tracksReadyIndex,
+                    ui.currentIndex,
+                ),
             )
         ) {
             return@LaunchedEffect

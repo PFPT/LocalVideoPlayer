@@ -154,6 +154,14 @@ data class PendingSeriesText(
     val value: SeriesTextMemory?,
 )
 
+fun seriesTracksReady(
+    groupsNonEmpty: Boolean,
+    tracksIndex: Int,
+    requestIndex: Int,
+): Boolean {
+    return groupsNonEmpty && tracksIndex == requestIndex
+}
+
 fun shouldCommitSeriesTrackApply(
     request: SeriesTrackApplyRequest,
     indexNow: Int,
