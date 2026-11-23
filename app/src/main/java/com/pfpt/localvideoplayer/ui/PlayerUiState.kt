@@ -9,7 +9,9 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.pfpt.localvideoplayer.model.AspectRatioMode
+import com.pfpt.localvideoplayer.player.PendingSeriesText
 import com.pfpt.localvideoplayer.player.SeriesTrackApplyRequest
+import com.pfpt.localvideoplayer.player.SeriesTrackHold
 import kotlinx.coroutines.Job
 
 enum class PlaybackFailure {
@@ -73,7 +75,8 @@ class PlayerUiState(
     var abPointB by mutableStateOf<Long?>(null)
     var tracksRevision by mutableIntStateOf(0)
     var appliedSeriesTracks by mutableStateOf<SeriesTrackApplyRequest?>(null)
-    var skippedSeriesTracks by mutableStateOf<SeriesTrackApplyRequest?>(null)
+    var seriesTrackHold by mutableStateOf<SeriesTrackHold?>(null)
+    var pendingSeriesText by mutableStateOf<PendingSeriesText?>(null)
 
     fun resetSpeedBoost() {
         if (isSpeedBoosted) {

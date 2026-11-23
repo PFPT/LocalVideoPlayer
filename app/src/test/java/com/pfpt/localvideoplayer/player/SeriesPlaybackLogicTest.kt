@@ -162,16 +162,31 @@ class SeriesPlaybackLogicTest {
     }
 
     @Test
-    fun commitWhenTracksReadySameIndexSkippedNullAndNotApplied() {
+    fun commitWhenNoHoldNotAppliedTracksReadySameIndex() {
         val request = seriesTrackRequest()
         assertTrue(
             shouldCommitSeriesTrackApply(
                 request = request,
                 indexNow = request.index,
+                holdAtStart = null,
+                holdNow = null,
                 applied = null,
-                skippedAtStart = null,
-                skippedNow = null,
                 tracksReady = true,
+            ),
+        )
+    }
+
+    @Test
+    fun doNotCommitWhenTracksNotReady() {
+        val request = seriesTrackRequest()
+        assertFalse(
+            shouldCommitSeriesTrackApply(
+                request = request,
+                indexNow = request.index,
+                holdAtStart = null,
+                holdNow = null,
+                applied = null,
+                tracksReady = false,
             ),
         )
     }
@@ -183,25 +198,25 @@ class SeriesPlaybackLogicTest {
             shouldCommitSeriesTrackApply(
                 request = request,
                 indexNow = request.index,
+                holdAtStart = null,
+                holdNow = null,
                 applied = request,
-                skippedAtStart = null,
-                skippedNow = null,
                 tracksReady = true,
             ),
         )
     }
 
     @Test
-    fun doNotCommitWhenSkippedNowDiffersFromSkippedAtStart() {
-        val request = seriesTrackRequest().copy(index = 1)
-        val previous = seriesTrackRequest()
+    fun doNotCommitWhenHoldNowDiffersFromHoldAtStart() {
+        val request = seriesTrackRequest()
+        val holdAtStart = SeriesTrackHold(index = request.index, seriesKey = request.seriesKey)
         assertFalse(
             shouldCommitSeriesTrackApply(
                 request = request,
                 indexNow = request.index,
+                holdAtStart = holdAtStart,
+                holdNow = SeriesTrackHold(index = request.index + 1, seriesKey = request.seriesKey),
                 applied = null,
-                skippedAtStart = previous,
-                skippedNow = previous.copy(text = SeriesTextMemory.Off),
                 tracksReady = true,
             ),
         )
@@ -214,93 +229,83 @@ class SeriesPlaybackLogicTest {
             shouldCommitSeriesTrackApply(
                 request = request,
                 indexNow = request.index + 1,
+                holdAtStart = null,
+                holdNow = null,
                 applied = null,
-                skippedAtStart = null,
-                skippedNow = null,
                 tracksReady = true,
             ),
         )
     }
 
     @Test
-    fun doNotCommitWhenSkippedAtStartAndSkippedNowBothEqualRequest() {
+    fun doNotCommitWhenHoldMatchesRequestIndexAndSeries() {
         val request = seriesTrackRequest()
+        val hold = SeriesTrackHold(index = request.index, seriesKey = request.seriesKey)
         assertFalse(
             shouldCommitSeriesTrackApply(
                 request = request,
                 indexNow = request.index,
+                holdAtStart = hold,
+                holdNow = hold,
                 applied = null,
-                skippedAtStart = request,
-                skippedNow = request,
                 tracksReady = true,
             ),
         )
     }
 
     @Test
-    fun commitWhenNextEpisodeRequestKeepsPreviousEpisodeSkip() {
-        val previous = seriesTrackRequest()
-        val request = previous.copy(index = 1)
+    fun commitWhenHoldIsPreviousEpisodeAndRequestIsNext() {
+        val request = seriesTrackRequest().copy(index = 1)
+        val hold = SeriesTrackHold(index = 0, seriesKey = request.seriesKey)
         assertTrue(
             shouldCommitSeriesTrackApply(
                 request = request,
                 indexNow = 1,
+                holdAtStart = hold,
+                holdNow = hold,
                 applied = null,
-                skippedAtStart = previous,
-                skippedNow = previous,
                 tracksReady = true,
             ),
         )
     }
 
     @Test
-    fun seriesTextOffUsesPendingOffOnThisIndexAndSeries() {
-        val pending = seriesTrackRequest().copy(text = SeriesTextMemory.Off)
+    fun seriesTextOffWhenPendingOffAndStoredLanguage() {
         assertTrue(
             seriesTextOffForApply(
                 stored = SeriesTextMemory.Language("jpn"),
-                pending = pending,
-                indexNow = pending.index,
-                seriesKey = pending.seriesKey,
+                pending = PendingSeriesText(SeriesTextMemory.Off),
             ),
         )
     }
 
     @Test
-    fun seriesTextOffFollowsStoredWhenPendingIsPreviousEpisode() {
-        val pending = seriesTrackRequest().copy(text = SeriesTextMemory.Off)
-        assertFalse(
-            seriesTextOffForApply(
-                stored = SeriesTextMemory.Language("jpn"),
-                pending = pending,
-                indexNow = pending.index + 1,
-                seriesKey = pending.seriesKey,
-            ),
-        )
-    }
-
-    @Test
-    fun seriesTextOffFollowsStoredWhenPendingTextEqualsStored() {
-        val stored = SeriesTextMemory.Language("jpn")
-        val pending = seriesTrackRequest().copy(text = stored)
-        assertFalse(
-            seriesTextOffForApply(
-                stored = stored,
-                pending = pending,
-                indexNow = pending.index,
-                seriesKey = pending.seriesKey,
-            ),
-        )
-    }
-
-    @Test
-    fun seriesTextOffWhenStoredOffAndPendingNull() {
+    fun seriesTextOffWhenPendingNullAndStoredOff() {
         assertTrue(
             seriesTextOffForApply(
                 stored = SeriesTextMemory.Off,
                 pending = null,
-                indexNow = 0,
-                seriesKey = "name:show",
+            ),
+        )
+    }
+
+    @Test
+    fun seriesTextOffFalseWhenPendingAutoAndStoredOff() {
+        assertFalse(
+            seriesTextOffForApply(
+                stored = SeriesTextMemory.Off,
+                pending = PendingSeriesText(null),
+            ),
+        )
+    }
+
+    @Test
+    fun seriesTextOffFalseWhenPendingEqualsStoredLanguage() {
+        val stored = SeriesTextMemory.Language("jpn")
+        assertFalse(
+            seriesTextOffForApply(
+                stored = stored,
+                pending = PendingSeriesText(stored),
             ),
         )
     }

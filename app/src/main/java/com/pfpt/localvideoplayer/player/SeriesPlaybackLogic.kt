@@ -113,39 +113,37 @@ fun shouldApplySeriesTracks(
     return true
 }
 
+data class SeriesTrackHold(
+    val index: Int,
+    val seriesKey: String?,
+)
+
+data class PendingSeriesText(
+    val value: SeriesTextMemory?,
+)
+
 fun shouldCommitSeriesTrackApply(
     request: SeriesTrackApplyRequest,
     indexNow: Int,
+    holdAtStart: SeriesTrackHold?,
+    holdNow: SeriesTrackHold?,
     applied: SeriesTrackApplyRequest?,
-    skippedAtStart: SeriesTrackApplyRequest?,
-    skippedNow: SeriesTrackApplyRequest?,
     tracksReady: Boolean,
 ): Boolean {
+    if (!tracksReady) return false
     if (indexNow != request.index) return false
-    if (skippedNow != skippedAtStart) return false
-    return shouldApplySeriesTracks(
-        tracksReady = tracksReady,
-        request = request,
-        applied = applied,
-        skipped = skippedNow,
-    )
+    if (holdNow != holdAtStart) return false
+    if (holdNow != null && holdNow.index == request.index && holdNow.seriesKey == request.seriesKey) {
+        return false
+    }
+    if (request == applied) return false
+    return true
 }
 
 fun seriesTextOffForApply(
     stored: SeriesTextMemory?,
-    pending: SeriesTrackApplyRequest?,
-    indexNow: Int,
-    seriesKey: String?,
+    pending: PendingSeriesText?,
 ): Boolean {
-    val text = if (
-        pending != null &&
-        pending.index == indexNow &&
-        pending.seriesKey == seriesKey &&
-        pending.text != stored
-    ) {
-        pending.text
-    } else {
-        stored
-    }
+    val text = if (pending != null) pending.value else stored
     return text is SeriesTextMemory.Off
 }

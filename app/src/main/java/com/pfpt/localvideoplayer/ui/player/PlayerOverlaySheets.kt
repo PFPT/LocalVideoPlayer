@@ -18,13 +18,15 @@ import com.pfpt.localvideoplayer.data.SeriesSkipSettings
 import com.pfpt.localvideoplayer.data.SeriesSkipStore
 import com.pfpt.localvideoplayer.player.SeriesPlaybackSettings
 import com.pfpt.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.player.PendingSeriesText
 import com.pfpt.localvideoplayer.player.PlaybackSession
 import com.pfpt.localvideoplayer.player.PlayerProgressState
 import com.pfpt.localvideoplayer.player.SeriesTextMemory
-import com.pfpt.localvideoplayer.player.SeriesTrackApplyRequest
+import com.pfpt.localvideoplayer.player.SeriesTrackHold
 import com.pfpt.localvideoplayer.player.TrackMemoryUpdate
 import com.pfpt.localvideoplayer.player.applyTrackSelection
 import com.pfpt.localvideoplayer.player.audioMemoryUpdate
+import com.pfpt.localvideoplayer.player.seriesTextOffForApply
 import com.pfpt.localvideoplayer.player.textMemoryUpdate
 import com.pfpt.localvideoplayer.player.trackOptions
 import com.pfpt.localvideoplayer.ui.PlayerUiState
@@ -74,7 +76,8 @@ internal fun PlayerOverlaySheets(
 ) {
     val context = LocalContext.current
     val seriesTrackWriteMutex = remember { Mutex() }
-    val seriesTrackWriteTicket = remember { mutableIntStateOf(0) }
+    val audioWriteTicket = remember { mutableIntStateOf(0) }
+    val textWriteTicket = remember { mutableIntStateOf(0) }
     if (ui.showSpeedSheet) {
         SpeedSelectorSheet(
             currentSpeed = ui.playbackSpeed,
@@ -269,42 +272,38 @@ internal fun PlayerOverlaySheets(
             options = options,
             onOptionSelected = { optionId ->
                 exoPlayer.applyTrackSelection(type, optionId)
-                val key = seriesKey
-                if (key.isNullOrBlank()) return@TrackSelectorSheet
                 if (type != C.TRACK_TYPE_AUDIO && type != C.TRACK_TYPE_TEXT) return@TrackSelectorSheet
+                ui.seriesTrackHold = SeriesTrackHold(ui.currentIndex, seriesKey)
                 val language = options.firstOrNull { it.id == optionId }?.language
                 val update = if (type == C.TRACK_TYPE_AUDIO) {
                     audioMemoryUpdate(optionId, language)
                 } else {
                     textMemoryUpdate(optionId, language)
                 }
-                val nextAudio = when {
-                    type != C.TRACK_TYPE_AUDIO -> seriesPlayback.audioLanguage
-                    update is TrackMemoryUpdate.Clear -> null
-                    update is TrackMemoryUpdate.SaveLanguage -> update.code
-                    else -> seriesPlayback.audioLanguage
-                }
-                val nextText = when {
-                    type != C.TRACK_TYPE_TEXT -> seriesPlayback.text
-                    update is TrackMemoryUpdate.Clear -> null
-                    update is TrackMemoryUpdate.SaveOff -> SeriesTextMemory.Off
-                    update is TrackMemoryUpdate.SaveLanguage -> SeriesTextMemory.Language(update.code)
-                    else -> seriesPlayback.text
-                }
-                val ticket = seriesTrackWriteTicket.intValue + 1
-                seriesTrackWriteTicket.intValue = ticket
-                ui.skippedSeriesTracks = SeriesTrackApplyRequest(
-                    index = ui.currentIndex,
-                    seriesKey = key,
-                    audioLanguage = nextAudio,
-                    text = nextText,
-                )
                 if (type == C.TRACK_TYPE_TEXT) {
-                    playbackSession.setSeriesTextOff(nextText is SeriesTextMemory.Off)
+                    when (update) {
+                        TrackMemoryUpdate.Clear -> ui.pendingSeriesText = PendingSeriesText(null)
+                        TrackMemoryUpdate.SaveOff -> {
+                            ui.pendingSeriesText = PendingSeriesText(SeriesTextMemory.Off)
+                        }
+                        is TrackMemoryUpdate.SaveLanguage -> {
+                            ui.pendingSeriesText = PendingSeriesText(SeriesTextMemory.Language(update.code))
+                        }
+                        TrackMemoryUpdate.Leave -> Unit
+                    }
+                    playbackSession.setSeriesTextOff(
+                        seriesTextOffForApply(seriesPlayback.text, ui.pendingSeriesText),
+                    )
                 }
+                val key = seriesKey
+                if (key.isNullOrBlank()) return@TrackSelectorSheet
+                val ticketState = if (type == C.TRACK_TYPE_AUDIO) audioWriteTicket else textWriteTicket
+                val ticket = ticketState.intValue + 1
+                ticketState.intValue = ticket
+                if (update is TrackMemoryUpdate.Leave) return@TrackSelectorSheet
                 scope.launch {
                     seriesTrackWriteMutex.withLock {
-                        if (seriesTrackWriteTicket.intValue != ticket) return@withLock
+                        if (ticketState.intValue != ticket) return@withLock
                         when (update) {
                             TrackMemoryUpdate.Clear -> if (type == C.TRACK_TYPE_AUDIO) {
                                 seriesPlaybackStore.clearAudioLanguage(key)

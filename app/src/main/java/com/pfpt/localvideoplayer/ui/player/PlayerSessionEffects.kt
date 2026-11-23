@@ -36,7 +36,6 @@ import com.pfpt.localvideoplayer.player.isSoftwareDecodeRetryable
 import com.pfpt.localvideoplayer.player.isSourceReadFailure
 import com.pfpt.localvideoplayer.player.seriesTextOffForApply
 import com.pfpt.localvideoplayer.player.seriesTrackDirective
-import com.pfpt.localvideoplayer.player.shouldApplySeriesTracks
 import com.pfpt.localvideoplayer.player.shouldCommitSeriesTrackApply
 import com.pfpt.localvideoplayer.player.showsPauseIcon
 import com.pfpt.localvideoplayer.player.shouldBackfillDuration
@@ -333,13 +332,11 @@ internal fun PlayerSessionEffects(
         seriesPlayback.text,
         ui.tracksRevision,
     ) {
+        if (ui.pendingSeriesText != null && ui.pendingSeriesText?.value == seriesPlayback.text) {
+            ui.pendingSeriesText = null
+        }
         playbackSession.setSeriesTextOff(
-            seriesTextOffForApply(
-                seriesPlayback.text,
-                ui.skippedSeriesTracks,
-                ui.currentIndex,
-                seriesKey,
-            ),
+            seriesTextOffForApply(seriesPlayback.text, ui.pendingSeriesText),
         )
         val request = SeriesTrackApplyRequest(
             index = ui.currentIndex,
@@ -347,17 +344,18 @@ internal fun PlayerSessionEffects(
             audioLanguage = seriesPlayback.audioLanguage,
             text = seriesPlayback.text,
         )
-        val tracksReady = exoPlayer.currentTracks.groups.isNotEmpty()
-        if (!shouldApplySeriesTracks(
-                tracksReady = tracksReady,
+        val holdAtStart = ui.seriesTrackHold
+        if (!shouldCommitSeriesTrackApply(
                 request = request,
+                indexNow = ui.currentIndex,
+                holdAtStart = holdAtStart,
+                holdNow = ui.seriesTrackHold,
                 applied = ui.appliedSeriesTracks,
-                skipped = ui.skippedSeriesTracks,
+                tracksReady = exoPlayer.currentTracks.groups.isNotEmpty(),
             )
         ) {
             return@LaunchedEffect
         }
-        val skippedAtStart = ui.skippedSeriesTracks
         val video = playlist.getOrNull(ui.currentIndex)
         val external = if (video == null) {
             null
@@ -367,9 +365,9 @@ internal fun PlayerSessionEffects(
         if (!shouldCommitSeriesTrackApply(
                 request = request,
                 indexNow = ui.currentIndex,
+                holdAtStart = holdAtStart,
+                holdNow = ui.seriesTrackHold,
                 applied = ui.appliedSeriesTracks,
-                skippedAtStart = skippedAtStart,
-                skippedNow = ui.skippedSeriesTracks,
                 tracksReady = exoPlayer.currentTracks.groups.isNotEmpty(),
             )
         ) {
