@@ -563,6 +563,114 @@ class SeriesPlaybackLogicTest {
     }
 
     @Test
+    fun trackChoiceMarksAutoOnlyWhenNothingElseIsChosen() {
+        assertTrue(
+            trackChoiceSelected(
+                choice = "auto",
+                trackSelected = false,
+                hasOverride = false,
+                trackDisabled = false,
+                preferredLanguage = null,
+                trackLanguage = null,
+            ),
+        )
+        assertFalse(
+            trackChoiceSelected(
+                choice = "auto",
+                trackSelected = false,
+                hasOverride = false,
+                trackDisabled = false,
+                preferredLanguage = "jpn",
+                trackLanguage = null,
+            ),
+        )
+        assertFalse(
+            trackChoiceSelected(
+                choice = "auto",
+                trackSelected = false,
+                hasOverride = false,
+                trackDisabled = true,
+                preferredLanguage = null,
+                trackLanguage = null,
+            ),
+        )
+        assertFalse(
+            trackChoiceSelected(
+                choice = "auto",
+                trackSelected = false,
+                hasOverride = true,
+                trackDisabled = false,
+                preferredLanguage = null,
+                trackLanguage = null,
+            ),
+        )
+    }
+
+    @Test
+    fun trackChoiceMarksOffOnlyWhenDisabledAndLanguageFromPreferenceOrOverride() {
+        assertTrue(
+            trackChoiceSelected(
+                choice = "off",
+                trackSelected = false,
+                hasOverride = false,
+                trackDisabled = true,
+                preferredLanguage = null,
+                trackLanguage = null,
+            ),
+        )
+        assertFalse(
+            trackChoiceSelected(
+                choice = "off",
+                trackSelected = false,
+                hasOverride = false,
+                trackDisabled = false,
+                preferredLanguage = null,
+                trackLanguage = null,
+            ),
+        )
+        assertTrue(
+            trackChoiceSelected(
+                choice = "0:1",
+                trackSelected = true,
+                hasOverride = false,
+                trackDisabled = false,
+                preferredLanguage = "jpn",
+                trackLanguage = " jpn ",
+            ),
+        )
+        assertTrue(
+            trackChoiceSelected(
+                choice = "0:1",
+                trackSelected = true,
+                hasOverride = true,
+                trackDisabled = false,
+                preferredLanguage = null,
+                trackLanguage = "und",
+            ),
+        )
+        assertFalse(
+            trackChoiceSelected(
+                choice = "0:1",
+                trackSelected = true,
+                hasOverride = false,
+                trackDisabled = false,
+                preferredLanguage = "eng",
+                trackLanguage = "jpn",
+            ),
+        )
+        assertFalse(
+            trackChoiceSelected(
+                choice = "0:1",
+                trackSelected = false,
+                hasOverride = true,
+                trackDisabled = false,
+                preferredLanguage = "jpn",
+                trackLanguage = "jpn",
+            ),
+        )
+    }
+
+    @Test
     fun heldTrackSelectionNullWhenHoldMissingOrEpisodeDiffers() {
         assertNull(heldTrackSelection(hold = null, indexNow = 0, seriesKey = "name:show"))
         val hold = SeriesTrackHold(

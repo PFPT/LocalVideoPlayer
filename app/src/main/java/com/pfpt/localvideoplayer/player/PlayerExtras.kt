@@ -109,16 +109,49 @@ fun VideoItem.toMediaItemWithSubtitle(context: Context, subtitleUri: Uri): Media
         .build()
 }
 
+fun trackChoiceSelected(
+    choice: String,
+    trackSelected: Boolean,
+    hasOverride: Boolean,
+    trackDisabled: Boolean,
+    preferredLanguage: String?,
+    trackLanguage: String?,
+): Boolean {
+    return when (choice) {
+        "auto" -> preferredLanguage == null && !trackDisabled && !hasOverride
+        "off" -> trackDisabled
+        else -> trackSelected && (
+            hasOverride || sameTrackLanguage(preferredLanguage, trackLanguage)
+        )
+    }
+}
+
+fun sameTrackLanguage(preferredLanguage: String?, trackLanguage: String?): Boolean {
+    val preferred = preferredLanguage?.trim()?.takeIf { it.isNotEmpty() } ?: return false
+    val track = usableTrackLanguage(trackLanguage) ?: return false
+    return track.equals(preferred, ignoreCase = true)
+}
+
 fun ExoPlayer.trackOptions(
     context: Context,
     type: @C.TrackType Int,
 ): List<TrackOption> {
     val tracks = currentTracks
+    val disabled = trackSelectionParameters.disabledTrackTypes.contains(type)
+    val override = hasExplicitOverride(type)
+    val preferred = preferredTrackLanguage(type)
     val options = mutableListOf(
         TrackOption(
             id = "auto",
             label = context.getString(R.string.track_auto),
-            selected = !hasExplicitOverride(type),
+            selected = trackChoiceSelected(
+                choice = "auto",
+                trackSelected = false,
+                hasOverride = override,
+                trackDisabled = disabled,
+                preferredLanguage = preferred,
+                trackLanguage = null,
+            ),
         ),
     )
     if (type == C.TRACK_TYPE_TEXT) {
@@ -126,7 +159,14 @@ fun ExoPlayer.trackOptions(
             TrackOption(
                 id = "off",
                 label = context.getString(R.string.track_off),
-                selected = trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT),
+                selected = trackChoiceSelected(
+                    choice = "off",
+                    trackSelected = false,
+                    hasOverride = override,
+                    trackDisabled = disabled,
+                    preferredLanguage = preferred,
+                    trackLanguage = null,
+                ),
             ),
         )
     }
@@ -138,18 +178,52 @@ fun ExoPlayer.trackOptions(
             val label = format.label
                 ?: format.language
                 ?: "${groupIndex + 1}-${i + 1}"
-            val selected = group.isTrackSelected(i)
             options.add(
                 TrackOption(
                     id = "$groupIndex:$i",
                     label = label,
-                    selected = selected && hasExplicitOverride(type),
+                    selected = trackChoiceSelected(
+                        choice = "$groupIndex:$i",
+                        trackSelected = group.isTrackSelected(i),
+                        hasOverride = override,
+                        trackDisabled = disabled,
+                        preferredLanguage = preferred,
+                        trackLanguage = format.language,
+                    ),
                     language = format.language,
                 ),
             )
         }
     }
     return options
+}
+
+private fun ExoPlayer.preferredTrackLanguage(type: @C.TrackType Int): String? {
+    val languages = when (type) {
+        C.TRACK_TYPE_AUDIO -> trackSelectionParameters.preferredAudioLanguages
+        C.TRACK_TYPE_TEXT -> trackSelectionParameters.preferredTextLanguages
+        else -> return null
+    }
+    return languages.firstOrNull()
+}
+
+fun ExoPlayer.heldOptionApplied(type: @C.TrackType Int, optionId: String): Boolean {
+    if (optionId == "auto") {
+        return preferredTrackLanguage(type) == null &&
+            !trackSelectionParameters.disabledTrackTypes.contains(type) &&
+            !hasExplicitOverride(type)
+    }
+    if (optionId == "off") {
+        return trackSelectionParameters.disabledTrackTypes.contains(type)
+    }
+    val parts = optionId.split(":")
+    if (parts.size != 2) return false
+    val groupIndex = parts[0].toIntOrNull() ?: return false
+    val trackIndex = parts[1].toIntOrNull() ?: return false
+    val group = currentTracks.groups.getOrNull(groupIndex) ?: return false
+    if (group.type != type) return false
+    val override = trackSelectionParameters.overrides[group.mediaTrackGroup] ?: return false
+    return trackIndex in override.trackIndices
 }
 
 private fun ExoPlayer.hasExplicitOverride(type: @C.TrackType Int): Boolean {

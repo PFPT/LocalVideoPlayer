@@ -30,10 +30,12 @@ import com.pfpt.localvideoplayer.player.PlayerViewModel
 import com.pfpt.localvideoplayer.player.PlayerProgressState
 import com.pfpt.localvideoplayer.player.DecoderRecovery
 import com.pfpt.localvideoplayer.player.SeriesPlaybackSettings
+import com.pfpt.localvideoplayer.player.SeriesTrackHold
 import com.pfpt.localvideoplayer.player.SeriesTrackApplyRequest
 import com.pfpt.localvideoplayer.player.abLoopTarget
 import com.pfpt.localvideoplayer.player.applySeriesTrackDirective
 import com.pfpt.localvideoplayer.player.applyTrackSelection
+import com.pfpt.localvideoplayer.player.heldOptionApplied
 import com.pfpt.localvideoplayer.player.heldTrackSelection
 import com.pfpt.localvideoplayer.player.clearedAppliedSeriesTracks
 import com.pfpt.localvideoplayer.player.clearedPendingSeriesText
@@ -339,6 +341,7 @@ internal fun PlayerSessionEffects(
 
     val seriesLatchPlayer = remember { mutableStateOf<ExoPlayer?>(null) }
     val seriesPlayerReplaced = remember { mutableStateOf(false) }
+    val seriesHeldRestorePending = remember { mutableStateOf(false) }
     LaunchedEffect(
         exoPlayer,
         ui.currentIndex,
@@ -378,6 +381,17 @@ internal fun PlayerSessionEffects(
         ui.seriesTrackHold = clearedSeriesTrackHold(ui.seriesTrackHold, ui.currentIndex, seriesKey)
         ui.appliedSeriesTracks = clearedAppliedSeriesTracks(ui.appliedSeriesTracks, ui.currentIndex, seriesKey)
         ui.pendingSeriesText = clearedPendingSeriesText(ui.pendingSeriesText, ui.currentIndex, seriesKey)
+        if (
+            seriesHeldRestorePending.value &&
+            seriesTracksReady(
+                exoPlayer.currentTracks.groups.isNotEmpty(),
+                ui.tracksReadyIndex,
+                ui.currentIndex,
+            ) &&
+            restoreHeldTrackSelection(exoPlayer, ui.seriesTrackHold, ui.currentIndex, seriesKey)
+        ) {
+            seriesHeldRestorePending.value = false
+        }
         val holdAtStart = ui.seriesTrackHold
         if (!shouldCommitSeriesTrackApply(
                 request = request,
@@ -443,11 +457,15 @@ internal fun PlayerSessionEffects(
                 hasExternalSubtitle = external != null,
             ),
         )
-        val held = heldTrackSelection(ui.seriesTrackHold, ui.currentIndex, seriesKey)
-        held?.audioOptionId?.let { exoPlayer.applyTrackSelection(C.TRACK_TYPE_AUDIO, it) }
-        held?.textOptionId?.let { exoPlayer.applyTrackSelection(C.TRACK_TYPE_TEXT, it) }
+        val heldRestored = restoreHeldTrackSelection(
+            exoPlayer,
+            ui.seriesTrackHold,
+            ui.currentIndex,
+            seriesKey,
+        )
         ui.appliedSeriesTracks = request
         seriesPlayerReplaced.value = false
+        seriesHeldRestorePending.value = !heldRestored
     }
 
     LaunchedEffect(ui.playbackSpeed) {
@@ -487,4 +505,22 @@ internal fun PlayerSessionEffects(
         }
         onDurationKnown(video.uri.toString(), displayDurationMs)
     }
+}
+
+private fun restoreHeldTrackSelection(
+    exoPlayer: ExoPlayer,
+    hold: SeriesTrackHold?,
+    index: Int,
+    seriesKey: String?,
+): Boolean {
+    val held = heldTrackSelection(hold, index, seriesKey) ?: return true
+    val audioOk = held.audioOptionId?.let { optionId ->
+        exoPlayer.applyTrackSelection(C.TRACK_TYPE_AUDIO, optionId)
+        exoPlayer.heldOptionApplied(C.TRACK_TYPE_AUDIO, optionId)
+    } ?: true
+    val textOk = held.textOptionId?.let { optionId ->
+        exoPlayer.applyTrackSelection(C.TRACK_TYPE_TEXT, optionId)
+        exoPlayer.heldOptionApplied(C.TRACK_TYPE_TEXT, optionId)
+    } ?: true
+    return audioOk && textOk
 }
