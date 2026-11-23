@@ -389,6 +389,110 @@ class SeriesPlaybackLogicTest {
         assertNull(clearedSeriesTrackHold(hold = hold, indexNow = 2, seriesKey = "name:other"))
     }
 
+    @Test
+    fun clearedAppliedSeriesTracksStaysNull() {
+        assertNull(
+            clearedAppliedSeriesTracks(applied = null, indexNow = 0, seriesKey = "name:show"),
+        )
+    }
+
+    @Test
+    fun clearedAppliedSeriesTracksKeepsMatchingRequest() {
+        val applied = SeriesTrackApplyRequest(
+            index = 2,
+            seriesKey = "name:show",
+            audioLanguage = "jpn",
+            text = SeriesTextMemory.Language("jpn"),
+        )
+        assertSame(
+            applied,
+            clearedAppliedSeriesTracks(applied = applied, indexNow = 2, seriesKey = "name:show"),
+        )
+    }
+
+    @Test
+    fun clearedAppliedSeriesTracksClearsWhenIndexDiffers() {
+        val applied = SeriesTrackApplyRequest(
+            index = 2,
+            seriesKey = "name:show",
+            audioLanguage = "jpn",
+            text = null,
+        )
+        assertNull(
+            clearedAppliedSeriesTracks(applied = applied, indexNow = 3, seriesKey = "name:show"),
+        )
+    }
+
+    @Test
+    fun clearedAppliedSeriesTracksClearsWhenSeriesKeyDiffers() {
+        val applied = SeriesTrackApplyRequest(
+            index = 2,
+            seriesKey = "name:show",
+            audioLanguage = "jpn",
+            text = null,
+        )
+        assertNull(
+            clearedAppliedSeriesTracks(applied = applied, indexNow = 2, seriesKey = "name:other"),
+        )
+    }
+
+    @Test
+    fun clearedPendingSeriesTextStaysNull() {
+        assertNull(
+            clearedPendingSeriesText(pending = null, indexNow = 0, seriesKey = "name:show"),
+        )
+    }
+
+    @Test
+    fun clearedPendingSeriesTextKeepsMatchingPending() {
+        val pending = PendingSeriesText(
+            index = 2,
+            seriesKey = "name:show",
+            value = SeriesTextMemory.Off,
+        )
+        assertSame(
+            pending,
+            clearedPendingSeriesText(pending = pending, indexNow = 2, seriesKey = "name:show"),
+        )
+    }
+
+    @Test
+    fun clearedPendingSeriesTextClearsWhenIndexDiffers() {
+        val pending = PendingSeriesText(
+            index = 2,
+            seriesKey = "name:show",
+            value = SeriesTextMemory.Off,
+        )
+        assertNull(
+            clearedPendingSeriesText(pending = pending, indexNow = 3, seriesKey = "name:show"),
+        )
+    }
+
+    @Test
+    fun clearedPendingSeriesTextClearsWhenSeriesKeyDiffers() {
+        val pending = PendingSeriesText(
+            index = 2,
+            seriesKey = "name:show",
+            value = SeriesTextMemory.Off,
+        )
+        assertNull(
+            clearedPendingSeriesText(pending = pending, indexNow = 2, seriesKey = "name:other"),
+        )
+    }
+
+    @Test
+    fun clearedPendingSeriesTextKeepsKeylessPendingOnSameIndex() {
+        val pending = PendingSeriesText(
+            index = 2,
+            seriesKey = null,
+            value = SeriesTextMemory.Off,
+        )
+        assertSame(
+            pending,
+            clearedPendingSeriesText(pending = pending, indexNow = 2, seriesKey = null),
+        )
+    }
+
     private fun seriesTrackRequest(): SeriesTrackApplyRequest {
         return SeriesTrackApplyRequest(
             index = 0,

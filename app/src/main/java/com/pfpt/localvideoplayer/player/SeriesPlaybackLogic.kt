@@ -128,6 +128,26 @@ fun clearedSeriesTrackHold(
     return null
 }
 
+fun clearedAppliedSeriesTracks(
+    applied: SeriesTrackApplyRequest?,
+    indexNow: Int,
+    seriesKey: String?,
+): SeriesTrackApplyRequest? {
+    if (applied == null) return null
+    if (applied.index == indexNow && applied.seriesKey == seriesKey) return applied
+    return null
+}
+
+fun clearedPendingSeriesText(
+    pending: PendingSeriesText?,
+    indexNow: Int,
+    seriesKey: String?,
+): PendingSeriesText? {
+    if (pending == null) return null
+    if (pending.index == indexNow && pending.seriesKey == seriesKey) return pending
+    return null
+}
+
 data class PendingSeriesText(
     val index: Int,
     val seriesKey: String?,
