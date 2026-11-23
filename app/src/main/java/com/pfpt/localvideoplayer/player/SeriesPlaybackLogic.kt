@@ -76,6 +76,10 @@ data class SeriesTrackDirective(
     val text: SeriesTextDirective,
 )
 
+fun showExternalSubtitle(resolved: String?, textOff: Boolean): Boolean {
+    return resolved != null && !textOff
+}
+
 fun seriesTrackDirective(
     audioLanguage: String?,
     text: SeriesTextMemory?,

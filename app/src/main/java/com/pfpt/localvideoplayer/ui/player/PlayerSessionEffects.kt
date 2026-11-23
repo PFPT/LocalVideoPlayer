@@ -44,6 +44,7 @@ import com.pfpt.localvideoplayer.player.decoderRecovery
 import com.pfpt.localvideoplayer.player.isSoftwareDecodeRetryable
 import com.pfpt.localvideoplayer.player.isSourceReadFailure
 import com.pfpt.localvideoplayer.player.seriesTextOffForApply
+import com.pfpt.localvideoplayer.player.showExternalSubtitle
 import com.pfpt.localvideoplayer.player.seriesTracksReady
 import com.pfpt.localvideoplayer.player.seriesTrackDirective
 import com.pfpt.localvideoplayer.player.shouldCommitSeriesTrackApply
@@ -364,14 +365,6 @@ internal fun PlayerSessionEffects(
         ) {
             ui.pendingSeriesText = null
         }
-        playbackSession.setSeriesTextOff(
-            seriesTextOffForApply(
-                seriesPlayback.text,
-                ui.pendingSeriesText,
-                ui.currentIndex,
-                seriesKey,
-            ),
-        )
         val request = SeriesTrackApplyRequest(
             index = ui.currentIndex,
             seriesKey = seriesKey,
@@ -381,6 +374,13 @@ internal fun PlayerSessionEffects(
         ui.seriesTrackHold = clearedSeriesTrackHold(ui.seriesTrackHold, ui.currentIndex, seriesKey)
         ui.appliedSeriesTracks = clearedAppliedSeriesTracks(ui.appliedSeriesTracks, ui.currentIndex, seriesKey)
         ui.pendingSeriesText = clearedPendingSeriesText(ui.pendingSeriesText, ui.currentIndex, seriesKey)
+        val textOff = seriesTextOffForApply(
+            seriesPlayback.text,
+            ui.pendingSeriesText,
+            ui.currentIndex,
+            seriesKey,
+        )
+        playbackSession.setSeriesTextOff(textOff)
         if (
             seriesHeldRestorePending.value &&
             seriesTracksReady(
@@ -393,7 +393,8 @@ internal fun PlayerSessionEffects(
             seriesHeldRestorePending.value = false
         }
         val holdAtStart = ui.seriesTrackHold
-        if (!shouldCommitSeriesTrackApply(
+        fun commitNow(): Boolean {
+            return shouldCommitSeriesTrackApply(
                 request = request,
                 indexNow = ui.currentIndex,
                 holdAtStart = holdAtStart,
@@ -406,7 +407,8 @@ internal fun PlayerSessionEffects(
                 ),
                 allowHeldApply = seriesPlayerReplaced.value,
             )
-        ) {
+        }
+        if (!commitNow()) {
             return@LaunchedEffect
         }
         val video = playlist.getOrNull(ui.currentIndex)
@@ -415,46 +417,20 @@ internal fun PlayerSessionEffects(
         } else {
             withContext(Dispatchers.IO) { playbackSession.peekExternalSubtitle(video) }
         }
-        if (!shouldCommitSeriesTrackApply(
-                request = request,
-                indexNow = ui.currentIndex,
-                holdAtStart = holdAtStart,
-                holdNow = ui.seriesTrackHold,
-                applied = ui.appliedSeriesTracks,
-                tracksReady = seriesTracksReady(
-                    exoPlayer.currentTracks.groups.isNotEmpty(),
-                    ui.tracksReadyIndex,
-                    ui.currentIndex,
-                ),
-                allowHeldApply = seriesPlayerReplaced.value,
-            )
-        ) {
+        if (!commitNow()) {
             return@LaunchedEffect
         }
         if (video != null) {
             playbackSession.attachSubtitle(ui.currentIndex)
         }
-        if (!shouldCommitSeriesTrackApply(
-                request = request,
-                indexNow = ui.currentIndex,
-                holdAtStart = holdAtStart,
-                holdNow = ui.seriesTrackHold,
-                applied = ui.appliedSeriesTracks,
-                tracksReady = seriesTracksReady(
-                    exoPlayer.currentTracks.groups.isNotEmpty(),
-                    ui.tracksReadyIndex,
-                    ui.currentIndex,
-                ),
-                allowHeldApply = seriesPlayerReplaced.value,
-            )
-        ) {
+        if (!commitNow()) {
             return@LaunchedEffect
         }
         exoPlayer.applySeriesTrackDirective(
             seriesTrackDirective(
                 audioLanguage = request.audioLanguage,
                 text = request.text,
-                hasExternalSubtitle = external != null,
+                hasExternalSubtitle = showExternalSubtitle(external, textOff),
             ),
         )
         val heldRestored = restoreHeldTrackSelection(

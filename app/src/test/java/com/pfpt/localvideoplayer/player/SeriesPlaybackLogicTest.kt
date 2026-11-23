@@ -91,6 +91,22 @@ class SeriesPlaybackLogicTest {
     }
 
     @Test
+    fun offWithManualFileKeepsTheSubtitleTrackDisabled() {
+        val show = showExternalSubtitle(resolved = "manual.srt", textOff = true)
+        assertFalse(show)
+        assertEquals(
+            SeriesTextDirective.Off,
+            seriesTrackDirective(
+                audioLanguage = null,
+                text = SeriesTextMemory.Off,
+                hasExternalSubtitle = show,
+            ).text,
+        )
+        assertTrue(showExternalSubtitle(resolved = "manual.srt", textOff = false))
+        assertFalse(showExternalSubtitle(resolved = null, textOff = false))
+    }
+
+    @Test
     fun offWithoutExternalDisablesText() {
         val directive = seriesTrackDirective(
             audioLanguage = null,
