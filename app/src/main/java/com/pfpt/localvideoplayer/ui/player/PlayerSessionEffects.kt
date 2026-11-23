@@ -28,13 +28,13 @@ import com.pfpt.localvideoplayer.player.PlayerViewModel
 import com.pfpt.localvideoplayer.player.PlayerProgressState
 import com.pfpt.localvideoplayer.player.DecoderRecovery
 import com.pfpt.localvideoplayer.player.SeriesPlaybackSettings
-import com.pfpt.localvideoplayer.player.SeriesTextMemory
 import com.pfpt.localvideoplayer.player.SeriesTrackApplyRequest
 import com.pfpt.localvideoplayer.player.abLoopTarget
 import com.pfpt.localvideoplayer.player.applySeriesTrackDirective
 import com.pfpt.localvideoplayer.player.decoderRecovery
 import com.pfpt.localvideoplayer.player.isSoftwareDecodeRetryable
 import com.pfpt.localvideoplayer.player.isSourceReadFailure
+import com.pfpt.localvideoplayer.player.seriesTextOffForApply
 import com.pfpt.localvideoplayer.player.seriesTrackDirective
 import com.pfpt.localvideoplayer.player.shouldApplySeriesTracks
 import com.pfpt.localvideoplayer.player.shouldCommitSeriesTrackApply
@@ -333,7 +333,14 @@ internal fun PlayerSessionEffects(
         seriesPlayback.text,
         ui.tracksRevision,
     ) {
-        playbackSession.setSeriesTextOff(seriesPlayback.text is SeriesTextMemory.Off)
+        playbackSession.setSeriesTextOff(
+            seriesTextOffForApply(
+                seriesPlayback.text,
+                ui.skippedSeriesTracks,
+                ui.currentIndex,
+                seriesKey,
+            ),
+        )
         val request = SeriesTrackApplyRequest(
             index = ui.currentIndex,
             seriesKey = seriesKey,
@@ -350,6 +357,7 @@ internal fun PlayerSessionEffects(
         ) {
             return@LaunchedEffect
         }
+        val skippedAtStart = ui.skippedSeriesTracks
         val video = playlist.getOrNull(ui.currentIndex)
         val external = if (video == null) {
             null
@@ -360,6 +368,7 @@ internal fun PlayerSessionEffects(
                 request = request,
                 indexNow = ui.currentIndex,
                 applied = ui.appliedSeriesTracks,
+                skippedAtStart = skippedAtStart,
                 skippedNow = ui.skippedSeriesTracks,
                 tracksReady = exoPlayer.currentTracks.groups.isNotEmpty(),
             )

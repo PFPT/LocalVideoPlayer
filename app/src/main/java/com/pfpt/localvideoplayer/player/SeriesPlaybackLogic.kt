@@ -117,15 +117,35 @@ fun shouldCommitSeriesTrackApply(
     request: SeriesTrackApplyRequest,
     indexNow: Int,
     applied: SeriesTrackApplyRequest?,
+    skippedAtStart: SeriesTrackApplyRequest?,
     skippedNow: SeriesTrackApplyRequest?,
     tracksReady: Boolean,
 ): Boolean {
     if (indexNow != request.index) return false
-    if (skippedNow != null && skippedNow != request) return false
+    if (skippedNow != skippedAtStart) return false
     return shouldApplySeriesTracks(
         tracksReady = tracksReady,
         request = request,
         applied = applied,
         skipped = skippedNow,
     )
+}
+
+fun seriesTextOffForApply(
+    stored: SeriesTextMemory?,
+    pending: SeriesTrackApplyRequest?,
+    indexNow: Int,
+    seriesKey: String?,
+): Boolean {
+    val text = if (
+        pending != null &&
+        pending.index == indexNow &&
+        pending.seriesKey == seriesKey &&
+        pending.text != stored
+    ) {
+        pending.text
+    } else {
+        stored
+    }
+    return text is SeriesTextMemory.Off
 }
