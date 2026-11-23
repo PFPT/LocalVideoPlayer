@@ -338,7 +338,6 @@ internal fun PlayerSessionEffects(
     }
 
     val seriesLatchPlayer = remember { mutableStateOf<ExoPlayer?>(null) }
-    val seriesHoldRestored = remember { mutableStateOf(false) }
     LaunchedEffect(
         exoPlayer,
         ui.currentIndex,
@@ -350,7 +349,6 @@ internal fun PlayerSessionEffects(
         if (seriesLatchPlayer.value !== exoPlayer) {
             ui.appliedSeriesTracks = null
             seriesLatchPlayer.value = exoPlayer
-            seriesHoldRestored.value = false
         }
         val pending = ui.pendingSeriesText
         if (
@@ -378,20 +376,6 @@ internal fun PlayerSessionEffects(
         ui.seriesTrackHold = clearedSeriesTrackHold(ui.seriesTrackHold, ui.currentIndex, seriesKey)
         ui.appliedSeriesTracks = clearedAppliedSeriesTracks(ui.appliedSeriesTracks, ui.currentIndex, seriesKey)
         ui.pendingSeriesText = clearedPendingSeriesText(ui.pendingSeriesText, ui.currentIndex, seriesKey)
-        val held = heldTrackSelection(ui.seriesTrackHold, ui.currentIndex, seriesKey)
-        if (
-            held != null &&
-            !seriesHoldRestored.value &&
-            seriesTracksReady(
-                exoPlayer.currentTracks.groups.isNotEmpty(),
-                ui.tracksReadyIndex,
-                ui.currentIndex,
-            )
-        ) {
-            seriesHoldRestored.value = true
-            held.audioOptionId?.let { exoPlayer.applyTrackSelection(C.TRACK_TYPE_AUDIO, it) }
-            held.textOptionId?.let { exoPlayer.applyTrackSelection(C.TRACK_TYPE_TEXT, it) }
-        }
         val holdAtStart = ui.seriesTrackHold
         if (!shouldCommitSeriesTrackApply(
                 request = request,
@@ -454,6 +438,9 @@ internal fun PlayerSessionEffects(
                 hasExternalSubtitle = external != null,
             ),
         )
+        val held = heldTrackSelection(ui.seriesTrackHold, ui.currentIndex, seriesKey)
+        held?.audioOptionId?.let { exoPlayer.applyTrackSelection(C.TRACK_TYPE_AUDIO, it) }
+        held?.textOptionId?.let { exoPlayer.applyTrackSelection(C.TRACK_TYPE_TEXT, it) }
         ui.appliedSeriesTracks = request
     }
 
