@@ -312,10 +312,10 @@ internal fun PlayerOverlaySheets(
                 }
                 val key = seriesKey
                 if (key.isNullOrBlank()) return@TrackSelectorSheet
+                if (update is TrackMemoryUpdate.Leave) return@TrackSelectorSheet
                 val ticketState = if (type == C.TRACK_TYPE_AUDIO) audioWriteTicket else textWriteTicket
                 val ticket = ticketState.intValue + 1
                 ticketState.intValue = ticket
-                if (update is TrackMemoryUpdate.Leave) return@TrackSelectorSheet
                 scope.launch {
                     seriesTrackWriteMutex.withLock {
                         if (ticketState.intValue != ticket) return@withLock
