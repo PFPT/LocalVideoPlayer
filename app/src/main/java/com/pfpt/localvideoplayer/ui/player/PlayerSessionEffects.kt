@@ -396,6 +396,21 @@ internal fun PlayerSessionEffects(
         } else {
             withContext(Dispatchers.IO) { playbackSession.peekExternalSubtitle(video) }
         }
+        if (!shouldCommitSeriesTrackApply(
+                request = request,
+                indexNow = ui.currentIndex,
+                holdAtStart = holdAtStart,
+                holdNow = ui.seriesTrackHold,
+                applied = ui.appliedSeriesTracks,
+                tracksReady = seriesTracksReady(
+                    exoPlayer.currentTracks.groups.isNotEmpty(),
+                    ui.tracksReadyIndex,
+                    ui.currentIndex,
+                ),
+            )
+        ) {
+            return@LaunchedEffect
+        }
         if (video != null) {
             playbackSession.attachSubtitle(ui.currentIndex)
         }

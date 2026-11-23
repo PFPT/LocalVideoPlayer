@@ -163,7 +163,15 @@ fun ExoPlayer.applyTrackSelection(type: @C.TrackType Int, optionId: String) {
         .build()
     when (optionId) {
         "auto" -> {
-            trackSelectionParameters = params
+            trackSelectionParameters = when (type) {
+                C.TRACK_TYPE_AUDIO -> params.buildUpon()
+                    .setPreferredAudioLanguage(null)
+                    .build()
+                C.TRACK_TYPE_TEXT -> params.buildUpon()
+                    .setPreferredTextLanguage(null)
+                    .build()
+                else -> params
+            }
         }
         "off" -> {
             trackSelectionParameters = params.buildUpon()
