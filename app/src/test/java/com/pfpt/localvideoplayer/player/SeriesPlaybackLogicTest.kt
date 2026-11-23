@@ -239,7 +239,27 @@ class SeriesPlaybackLogicTest {
     }
 
     @Test
-    fun commitWhenHoldMatchesAndRequestNotYetApplied() {
+    fun doNotCommitWhenHoldMatchesRequestIndexAndSeries() {
+        val request = seriesTrackRequest()
+        val hold = SeriesTrackHold(
+            index = request.index,
+            seriesKey = request.seriesKey,
+            audioOptionId = "0:1",
+        )
+        assertFalse(
+            shouldCommitSeriesTrackApply(
+                request = request,
+                indexNow = request.index,
+                holdAtStart = hold,
+                holdNow = hold,
+                applied = null,
+                tracksReady = true,
+            ),
+        )
+    }
+
+    @Test
+    fun commitHeldApplyOnReplacementUntilRequestIsApplied() {
         val request = seriesTrackRequest()
         val hold = SeriesTrackHold(
             index = request.index,
@@ -254,6 +274,7 @@ class SeriesPlaybackLogicTest {
                 holdNow = hold,
                 applied = null,
                 tracksReady = true,
+                allowHeldApply = true,
             ),
         )
         assertFalse(
@@ -264,6 +285,7 @@ class SeriesPlaybackLogicTest {
                 holdNow = hold,
                 applied = request,
                 tracksReady = true,
+                allowHeldApply = true,
             ),
         )
     }

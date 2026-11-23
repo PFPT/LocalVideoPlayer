@@ -186,10 +186,19 @@ fun shouldCommitSeriesTrackApply(
     holdNow: SeriesTrackHold?,
     applied: SeriesTrackApplyRequest?,
     tracksReady: Boolean,
+    allowHeldApply: Boolean = false,
 ): Boolean {
     if (!tracksReady) return false
     if (indexNow != request.index) return false
     if (holdNow != holdAtStart) return false
+    if (
+        !allowHeldApply &&
+        holdNow != null &&
+        holdNow.index == request.index &&
+        holdNow.seriesKey == request.seriesKey
+    ) {
+        return false
+    }
     if (request == applied) return false
     return true
 }

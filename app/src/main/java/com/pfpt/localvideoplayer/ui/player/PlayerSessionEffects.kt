@@ -338,6 +338,7 @@ internal fun PlayerSessionEffects(
     }
 
     val seriesLatchPlayer = remember { mutableStateOf<ExoPlayer?>(null) }
+    val seriesPlayerReplaced = remember { mutableStateOf(false) }
     LaunchedEffect(
         exoPlayer,
         ui.currentIndex,
@@ -349,6 +350,7 @@ internal fun PlayerSessionEffects(
         if (seriesLatchPlayer.value !== exoPlayer) {
             ui.appliedSeriesTracks = null
             seriesLatchPlayer.value = exoPlayer
+            seriesPlayerReplaced.value = true
         }
         val pending = ui.pendingSeriesText
         if (
@@ -388,6 +390,7 @@ internal fun PlayerSessionEffects(
                     ui.tracksReadyIndex,
                     ui.currentIndex,
                 ),
+                allowHeldApply = seriesPlayerReplaced.value,
             )
         ) {
             return@LaunchedEffect
@@ -409,6 +412,7 @@ internal fun PlayerSessionEffects(
                     ui.tracksReadyIndex,
                     ui.currentIndex,
                 ),
+                allowHeldApply = seriesPlayerReplaced.value,
             )
         ) {
             return@LaunchedEffect
@@ -427,6 +431,7 @@ internal fun PlayerSessionEffects(
                     ui.tracksReadyIndex,
                     ui.currentIndex,
                 ),
+                allowHeldApply = seriesPlayerReplaced.value,
             )
         ) {
             return@LaunchedEffect
@@ -442,6 +447,7 @@ internal fun PlayerSessionEffects(
         held?.audioOptionId?.let { exoPlayer.applyTrackSelection(C.TRACK_TYPE_AUDIO, it) }
         held?.textOptionId?.let { exoPlayer.applyTrackSelection(C.TRACK_TYPE_TEXT, it) }
         ui.appliedSeriesTracks = request
+        seriesPlayerReplaced.value = false
     }
 
     LaunchedEffect(ui.playbackSpeed) {
