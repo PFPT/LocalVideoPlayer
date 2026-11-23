@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -333,13 +334,20 @@ internal fun PlayerSessionEffects(
         }
     }
 
+    val seriesLatchPlayer = remember { mutableStateOf<ExoPlayer?>(null) }
     LaunchedEffect(
+        exoPlayer,
         ui.currentIndex,
         seriesKey,
         seriesPlayback.audioLanguage,
         seriesPlayback.text,
         ui.tracksRevision,
     ) {
+        if (seriesLatchPlayer.value !== exoPlayer) {
+            ui.appliedSeriesTracks = null
+            ui.seriesTrackHold = null
+            seriesLatchPlayer.value = exoPlayer
+        }
         val pending = ui.pendingSeriesText
         if (
             pending != null &&
@@ -387,6 +395,9 @@ internal fun PlayerSessionEffects(
             null
         } else {
             withContext(Dispatchers.IO) { playbackSession.peekExternalSubtitle(video) }
+        }
+        if (video != null) {
+            playbackSession.attachSubtitle(ui.currentIndex)
         }
         if (!shouldCommitSeriesTrackApply(
                 request = request,
