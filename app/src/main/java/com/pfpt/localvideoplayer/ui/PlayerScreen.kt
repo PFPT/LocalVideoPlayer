@@ -12,30 +12,20 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -73,17 +63,16 @@ import com.pfpt.localvideoplayer.player.rememberPlayerProgressState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.pfpt.localvideoplayer.ui.components.FittedPlayerSurface
-import com.pfpt.localvideoplayer.ui.components.LiveSeekPreview
 import com.pfpt.localvideoplayer.ui.components.LocalSubtitleAppearance
 import com.pfpt.localvideoplayer.ui.components.LocalTimelineMarks
 import com.pfpt.localvideoplayer.ui.components.SubtitleAppearance
 import com.pfpt.localvideoplayer.ui.components.TimelineMarks
-import com.pfpt.localvideoplayer.ui.components.LandscapePlayerContent
-import com.pfpt.localvideoplayer.ui.components.PortraitPlayerContent
+import com.pfpt.localvideoplayer.ui.player.PlayerGestureController
 import com.pfpt.localvideoplayer.ui.player.PlayerOverlaySheets
 import com.pfpt.localvideoplayer.ui.player.PlayerSessionEffects
+import com.pfpt.localvideoplayer.ui.player.PlayerSurface
 import com.pfpt.localvideoplayer.ui.player.playerChromeActions
+import com.pfpt.localvideoplayer.ui.player.rememberOpenedPlayer
 import com.pfpt.localvideoplayer.util.OrientationController
 import com.pfpt.localvideoplayer.util.PlaybackSystemControls
 import com.pfpt.localvideoplayer.util.PictureInPictureHelper
@@ -91,8 +80,6 @@ import com.pfpt.localvideoplayer.util.TitleParser
 import com.pfpt.localvideoplayer.util.VideoFrameCapture
 import com.pfpt.localvideoplayer.cast.CastUiState
 import com.pfpt.localvideoplayer.cast.LocalCastManager
-import com.pfpt.localvideoplayer.ui.components.CastButton
-import com.pfpt.localvideoplayer.ui.components.CastMiniController
 import com.pfpt.localvideoplayer.ui.components.rememberCastSheetActions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -158,25 +145,11 @@ fun PlayerScreen(
         }
     }
     val pipSupported = remember(activity) { activity?.isPipSupported() == true }
-    val exoPlayer by produceState<ExoPlayer?>(
-        initialValue = null,
-        playlist,
-        ui.softDecodeGeneration,
-    ) {
-        if (playlist.isEmpty()) {
-            value = null
-            return@produceState
-        }
-        val playIndex = ui.currentIndex.coerceIn(0, playlist.lastIndex)
-        val replay = ui.replayPositionMs
-        ui.replayPositionMs = null
-        value = playbackSession.open(
-            items = playlist,
-            startIndex = playIndex,
-            requestedSoftDecode = ui.appliedSoftDecode,
-            startPositionMs = replay,
-        )
-    }
+    val exoPlayer = rememberOpenedPlayer(
+        playlist = playlist,
+        ui = ui,
+        playbackSession = playbackSession,
+    )
     val player = exoPlayer
     if (player == null) {
         Box(
@@ -355,52 +328,8 @@ private fun PlayerScreenContent(
     }
 
 
-    fun handleBrightnessGestureStart() {
-        val controls = systemControls ?: return
-        ui.brightnessHideJob?.cancel()
-        ui.brightnessHideJob = null
-        ui.brightnessFraction = controls.currentBrightness()
-        ui.isAdjustingBrightness = true
-        ui.resetControlsTimer()
-    }
-
-    fun handleBrightnessChange(fraction: Float) {
-        val controls = systemControls ?: return
-        ui.brightnessFraction = fraction.coerceIn(0.01f, 1f)
-        controls.setBrightness(ui.brightnessFraction)
-    }
-
-    fun handleBrightnessGestureEnd() {
-        ui.brightnessHideJob?.cancel()
-        ui.brightnessHideJob = scope.launch {
-            delay(1_500)
-            ui.isAdjustingBrightness = false
-            ui.brightnessHideJob = null
-        }
-    }
-
-    fun handleVolumeGestureStart() {
-        val controls = systemControls ?: return
-        ui.volumeHideJob?.cancel()
-        ui.volumeHideJob = null
-        ui.volumeFraction = controls.currentVolumeFraction()
-        ui.isAdjustingVolume = true
-        ui.resetControlsTimer()
-    }
-
-    fun handleVolumeChange(fraction: Float) {
-        val controls = systemControls ?: return
-        controls.setVolumeFraction(fraction.coerceIn(0f, 1f))
-        ui.volumeFraction = controls.currentVolumeFraction()
-    }
-
-    fun handleVolumeGestureEnd() {
-        ui.volumeHideJob?.cancel()
-        ui.volumeHideJob = scope.launch {
-            delay(1_500)
-            ui.isAdjustingVolume = false
-            ui.volumeHideJob = null
-        }
+    val gestures = remember(systemControls, ui, scope) {
+        PlayerGestureController(systemControls, ui, scope)
     }
 
 
@@ -900,252 +829,55 @@ private fun PlayerScreenContent(
             abPointB = ui.abPointB,
         ),
     ) {
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .then(
-                if (hidePage) {
-                    Modifier
-                } else {
-                    Modifier.background(MaterialTheme.colorScheme.background)
-                },
-            ),
-    ) {
-        when {
-            ui.isInPipMode -> {
-                FittedPlayerSurface(
-                    player = exoPlayer,
-                    modifier = Modifier.fillMaxSize(),
-                    useTextureView = preferences.useTextureView,
-                )
-            }
-            useLandscapeLayout -> {
-                LandscapePlayerContent(
-                    exoPlayer = exoPlayer,
-                    progress = progress,
-                    durationMs = displayDurationMs,
-                    videoUri = currentVideo?.uri,
-                    videoScale = ui.videoScale,
-                    useTextureView = preferences.useTextureView,
-                    offsetX = ui.offsetX,
-                    offsetY = ui.offsetY,
-                    ui = ui,
-                    isCasting = isCasting,
-                    isSeeking = ui.isSeeking,
-                    controlsVisible = ui.controlsVisible,
-                    controlsLocked = ui.controlsLocked,
-                    isFullscreen = ui.isFullscreen,
-                    title = currentTitle,
-                    resolution = resolution,
-                    isPlaying = showsPause,
-                    playbackSpeed = ui.playbackSpeed,
-                    repeatOne = ui.repeatOne,
-                    isSpeedBoosted = ui.isSpeedBoosted,
-                    hasPrevious = hasPrevious,
-                    hasNext = hasNext,
-                    canEditSeriesSkip = canEditSeriesSkip && !isCasting,
-                    introEndMs = introEndMs,
-                    outroStartMs = outroStartMs,
-                    introMarked = seriesSkip.introSeconds != null,
-                    outroMarked = seriesSkip.outroSeconds != null,
-                    onMarkIntro = ::markSeriesIntro,
-                    onMarkOutro = ::markSeriesOutro,
-                    onClearIntro = ::clearSeriesIntro,
-                    onClearOutro = ::clearSeriesOutro,
-                    onScaleChange = { ui.videoScale = it },
-                    onOffsetChange = { x, y ->
-                        ui.offsetX = x
-                        ui.offsetY = y
-                    },
-                    onSeekPreview = ::handleSeekPreview,
-                    onSeekPreviewFrame = ::handleSeekPreviewFrame,
-                    onSeekCommitted = { position ->
-                        handleSeekCommitted(position)
-                        ui.resetControlsTimer()
-                    },
-                    onTap = ::handleFullscreenTap,
-                    onDoubleTap = ::handleDoubleTap,
-                    onSeekingChange = ::handleSeekingChange,
-                    onSpeedBoostStart = chrome.onSpeedBoostStart,
-                    onSpeedBoostEnd = chrome.onSpeedBoostEnd,
-                    onBrightnessGestureStart = ::handleBrightnessGestureStart.takeIf { preferences.gestureBrightness },
-                    onBrightnessChange = ::handleBrightnessChange.takeIf { preferences.gestureBrightness },
-                    onBrightnessGestureEnd = ::handleBrightnessGestureEnd.takeIf { preferences.gestureBrightness },
-                    onVolumeGestureStart = ::handleVolumeGestureStart.takeIf { preferences.gestureVolume },
-                    onVolumeChange = ::handleVolumeChange.takeIf { preferences.gestureVolume },
-                    onVolumeGestureEnd = ::handleVolumeGestureEnd.takeIf { preferences.gestureVolume },
-                    getCurrentBrightness = chrome.getCurrentBrightness,
-                    getCurrentVolume = chrome.getCurrentVolume,
-                    isAdjustingBrightness = ui.isAdjustingBrightness,
-                    isAdjustingVolume = ui.isAdjustingVolume,
-                    brightnessFraction = ui.brightnessFraction,
-                    volumeFraction = ui.volumeFraction,
-                    onBack = ::handleBack,
-                    onPlayPauseClick = chrome.onPlayPauseClick,
-                    onPreviousClick = chrome.onPreviousClick,
-                    onNextClick = chrome.onNextClick,
-                    onSeek = { position ->
-                        ui.resetControlsTimer()
-                        chrome.seekToPosition(position)
-                    },
-                    onScrubStart = chrome.onScrubStart,
-                    onScrubEnd = chrome.onScrubEnd,
-                    onLockToggle = ::handleLockToggle,
-                    onRotateClick = ::handleRotateClick,
-                    onSpeedClick = {
-                        ui.resetControlsTimer()
-                        ui.showSpeedSheet = true
-                    },
-                    onLoopClick = {
-                        ui.resetControlsTimer()
-                        chrome.toggleRepeatOne()
-                    },
-                    onEpisodePickerClick = {
-                        ui.resetControlsTimer()
-                        ui.showEpisodeSheet = true
-                    },
-                    onMoreClick = {
-                        ui.resetControlsTimer()
-                        ui.showMoreSheet = true
-                    },
-                    onSkipIntro = ::skipIntro,
-                    onSkipOutro = ::skipOutro,
-                    pipSupported = pipSupported,
-                    onPipClick = ::handlePipClick,
-                    onFullscreenClick = ::handleFullscreenToggleClick,
-                    contentScale = ui.aspectRatioMode.contentScale,
-                    frameAspectRatio = ui.aspectRatioMode.frameAspectRatio,
-                    seekEnabled = preferences.gestureSeek,
-                    pinchEnabled = preferences.gesturePinchZoom,
-                )
-            }
-            else -> {
-                if (currentVideo != null) {
-                    PortraitPlayerContent(
-                        title = currentTitle,
-                        resolution = resolution,
-                        seriesTitle = seriesTitle,
-                        exoPlayer = exoPlayer,
-                        progress = progress,
-                        ui = ui,
-                        isCasting = isCasting,
-                        durationMs = displayDurationMs,
-                        isSeeking = ui.isSeeking,
-                        controlsVisible = ui.controlsVisible,
-                        episodes = playlist,
-                        currentIndex = ui.currentIndex,
-                        isPlaying = showsPause,
-                        hasPrevious = hasPrevious,
-                        hasNext = hasNext,
-                        canEditSeriesSkip = canEditSeriesSkip && !isCasting,
-                        introEndMs = introEndMs,
-                        outroStartMs = outroStartMs,
-                        introMarked = seriesSkip.introSeconds != null,
-                        outroMarked = seriesSkip.outroSeconds != null,
-                        onMarkIntro = ::markSeriesIntro,
-                        onMarkOutro = ::markSeriesOutro,
-                        onClearIntro = ::clearSeriesIntro,
-                        onClearOutro = ::clearSeriesOutro,
-                        onSeekPreview = ::handleSeekPreview,
-                        onSeekPreviewFrame = ::handleSeekPreviewFrame,
-                        onSeekCommitted = ::handleSeekCommitted,
-                        onSeekingChange = ::handleSeekingChange,
-                        onSpeedBoostStart = chrome.onSpeedBoostStart,
-                        onSpeedBoostEnd = chrome.onSpeedBoostEnd,
-                        onBrightnessGestureStart = ::handleBrightnessGestureStart,
-                        onBrightnessChange = ::handleBrightnessChange,
-                        onBrightnessGestureEnd = ::handleBrightnessGestureEnd,
-                        onVolumeGestureStart = ::handleVolumeGestureStart,
-                        onVolumeChange = ::handleVolumeChange,
-                        onVolumeGestureEnd = ::handleVolumeGestureEnd,
-                        getCurrentBrightness = chrome.getCurrentBrightness,
-                        getCurrentVolume = chrome.getCurrentVolume,
-                        isAdjustingBrightness = ui.isAdjustingBrightness,
-                        isAdjustingVolume = ui.isAdjustingVolume,
-                        brightnessFraction = ui.brightnessFraction,
-                        volumeFraction = ui.volumeFraction,
-                        isSpeedBoosted = ui.isSpeedBoosted,
-                        onVideoTap = { ui.toggleControlsVisibility() },
-                        onPlayPauseClick = chrome.onPlayPauseClick,
-                        onPreviousClick = chrome.onPreviousClick,
-                        onNextClick = chrome.onNextClick,
-                        onSeek = chrome.seekToPosition,
-                        onScrubStart = chrome.onScrubStart,
-                        onScrubEnd = chrome.onScrubEnd,
-                        playbackSpeed = ui.playbackSpeed,
-                        repeatOne = ui.repeatOne,
-                        onEpisodeSelected = ::selectEpisode,
-                        onSpeedClick = { ui.showSpeedSheet = true },
-                        onLoopClick = chrome.toggleRepeatOne,
-                        onMoreClick = { ui.showMoreSheet = true },
-                        onSkipIntro = ::skipIntro,
-                        onSkipOutro = ::skipOutro,
-                        onVideoDoubleTap = ::handleDoubleTap,
-                        onFullscreenClick = ::enterLandscapeFullscreen,
-                        contentScale = ui.aspectRatioMode.contentScale,
-                        frameAspectRatio = ui.aspectRatioMode.frameAspectRatio,
-                        useTextureView = preferences.useTextureView,
-                        seekEnabled = preferences.gestureSeek,
-                        pinchEnabled = preferences.gesturePinchZoom,
-                        brightnessEnabled = preferences.gestureBrightness,
-                        volumeEnabled = preferences.gestureVolume,
-                    )
-                }
-            }
-        }
-
-        if (!hidePage) {
-            LiveSeekPreview(
-                ui = ui,
-                durationMs = displayDurationMs,
-                forDoubleTap = true,
-            )
-        }
-
-        if (castManager != null && ui.controlsVisible && !ui.isInPipMode && !hidePage) {
-            CastButton(
-                state = castState,
-                onClick = { castSheet.open() },
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding(),
-            )
-        }
-
-        val connected = castState as? CastUiState.Connected
-        if (connected != null && !ui.isInPipMode && !hidePage) {
-            CastMiniController(
-                visible = true,
-                title = connected.title,
-                isPlaying = castPlaying,
-                onPlayPause = {
-                    if (castPlaying) castManager?.playback?.pause() else castManager?.playback?.play()
-                },
-                onDisconnect = { castManager?.disconnect() },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding(),
-            )
-        }
-
-        ui.playbackFailure?.let { failure ->
-            Text(
-                text = stringResource(
-                    if (failure == PlaybackFailure.Read) {
-                        R.string.playback_error_read
-                    } else {
-                        R.string.playback_error_decode
-                    },
-                ),
-                color = Color.White,
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(horizontal = 32.dp),
-            )
-        }
-    }
+        PlayerSurface(
+            modifier = modifier,
+            hidePage = hidePage,
+            ui = ui,
+            exoPlayer = exoPlayer,
+            preferences = preferences,
+            progress = progress,
+            displayDurationMs = displayDurationMs,
+            currentVideo = currentVideo,
+            playlist = playlist,
+            useLandscapeLayout = useLandscapeLayout,
+            isCasting = isCasting,
+            currentTitle = currentTitle,
+            seriesTitle = seriesTitle,
+            resolution = resolution,
+            showsPause = showsPause,
+            hasPrevious = hasPrevious,
+            hasNext = hasNext,
+            canEditSeriesSkip = canEditSeriesSkip,
+            introEndMs = introEndMs,
+            outroStartMs = outroStartMs,
+            seriesSkip = seriesSkip,
+            chrome = chrome,
+            gestures = gestures,
+            pipSupported = pipSupported,
+            castManager = castManager,
+            castState = castState,
+            castPlaying = castPlaying,
+            castSheet = castSheet,
+            onMarkIntro = ::markSeriesIntro,
+            onMarkOutro = ::markSeriesOutro,
+            onClearIntro = ::clearSeriesIntro,
+            onClearOutro = ::clearSeriesOutro,
+            onSeekPreview = ::handleSeekPreview,
+            onSeekPreviewFrame = ::handleSeekPreviewFrame,
+            onSeekCommitted = ::handleSeekCommitted,
+            onSeekingChange = ::handleSeekingChange,
+            onFullscreenTap = ::handleFullscreenTap,
+            onDoubleTap = ::handleDoubleTap,
+            onBack = ::handleBack,
+            onLockToggle = ::handleLockToggle,
+            onRotateClick = ::handleRotateClick,
+            onSkipIntro = ::skipIntro,
+            onSkipOutro = ::skipOutro,
+            onPipClick = ::handlePipClick,
+            onFullscreenToggle = ::handleFullscreenToggleClick,
+            onEnterLandscapeFullscreen = ::enterLandscapeFullscreen,
+            onEpisodeSelected = ::selectEpisode,
+        )
     }
 }
 private fun deriveSeriesTitle(playlist: List<VideoItem>, currentIndex: Int): String {
