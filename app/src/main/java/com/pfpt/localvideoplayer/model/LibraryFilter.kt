@@ -93,6 +93,20 @@ fun applyTypeTab(
     return entries.filter { entry -> matchesTypeTab(entry, tab, pinnedKeys) }
 }
 
+fun showPinnedHomeRow(
+    sectioned: Boolean,
+    tab: LibraryTypeTab,
+    searching: Boolean,
+    selecting: Boolean,
+    pinnedCount: Int,
+): Boolean {
+    return sectioned &&
+        tab != LibraryTypeTab.MARKED &&
+        !searching &&
+        !selecting &&
+        pinnedCount > 0
+}
+
 fun pinMarkedFirst(
     entries: List<VideoLibraryEntry>,
     pinnedKeys: Set<String>,

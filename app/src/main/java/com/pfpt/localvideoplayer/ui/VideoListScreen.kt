@@ -113,6 +113,7 @@ import com.pfpt.localvideoplayer.model.VideoSortOrder
 import com.pfpt.localvideoplayer.model.applyTypeTab
 import com.pfpt.localvideoplayer.model.entryKey
 import com.pfpt.localvideoplayer.model.filterLibrary
+import com.pfpt.localvideoplayer.model.showPinnedHomeRow
 import com.pfpt.localvideoplayer.model.partitionWithPinned
 import com.pfpt.localvideoplayer.model.searchLibrary
 import com.pfpt.localvideoplayer.model.sortLibrary
@@ -129,6 +130,7 @@ import com.pfpt.localvideoplayer.ui.components.LibraryOptionsBottomSheet
 import com.pfpt.localvideoplayer.ui.components.LumenEmptyState
 import com.pfpt.localvideoplayer.ui.components.LumenLibraryTabBar
 import com.pfpt.localvideoplayer.ui.components.LumenListHeader
+import com.pfpt.localvideoplayer.ui.components.PinnedLibraryRow
 import com.pfpt.localvideoplayer.ui.components.RecentPlaybackSection
 import com.pfpt.localvideoplayer.ui.components.SelectionTopBar
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
@@ -325,6 +327,14 @@ fun VideoListScreen(
             null
         }
     }
+    val pinnedHomeEntries = pinnedSections?.pinned.orEmpty()
+    val showPinnedRow = showPinnedHomeRow(
+        sectioned = viewLayout == LibraryViewLayout.SECTIONED,
+        tab = selectedTypeTab,
+        searching = isSearching,
+        selecting = selectionMode,
+        pinnedCount = pinnedHomeEntries.size,
+    )
     val flatLibrary = remember(visibleLibrary, viewLayout) {
         if (viewLayout == LibraryViewLayout.FLAT) {
             visibleLibrary
@@ -550,6 +560,16 @@ fun VideoListScreen(
             onEnterSelection = enterSelectionHandler,
             onDeleteUris = openDeleteHandler,
         )
+    }
+
+    fun openPinned(entry: VideoLibraryEntry) {
+        when (entry) {
+            is VideoLibraryEntry.Series -> {
+                incrementPlayCount(entryKey(entry))
+                onOpenSeries(entry.series.id)
+            }
+            is VideoLibraryEntry.Single -> playVideoHandler(entry.video)
+        }
     }
 
     fun playRecentRecord(record: PlaybackRecord) {
@@ -931,16 +951,30 @@ fun VideoListScreen(
                     }
                 }
                 else -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pullToRefresh(
-                                state = pullRefreshState,
-                                isRefreshing = isRefreshing,
-                                onRefresh = onPullRefresh,
-                                enabled = !selectionMode,
-                            ),
-                    ) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        if (!selectionMode) {
+                            LumenLibraryTabBar(
+                                tabs = typeTabs,
+                                selectedTab = selectedTypeTab,
+                                onTabSelected = { tab ->
+                                    scope.launch { libraryPreferencesStore.setTypeTab(tab) }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = LumenSpaceXs, bottom = LumenSpaceXs),
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .pullToRefresh(
+                                    state = pullRefreshState,
+                                    isRefreshing = isRefreshing,
+                                    onRefresh = onPullRefresh,
+                                    enabled = !selectionMode,
+                                ),
+                        ) {
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize(),
@@ -961,20 +995,13 @@ fun VideoListScreen(
                                     )
                                 }
                             }
-
-                            if (!selectionMode) {
-                                item(key = "library-tabs") {
-                                    LumenLibraryTabBar(
-                                        tabs = typeTabs,
-                                        selectedTab = selectedTypeTab,
-                                        onTabSelected = { tab ->
-                                            scope.launch { libraryPreferencesStore.setTypeTab(tab) }
-                                        },
-                                        contentPadding = PaddingValues(0.dp),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(bottom = LumenSpaceXs)
-                                            .animateItem(placementSpec = null),
+                            if (showPinnedRow) {
+                                item(key = "pinned-home-row") {
+                                    PinnedLibraryRow(
+                                        entries = pinnedHomeEntries,
+                                        playbackStore = playbackStore,
+                                        onEntryClick = ::openPinned,
+                                        modifier = Modifier.animateItem(placementSpec = null),
                                     )
                                 }
                             }
@@ -1062,7 +1089,7 @@ fun VideoListScreen(
                             } else {
                                 val sections = pinnedSections
                                 if (sections != null) {
-                                    if (sections.pinned.isNotEmpty()) {
+                                    if (sections.pinned.isNotEmpty() && !showPinnedRow) {
                                         item(key = "header-pinned-${viewLayout.name}") {
                                             LibrarySectionHeader(
                                                 title = stringResource(R.string.section_pinned),
@@ -1197,6 +1224,7 @@ fun VideoListScreen(
                             isRefreshing = isRefreshing,
                             state = pullRefreshState,
                         )
+                        }
                     }
                 }
             }
