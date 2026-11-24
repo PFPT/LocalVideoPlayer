@@ -47,6 +47,28 @@ class VideoRepository(private val context: Context) {
         }
     }
 
+    fun loadVideo(uri: Uri): VideoItem? {
+        val id = runCatching { ContentUris.parseId(uri) }.getOrNull() ?: return null
+        val wanted = uri.toString()
+        return try {
+            val fromVideo = queryVideos(
+                "${MediaStore.Video.Media._ID} = ?${notPendingClause()}",
+                arrayOf(id.toString()),
+            ).firstOrNull()
+            if (fromVideo != null && fromVideo.uri.toString() == wanted) return fromVideo
+            val fromDownload = queryDownloadVideos(mutableSetOf(), onlyId = id).firstOrNull()
+            if (fromDownload != null && fromDownload.uri.toString() == wanted) return fromDownload
+            val fromFile = queryOrphanVideosByExtension(
+                seenUris = mutableSetOf(),
+                onlyId = id,
+                skipVideoMediaType = false,
+            ).firstOrNull()
+            fromFile?.takeIf { it.uri.toString() == wanted }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     fun loadVideosAddedAfter(minDateAdded: Long, minId: Long): List<VideoItem> {
         val selection = "(${MediaStore.Video.Media.DATE_ADDED} > ?) OR " +
             "(${MediaStore.Video.Media.DATE_ADDED} = ? AND ${MediaStore.Video.Media._ID} > ?)"
@@ -141,10 +163,11 @@ class VideoRepository(private val context: Context) {
         seenUris: MutableSet<String>,
         minDateAdded: Long? = null,
         minId: Long? = null,
+        onlyId: Long? = null,
     ): List<VideoItem> {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return emptyList()
         val videos = mutableListOf<VideoItem>()
-        val incremental = minDateAdded != null && minId != null
+        val incremental = onlyId == null && minDateAdded != null && minId != null
         val projection = arrayOf(
             MediaStore.Downloads._ID,
             MediaStore.Downloads.DISPLAY_NAME,
@@ -156,6 +179,7 @@ class VideoRepository(private val context: Context) {
         )
         val selectionArgs = buildList {
             addAll(VIDEO_EXTENSIONS.map { "%.$it" })
+            if (onlyId != null) add(onlyId.toString())
             if (incremental) {
                 add(minDateAdded.toString())
                 add(minDateAdded.toString())
@@ -166,7 +190,7 @@ class VideoRepository(private val context: Context) {
             context.contentResolver.query(
                 MediaStore.Downloads.EXTERNAL_CONTENT_URI,
                 projection,
-                downloadVideoSelection(incremental),
+                downloadVideoSelection(incremental, byId = onlyId != null),
                 selectionArgs,
                 "${MediaStore.Downloads.DATE_ADDED} ASC, ${MediaStore.Downloads._ID} ASC",
             )?.use { cursor ->
@@ -219,7 +243,7 @@ class VideoRepository(private val context: Context) {
         return queryDownloadVideos(mutableSetOf()).mapTo(mutableSetOf()) { it.id }
     }
 
-    private fun downloadVideoSelection(incremental: Boolean): String {
+    private fun downloadVideoSelection(incremental: Boolean, byId: Boolean = false): String {
         val extensionClauses = VIDEO_EXTENSIONS.joinToString(" OR ") {
             "${MediaStore.Downloads.DISPLAY_NAME} LIKE ?"
         }
@@ -233,6 +257,11 @@ class VideoRepository(private val context: Context) {
             append(" = 0 OR ")
             append(MediaStore.MediaColumns.IS_PENDING)
             append(" IS NULL)")
+            if (byId) {
+                append(" AND ")
+                append(MediaStore.Downloads._ID)
+                append(" = ?")
+            }
             if (incremental) {
                 append(" AND ((")
                 append(MediaStore.Downloads.DATE_ADDED)
@@ -249,6 +278,8 @@ class VideoRepository(private val context: Context) {
         seenUris: MutableSet<String>,
         minDateAdded: Long? = null,
         minId: Long? = null,
+        onlyId: Long? = null,
+        skipVideoMediaType: Boolean = true,
     ): List<VideoItem> {
         val videos = mutableListOf<VideoItem>()
         val projection = buildList {
@@ -264,10 +295,12 @@ class VideoRepository(private val context: Context) {
                 add(MediaStore.Files.FileColumns.IS_PENDING)
             }
         }.toTypedArray()
-        val selection = buildOrphanVideoSelection(minDateAdded != null && minId != null)
+        val incremental = onlyId == null && minDateAdded != null && minId != null
+        val selection = buildOrphanVideoSelection(incremental, byId = onlyId != null)
         val selectionArgs = buildList {
             addAll(ORPHAN_EXTENSIONS.map { "%.$it" })
-            if (minDateAdded != null && minId != null) {
+            if (onlyId != null) add(onlyId.toString())
+            if (incremental) {
                 add(minDateAdded.toString())
                 add(minDateAdded.toString())
                 add(minId.toString())
@@ -291,7 +324,11 @@ class VideoRepository(private val context: Context) {
                 val pendingColumn = cursor.getColumnIndex(MediaStore.Files.FileColumns.IS_PENDING)
                 while (cursor.moveToNext()) {
                     if (pendingColumn >= 0 && cursor.getInt(pendingColumn) == 1) continue
-                    if (cursor.getInt(mediaTypeColumn) == MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO) continue
+                    if (skipVideoMediaType &&
+                        cursor.getInt(mediaTypeColumn) == MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO
+                    ) {
+                        continue
+                    }
                     val name = cursor.getString(nameColumn) ?: continue
                     if (!FolderVideoScanner.isVideoFile(name, mime = "")) continue
                     val id = cursor.getLong(idColumn)
@@ -359,7 +396,7 @@ class VideoRepository(private val context: Context) {
         return ids
     }
 
-    private fun buildOrphanVideoSelection(incremental: Boolean = false): String {
+    private fun buildOrphanVideoSelection(incremental: Boolean = false, byId: Boolean = false): String {
         val nameClauses = ORPHAN_EXTENSIONS.joinToString(" OR ") {
             "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE ?"
         }
@@ -377,6 +414,11 @@ class VideoRepository(private val context: Context) {
                 append(" = 0 OR ")
                 append(MediaStore.MediaColumns.IS_PENDING)
                 append(" IS NULL)")
+            }
+            if (byId) {
+                append(" AND ")
+                append(MediaStore.Files.FileColumns._ID)
+                append(" = ?")
             }
             if (incremental) {
                 append(" AND ((")
@@ -551,6 +593,11 @@ class VideoRepository(private val context: Context) {
             "mp4", "mkv", "avi", "webm", "mov", "m4v", "ts", "flv", "wmv", "mpeg", "mpg",
         )
         private val ORPHAN_EXTENSIONS = listOf("mp4", "mkv", "ts", "avi", "mov", "m4v")
+
+        private fun notPendingClause(): String {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return ""
+            return " AND (${MediaStore.MediaColumns.IS_PENDING} = 0 OR ${MediaStore.MediaColumns.IS_PENDING} IS NULL)"
+        }
 
         fun leafBucketName(relativePath: String?): String? {
             val trimmed = relativePath?.trim()?.trim('/') ?: return null

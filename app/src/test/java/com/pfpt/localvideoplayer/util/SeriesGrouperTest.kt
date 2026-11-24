@@ -1,6 +1,7 @@
 package com.pfpt.localvideoplayer.util
 
 import android.net.Uri
+import com.pfpt.localvideoplayer.model.APP_DOWNLOAD_BUCKET
 import com.pfpt.localvideoplayer.model.SeriesGroupKind
 import com.pfpt.localvideoplayer.model.VideoItem
 import com.pfpt.localvideoplayer.model.VideoLibraryEntry
@@ -41,6 +42,21 @@ class SeriesGrouperTest {
         requireNotNull(playlist)
         assertEquals(3, playlist.items.size)
         assertEquals(1, playlist.currentIndex)
+    }
+
+    @Test
+    fun downloadFolderEpisodeIndexIsTheNewFile() {
+        val existing = video(1, "Alpha.mp4").copy(relativePath = "Download/LocalVideoPlayer/")
+        val added = video(2, "Zebra.mp4").copy(
+            uri = Uri.parse("content://media/external/downloads/2"),
+            relativePath = "Movies/LocalVideoPlayer/",
+        )
+        val series = SeriesGrouper.groupVideos(listOf(existing, added))
+            .filterIsInstance<VideoLibraryEntry.Series>()
+            .single { it.series.title.equals(APP_DOWNLOAD_BUCKET, ignoreCase = true) }
+        val index = series.series.episodes.indexOfFirst { it.uri == added.uri }
+        assertEquals(1, index)
+        assertEquals(added.uri, series.series.episodes[index].uri)
     }
 
     @Test

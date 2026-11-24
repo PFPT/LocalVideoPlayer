@@ -230,6 +230,27 @@ class LibraryViewModel(
     fun playlistStateFor(video: VideoItem) =
         repository.playlistStateFor(video, _libraryEntries.value)
 
+    suspend fun includeDownloaded(uri: Uri): VideoItem? {
+        libraryVideo(uri)?.let { return it }
+        val loaded = withContext(Dispatchers.IO) {
+            runCatching { repository.loadVideo(uri) }.getOrNull()
+        } ?: return null
+        val hiddenUris = withContext(Dispatchers.IO) { hiddenVideosStore.getHiddenUris() }
+        if (loaded.uri.toString() in hiddenUris) return null
+        val visible = mergeVideos(flattenVideos(_libraryEntries.value), listOf(loaded))
+            .filter { it.uri.toString() !in hiddenUris }
+        applyVideos(visible, hiddenUris)
+        saveCaches(visible)
+        rememberSignatures(flattenVideos(_libraryEntries.value))
+        startBackfill()
+        return libraryVideo(loaded.uri) ?: loaded
+    }
+
+    private fun libraryVideo(uri: Uri): VideoItem? {
+        val key = uri.toString()
+        return flattenVideos(_libraryEntries.value).firstOrNull { it.uri.toString() == key }
+    }
+
     suspend fun playlistStateFor(
         video: VideoItem,
         entries: List<VideoLibraryEntry>,
