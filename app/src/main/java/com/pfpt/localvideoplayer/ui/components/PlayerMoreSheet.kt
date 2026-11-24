@@ -28,6 +28,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.data.SeriesBookmark
 import com.pfpt.localvideoplayer.data.SubtitleTextSize
 import com.pfpt.localvideoplayer.player.PlaybackSession
 import com.pfpt.localvideoplayer.player.SleepChoice
@@ -71,10 +72,11 @@ fun PlayerMoreSheet(
     onSetAbPointA: () -> Unit,
     onSetAbPointB: () -> Unit,
     onClearAb: () -> Unit,
-    bookmarks: List<Long>,
+    bookmarks: List<SeriesBookmark>,
+    showEpisodeTitles: Boolean,
     onAddBookmark: () -> Unit,
-    onJumpBookmark: (Long) -> Unit,
-    onRemoveBookmark: (Long) -> Unit,
+    onJumpBookmark: (SeriesBookmark) -> Unit,
+    onRemoveBookmark: (SeriesBookmark) -> Unit,
     playbackSession: PlaybackSession,
     onSleepSelected: (SleepChoice) -> Unit,
     onDismiss: () -> Unit,
@@ -150,7 +152,9 @@ fun PlayerMoreSheet(
                 title = stringResource(R.string.bookmark_add),
                 onClick = onAddBookmark,
             )
-            bookmarks.forEach { positionMs ->
+            bookmarks.forEach { bookmark ->
+                val time = formatAb(bookmark.positionMs)
+                val label = if (showEpisodeTitles) "${bookmark.title} · $time" else time
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -158,19 +162,19 @@ fun PlayerMoreSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = formatAb(positionMs),
+                        text = label,
                         style = MaterialTheme.typography.bodyLarge,
                         color = theme.onBackground,
                         modifier = Modifier
                             .weight(1f)
-                            .clickable { onJumpBookmark(positionMs) }
+                            .clickable { onJumpBookmark(bookmark) }
                             .padding(vertical = 8.dp),
                     )
                     Text(
                         text = stringResource(R.string.bookmark_delete),
                         color = theme.onSurfaceMuted,
                         modifier = Modifier
-                            .clickable { onRemoveBookmark(positionMs) }
+                            .clickable { onRemoveBookmark(bookmark) }
                             .padding(vertical = 8.dp),
                     )
                 }

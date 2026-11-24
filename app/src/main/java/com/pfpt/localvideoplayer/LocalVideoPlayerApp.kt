@@ -331,6 +331,10 @@ fun LocalVideoPlayerApp(
                                             seriesPlaybackStore = seriesPlaybackStore,
                                             bookmarkStore = bookmarkStore,
                                             playbackSession = playbackSession,
+                                            seriesPlaylistFor = { video ->
+                                                libraryViewModel.playlistStateFor(video)
+                                            },
+                                            onReplacePlaylist = { playlistState = it },
                                             onDurationKnown = { uri, durationMs ->
                                                 libraryViewModel.applyKnownDurations(mapOf(uri to durationMs))
                                             },

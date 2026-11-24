@@ -3,6 +3,7 @@ package com.pfpt.localvideoplayer.ui
 import android.app.Activity
 import android.content.Context
 import android.media.AudioManager
+import android.net.Uri
 import android.util.Rational
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -44,6 +45,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.pfpt.localvideoplayer.MainActivity
 import com.pfpt.localvideoplayer.R
 import com.pfpt.localvideoplayer.data.BookmarkStore
+import com.pfpt.localvideoplayer.data.seriesBookmarks
 import com.pfpt.localvideoplayer.data.PlaybackStore
 import com.pfpt.localvideoplayer.data.PinnedItemsStore
 import com.pfpt.localvideoplayer.data.PlayerPreferences
@@ -96,7 +98,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -112,6 +113,8 @@ fun PlayerScreen(
     seriesPlaybackStore: SeriesPlaybackStore,
     bookmarkStore: BookmarkStore,
     playbackSession: PlaybackSession,
+    seriesPlaylistFor: (VideoItem) -> PlaylistState,
+    onReplacePlaylist: (PlaylistState) -> Unit,
     onDurationKnown: (uri: String, durationMs: Long) -> Unit = { _, _ -> },
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -192,6 +195,8 @@ fun PlayerScreen(
             seriesPlaybackStore = seriesPlaybackStore,
             bookmarkStore = bookmarkStore,
             playbackSession = playbackSession,
+            seriesPlaylistFor = seriesPlaylistFor,
+            onReplacePlaylist = onReplacePlaylist,
             onDurationKnown = onDurationKnown,
             onBack = onBack,
             modifier = modifier,
@@ -222,6 +227,8 @@ private fun PlayerScreenContent(
     seriesPlaybackStore: SeriesPlaybackStore,
     bookmarkStore: BookmarkStore,
     playbackSession: PlaybackSession,
+    seriesPlaylistFor: (VideoItem) -> PlaylistState,
+    onReplacePlaylist: (PlaylistState) -> Unit,
     onDurationKnown: (uri: String, durationMs: Long) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier,
@@ -241,11 +248,20 @@ private fun PlayerScreenContent(
     val context = LocalContext.current
     val flight = currentPlayerFlight()
     val scope = rememberCoroutineScope()
-    val bookmarkUri = playlist.getOrNull(ui.currentIndex)?.uri
-    val bookmarkFlow = remember(bookmarkUri) {
-        bookmarkUri?.let { bookmarkStore.bookmarks(it) } ?: flowOf(emptyList())
-    }
-    val bookmarks by bookmarkFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+    val playing = playlist.getOrNull(ui.currentIndex)
+    val seriesState = playing?.let(seriesPlaylistFor) ?: PlaylistState(
+        items = listOfNotNull(playing),
+        currentIndex = 0,
+    )
+    val seriesUris = seriesState.items.map { it.uri.toString() }
+    val seriesMarks by remember(seriesUris) {
+        bookmarkStore.bookmarksFor(seriesState.items.map { it.uri })
+    }.collectAsStateWithLifecycle(initialValue = emptyMap())
+    val seriesBookmarkRows = seriesBookmarks(
+        episodes = seriesState.items.map { it.uri.toString() to it.title },
+        marksByUri = seriesMarks,
+    )
+    val bookmarks = seriesMarks[playing?.uri?.toString()].orEmpty()
     val progress = rememberPlayerProgressState(
         player = exoPlayer,
         isSeeking = ui.isSeeking,
@@ -820,7 +836,36 @@ private fun PlayerScreenContent(
             effectiveOutroSeconds = effectiveOutroSeconds,
             isFavorite = isFavorite,
             favoriteKey = favoriteKey,
-            bookmarks = bookmarks,
+            bookmarks = seriesBookmarkRows,
+            showEpisodeTitles = seriesState.items.size > 1,
+            onJumpBookmark = { bookmark ->
+                val target = seriesState.items.getOrNull(bookmark.episodeIndex) ?: return@PlayerOverlaySheets
+                val series = seriesPlaylistFor(target)
+                val sameList = playlist.size == series.items.size &&
+                    playlist.indices.all { index ->
+                        playlist[index].uri.toString() == series.items[index].uri.toString()
+                    }
+                ui.replayPositionMs = bookmark.positionMs
+                ui.showMoreSheet = false
+                val index = series.currentIndex
+                if (sameList) {
+                    scope.launch {
+                        saveCurrentProgress()
+                        playbackSession.resumedIndices.remove(index)
+                        openEpisode(index)
+                        exoPlayer.seekTo(index, bookmark.positionMs)
+                        progress.currentPositionMs = bookmark.positionMs
+                    }
+                } else {
+                    ui.currentIndex = index
+                    onReplacePlaylist(series)
+                }
+            },
+            onRemoveBookmark = { bookmark ->
+                scope.launch {
+                    bookmarkStore.remove(Uri.parse(bookmark.uri), bookmark.positionMs)
+                }
+            },
             resolution = resolution,
             onEpisodeSelected = ::selectEpisode,
             onPickSubtitleFile = { subtitlePicker.launch("*/*") },

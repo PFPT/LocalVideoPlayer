@@ -16,4 +16,37 @@ class BookmarkListTest {
         assertEquals(20, again.size)
         assertEquals(1, again.count { it == 24_000L })
     }
+
+    @Test
+    fun seriesBookmarksFollowEpisodeOrderThenTime() {
+        val rows = seriesBookmarks(
+            episodes = listOf(
+                "content://ep1" to "Episode 1",
+                "content://ep2" to "Episode 2",
+                "content://ep3" to "Episode 3",
+            ),
+            marksByUri = mapOf(
+                "content://ep2" to listOf(30_000L, 5_000L),
+                "content://ep1" to listOf(1_000L),
+                "content://missing" to listOf(9_000L),
+            ),
+        )
+        assertEquals(
+            listOf(
+                SeriesBookmark(0, "Episode 1", "content://ep1", 1_000L),
+                SeriesBookmark(1, "Episode 2", "content://ep2", 5_000L),
+                SeriesBookmark(1, "Episode 2", "content://ep2", 30_000L),
+            ),
+            rows,
+        )
+    }
+
+    @Test
+    fun seriesBookmarksOmitEpisodesWithoutMarks() {
+        val rows = seriesBookmarks(
+            episodes = listOf("content://ep1" to "Episode 1"),
+            marksByUri = mapOf("content://ep1" to emptyList()),
+        )
+        assertEquals(emptyList<SeriesBookmark>(), rows)
+    }
 }

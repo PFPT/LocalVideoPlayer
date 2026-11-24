@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 private val Context.bookmarkDataStore: DataStore<Preferences> by preferencesDataStore(
@@ -15,6 +16,29 @@ private val Context.bookmarkDataStore: DataStore<Preferences> by preferencesData
 )
 
 const val BOOKMARK_LIMIT = 20
+
+data class SeriesBookmark(
+    val episodeIndex: Int,
+    val title: String,
+    val uri: String,
+    val positionMs: Long,
+)
+
+fun seriesBookmarks(
+    episodes: List<Pair<String, String>>,
+    marksByUri: Map<String, List<Long>>,
+): List<SeriesBookmark> {
+    return episodes.flatMapIndexed { index, (uri, title) ->
+        marksByUri[uri].orEmpty().sorted().map { positionMs ->
+            SeriesBookmark(
+                episodeIndex = index,
+                title = title,
+                uri = uri,
+                positionMs = positionMs,
+            )
+        }
+    }
+}
 
 fun updateBookmarks(existing: List<Long>, positionMs: Long, limit: Int = BOOKMARK_LIMIT): List<Long> {
     val position = positionMs.coerceAtLeast(0L)
@@ -37,6 +61,14 @@ class BookmarkStore(private val context: Context) {
     fun bookmarks(uri: Uri): Flow<List<Long>> {
         val key = bookmarkKey(uri.toString())
         return context.bookmarkDataStore.data.map { prefs -> decodeBookmarks(prefs[key]) }
+    }
+
+    fun bookmarksFor(uris: List<Uri>): Flow<Map<String, List<Long>>> {
+        val wanted = uris.map { it.toString() }.distinct()
+        if (wanted.isEmpty()) return flowOf(emptyMap())
+        return context.bookmarkDataStore.data.map { prefs ->
+            wanted.associateWith { decodeBookmarks(prefs[bookmarkKey(it)]) }
+        }
     }
 
     suspend fun add(uri: Uri, positionMs: Long) {

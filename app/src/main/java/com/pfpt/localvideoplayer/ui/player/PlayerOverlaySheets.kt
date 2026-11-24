@@ -13,6 +13,7 @@ import com.pfpt.localvideoplayer.data.BookmarkStore
 import com.pfpt.localvideoplayer.data.PinnedItemsStore
 import com.pfpt.localvideoplayer.data.PlayerPreferences
 import com.pfpt.localvideoplayer.data.PlayerPreferencesStore
+import com.pfpt.localvideoplayer.data.SeriesBookmark
 import com.pfpt.localvideoplayer.data.SeriesPlaybackStore
 import com.pfpt.localvideoplayer.data.SeriesSkipSettings
 import com.pfpt.localvideoplayer.data.SeriesSkipStore
@@ -69,7 +70,10 @@ internal fun PlayerOverlaySheets(
     effectiveOutroSeconds: Int,
     isFavorite: Boolean,
     favoriteKey: String?,
-    bookmarks: List<Long>,
+    bookmarks: List<SeriesBookmark>,
+    showEpisodeTitles: Boolean,
+    onJumpBookmark: (SeriesBookmark) -> Unit,
+    onRemoveBookmark: (SeriesBookmark) -> Unit,
     resolution: String?,
     onEpisodeSelected: (Int) -> Unit,
     onPickSubtitleFile: () -> Unit,
@@ -223,21 +227,15 @@ internal fun PlayerOverlaySheets(
                 ui.abPointB = null
             },
             bookmarks = bookmarks,
+            showEpisodeTitles = showEpisodeTitles,
             onAddBookmark = {
                 val uri = playlist.getOrNull(ui.currentIndex)?.uri ?: return@PlayerMoreSheet
                 scope.launch {
                     bookmarkStore.add(uri, exoPlayer.currentPosition.coerceAtLeast(0L))
                 }
             },
-            onJumpBookmark = { positionMs ->
-                exoPlayer.seekTo(ui.currentIndex, positionMs)
-                progress.currentPositionMs = positionMs
-                ui.showMoreSheet = false
-            },
-            onRemoveBookmark = { positionMs ->
-                val uri = playlist.getOrNull(ui.currentIndex)?.uri ?: return@PlayerMoreSheet
-                scope.launch { bookmarkStore.remove(uri, positionMs) }
-            },
+            onJumpBookmark = onJumpBookmark,
+            onRemoveBookmark = onRemoveBookmark,
             playbackSession = playbackSession,
             onSleepSelected = { playbackSession.setSleep(it) },
             onDismiss = { ui.showMoreSheet = false },
