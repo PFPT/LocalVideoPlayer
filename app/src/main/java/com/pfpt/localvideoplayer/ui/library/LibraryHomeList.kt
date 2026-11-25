@@ -63,6 +63,7 @@ internal fun LibraryHomeList(
     isSearching: Boolean,
     hasRecentPlayback: Boolean,
     playbackStore: PlaybackStore,
+    libraryEntries: List<VideoLibraryEntry>,
     onRecordClick: (PlaybackRecord) -> Unit,
     showPinnedRow: Boolean,
     pinnedHomeEntries: List<VideoLibraryEntry>,
@@ -96,6 +97,7 @@ internal fun LibraryHomeList(
             item(key = "recent-playback") {
                 RecentPlaybackSection(
                     playbackStore = playbackStore,
+                    libraryEntries = libraryEntries,
                     onRecordClick = onRecordClick,
                     modifier = Modifier.animateItem(placementSpec = null),
                 )

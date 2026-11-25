@@ -51,6 +51,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
 import com.pfpt.localvideoplayer.model.PlaybackRecord
+import com.pfpt.localvideoplayer.model.VideoLibraryEntry
+import com.pfpt.localvideoplayer.ui.library.recentHomeRows
 import com.pfpt.localvideoplayer.ui.rememberPlayerSharedOpen
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenCardPadding
@@ -63,13 +65,15 @@ import com.pfpt.localvideoplayer.ui.theme.LumenThumbCorner
 @Composable
 fun RecentPlaybackSection(
     playbackStore: PlaybackStore,
+    libraryEntries: List<VideoLibraryEntry>,
     onRecordClick: (PlaybackRecord) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val records by playbackStore.recentRecords.collectAsStateWithLifecycle(
         initialValue = playbackStore.snapshot.value.recent,
     )
-    if (records.isEmpty()) return
+    val rows = recentHomeRows(records, libraryEntries)
+    if (rows.isEmpty()) return
 
     Column(modifier = modifier.padding(bottom = LumenSpaceSm)) {
         Text(
@@ -81,10 +85,11 @@ fun RecentPlaybackSection(
             contentPadding = PaddingValues(0.dp),
             horizontalArrangement = Arrangement.spacedBy(LumenListItemGap),
         ) {
-            items(records, key = { it.uri.toString() }) { record ->
+            items(rows, key = { it.key }) { row ->
                 RecentPlaybackCard(
-                    record = record,
-                    onClick = { onRecordClick(record) },
+                    title = row.title,
+                    record = row.record,
+                    onClick = { onRecordClick(row.record) },
                 )
             }
         }
@@ -93,6 +98,7 @@ fun RecentPlaybackSection(
 
 @Composable
 private fun RecentPlaybackCard(
+    title: String,
     record: PlaybackRecord,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -104,6 +110,10 @@ private fun RecentPlaybackCard(
         onClick = onClick,
     )
     val subtitle = buildString {
+        if (title != record.title) {
+            append(record.title)
+            append(" · ")
+        }
         if (progress != null && progress > 0.01f) {
             append(stringResource(R.string.watched_percent, (progress * 100).toInt()))
             append(" · ")
@@ -111,7 +121,7 @@ private fun RecentPlaybackCard(
         if (record.durationMs > 0) {
             append(com.pfpt.localvideoplayer.util.formatDuration(record.durationMs))
         }
-    }
+    }.trimEnd(' ', '·')
 
     val theme = LocalLumenTheme.current
     val cardShape = RoundedCornerShape(LumenThumbCorner)
@@ -142,7 +152,7 @@ private fun RecentPlaybackCard(
             )
         }
         Text(
-            text = record.title,
+            text = title,
             style = MaterialTheme.typography.bodyLarge,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,

@@ -817,6 +817,7 @@ fun VideoListScreen(
                             isSearching = isSearching,
                             hasRecentPlayback = hasRecentPlayback,
                             playbackStore = playbackStore,
+                            libraryEntries = libraryEntries,
                             onRecordClick = ::playRecentRecord,
                             showPinnedRow = showPinnedRow,
                             pinnedHomeEntries = pinnedHomeEntries,
