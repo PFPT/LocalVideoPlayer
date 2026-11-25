@@ -6,6 +6,7 @@ import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import kotlinx.coroutines.CoroutineDispatcher
 import java.net.HttpURLConnection
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -382,6 +383,110 @@ internal object HlsDownloader {
     private fun addHlsInflight(service: DownloadService, taskId: String, bytes: Long) {
         if (bytes == 0L) return
         service.hlsInflightBytes.getOrPut(taskId) { AtomicLong(0L) }.addAndGet(bytes)
+    }
+
+    suspend fun mergeDownloaded(
+        service: DownloadService,
+        taskId: String,
+        hlsPackage: File,
+        manager: DownloadManager,
+        control: TaskControl,
+        partFile: File,
+        mergeDispatcher: CoroutineDispatcher,
+        effectiveTask: (DownloadTask) -> DownloadTask,
+        onMerging: suspend (DownloadTask) -> Unit,
+    ): File? {
+        val task = manager.get(taskId) ?: return null
+        val effective = effectiveTask(task)
+        val playlist = resolveMergePlaylist(service, effective, hlsPackage)
+        val segmentFormat = playlist.segmentFormat()
+        val segmentFiles = listHlsSegmentFiles(service, hlsPackage, segmentFormat)
+        segmentFiles.forEach(HlsSegmentSniffer::stripDisguise)
+        service.hlsInitFile(hlsPackage).takeIf { it.exists() }?.let(HlsSegmentSniffer::stripDisguise)
+        if (segmentFiles.isEmpty()) {
+            throw IOException(service.getString(R.string.download_hls_merge_failed))
+        }
+        if (segmentFiles.size != playlist.segments.size) {
+            throw IOException(
+                service.getString(
+                    R.string.download_hls_merge_segment_mismatch,
+                    segmentFiles.size,
+                    playlist.segments.size,
+                ),
+            )
+        }
+        val mergedTemp = File(partFile.parentFile, "${task.id}.merge.mp4")
+        partFile.parentFile?.mkdirs()
+        try {
+            merge(
+                segmentFiles = segmentFiles,
+                durationsSec = playlist.segments.map { it.durationSec },
+                format = segmentFormat,
+                initFile = service.hlsInitFile(hlsPackage).takeIf { it.exists() },
+                outputFile = mergedTemp,
+                mergeDispatcher = mergeDispatcher,
+                onMerging = { onMerging(task) },
+            )
+            partFile.delete()
+            if (!mergedTemp.renameTo(partFile)) {
+                mergedTemp.copyTo(partFile, overwrite = true)
+                mergedTemp.delete()
+            }
+        } catch (error: AdvancedDownloadUnavailable) {
+            mergedTemp.delete()
+            partFile.delete()
+            throw error
+        } catch (error: Exception) {
+            mergedTemp.delete()
+            partFile.delete()
+            val message = when {
+                error.message == "SEGMENTS_CORRUPT" || error.message?.startsWith("SEGMENTS_CORRUPT:") == true ->
+                    service.getString(R.string.download_hls_segments_corrupt)
+                else -> {
+                    val detail = error.message?.takeIf { it.isNotBlank() }
+                    if (detail != null) {
+                        "${service.getString(R.string.download_hls_merge_failed)}: $detail"
+                    } else {
+                        service.getString(R.string.download_hls_merge_failed)
+                    }
+                }
+            }
+            throw IOException(message, error)
+        }
+        if (control.stopped) throw IOException(service.getString(R.string.download_paused))
+        hlsPackage.listFiles()?.forEach { it.delete() }
+        hlsPackage.delete()
+        return partFile
+    }
+
+    private fun resolveMergePlaylist(
+        service: DownloadService,
+        task: DownloadTask,
+        hlsPackage: File,
+    ): HlsVodPlaylist {
+        val localPlaylist = File(hlsPackage, DownloadService.HLS_SOURCE_PLAYLIST_NAME)
+        if (!localPlaylist.exists()) throw IOException(service.getString(R.string.download_hls_invalid))
+        return try {
+            HlsVodPlaylistParser.parseMediaPlaylist(task.hlsPlaylistUrl ?: task.url, localPlaylist.readText())
+        } catch (error: HlsVodException) {
+            throw IOException(service.hlsFailureMessage(error.failure), error)
+        }
+    }
+
+    private fun listHlsSegmentFiles(
+        service: DownloadService,
+        hlsPackage: File,
+        format: HlsSegmentFormat,
+    ): List<File> {
+        val files = mutableListOf<File>()
+        var index = 0
+        while (true) {
+            val segment = service.resolveSegmentFile(hlsPackage, format, index)
+            if (!segment.exists()) break
+            files += segment
+            index++
+        }
+        return files
     }
 
     suspend fun merge(

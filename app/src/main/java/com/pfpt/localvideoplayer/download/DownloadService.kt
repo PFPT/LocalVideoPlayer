@@ -272,7 +272,22 @@ class DownloadService : Service() {
             return
         }
         if (DownloadUrlClassifier.isMagnetUrl(task.url)) {
-            downloadTorrent(task, manager, control)
+            val saveDir = torrentDir(task.id)
+            val videoFile = TorrentDownloader.collect(
+                task = task,
+                saveDir = saveDir,
+                manager = manager,
+                control = control,
+                pausedMessage = getString(R.string.download_paused),
+                defaultFileName = getString(R.string.download_default_file_name),
+                onProgress = { downloaded, total, speedBps ->
+                    reportTorrentProgress(task.id, manager, downloaded, total, speedBps)
+                },
+            )
+            publishPart(task.id, videoFile, manager, control)
+            if (saveDir.exists()) {
+                saveDir.deleteRecursively()
+            }
             return
         }
         val isHls = DownloadUrlClassifier.isHlsDownloadUrl(task.url)
@@ -281,7 +296,39 @@ class DownloadService : Service() {
             hlsPackage.mkdirs()
             HlsDownloader.download(this, task, hlsPackage, manager, control)
             if (control.stopped) throw IOException(getString(R.string.download_paused))
-            mergeAndPublishHls(task.id, hlsPackage, manager, control)
+            val mergedPart = partFile(task.id)
+            val merged = HlsDownloader.mergeDownloaded(
+                service = this,
+                taskId = task.id,
+                hlsPackage = hlsPackage,
+                manager = manager,
+                control = control,
+                partFile = mergedPart,
+                mergeDispatcher = mergeDispatcher,
+                effectiveTask = ::effectiveTask,
+                onMerging = { current ->
+                    manager.update(task.id) { it.copy(isMerging = true, downloadSpeedBps = 0) }
+                    updateNotification(
+                        task = current.copy(isMerging = true, downloadSpeedBps = 0),
+                        taskId = current.id,
+                        merging = true,
+                        force = true,
+                    )
+                },
+            ) ?: return
+            manager.update(task.id) {
+                it.copy(
+                    partialPath = merged.absolutePath,
+                    hlsCompletedSegments = 0,
+                    hlsTotalSegments = 0,
+                    isMerging = false,
+                    hlsPlaylistUrl = null,
+                    hlsPlaylistSignature = null,
+                    downloadedBytes = merged.length(),
+                    totalBytes = merged.length(),
+                )
+            }
+            publishPart(task.id, merged, manager, control)
             return
         }
         val part = File(task.partialPath ?: mergedPart.absolutePath)
@@ -300,46 +347,6 @@ class DownloadService : Service() {
         )
         if (control.stopped) throw IOException(getString(R.string.download_paused))
         publishPart(task.id, part, manager, control)
-    }
-
-    private suspend fun downloadTorrent(task: DownloadTask, manager: DownloadManager, control: TaskControl) {
-        val saveDir = torrentDir(task.id)
-        saveDir.mkdirs()
-        manager.update(task.id) { it.copy(partialPath = saveDir.absolutePath) }
-        val videoFile = try {
-            TorrentDownloader.download(
-                taskId = task.id,
-                magnetUri = task.url,
-                saveDir = saveDir,
-                shouldStop = { control.stopped },
-                isCanceled = { control.canceled },
-                onName = { name ->
-                    val sanitized = DownloadNameResolver.sanitizeTitle(name)
-                    if (sanitized.isBlank()) return@download
-                    val currentName = manager.get(task.id)?.fileName.orEmpty()
-                    val looksLikeHash = currentName.length in 32..64 && currentName.all { it.isLetterOrDigit() }
-                    if (looksLikeHash || currentName.isBlank() || currentName == getString(R.string.download_default_file_name)) {
-                        val withExt = if ('.' in sanitized.substringAfterLast('/')) sanitized else "$sanitized.mp4"
-                        manager.update(task.id) { it.copy(fileName = withExt) }
-                    }
-                },
-                onProgress = { downloaded, total, speedBps ->
-                    reportTorrentProgress(task.id, manager, downloaded, total, speedBps)
-                },
-            )
-        } catch (error: IOException) {
-            if (control.stopped && !control.canceled) {
-                throw IOException(getString(R.string.download_paused))
-            }
-            throw error
-        }
-        if (control.stopped) throw IOException(getString(R.string.download_paused))
-        val publishedName = ensureExtension(manager.get(task.id)?.fileName ?: videoFile.name, videoFile.name)
-        manager.update(task.id) { it.copy(fileName = publishedName) }
-        publishPart(task.id, videoFile, manager, control)
-        if (saveDir.exists()) {
-            saveDir.deleteRecursively()
-        }
     }
 
     private suspend fun reportTorrentProgress(
@@ -386,13 +393,6 @@ class DownloadService : Service() {
             taskId = taskId,
             force = force,
         )
-    }
-
-    private fun ensureExtension(preferred: String, fallbackFileName: String): String {
-        val preferredBase = preferred.substringAfterLast('/')
-        if ('.' in preferredBase) return preferred
-        val ext = fallbackFileName.substringAfterLast('.', "")
-        return if (ext.isNotBlank()) "$preferred.$ext" else preferred
     }
 
     internal suspend fun reportTrackedProgress(
@@ -452,96 +452,6 @@ class DownloadService : Service() {
         HlsVodFailure.UNSUPPORTED_FRAGMENTED -> getString(R.string.download_hls_fragmented_unsupported)
         HlsVodFailure.UNSUPPORTED_TS -> getString(R.string.download_hls_ts_unsupported)
         HlsVodFailure.UNSUPPORTED_SEGMENT -> getString(R.string.download_hls_segment_unsupported)
-    }
-
-    private suspend fun mergeAndPublishHls(
-        taskId: String,
-        hlsPackage: File,
-        manager: DownloadManager,
-        control: TaskControl,
-    ) {
-        val task = manager.get(taskId) ?: return
-        val effective = effectiveTask(task)
-        val playlist = resolveMergePlaylist(effective, hlsPackage)
-        val segmentFormat = playlist.segmentFormat()
-        val segmentFiles = listHlsSegmentFiles(hlsPackage, segmentFormat)
-        segmentFiles.forEach(HlsSegmentSniffer::stripDisguise)
-        hlsInitFile(hlsPackage).takeIf { it.exists() }?.let(HlsSegmentSniffer::stripDisguise)
-        if (segmentFiles.isEmpty()) {
-            throw IOException(getString(R.string.download_hls_merge_failed))
-        }
-        if (segmentFiles.size != playlist.segments.size) {
-            throw IOException(
-                getString(
-                    R.string.download_hls_merge_segment_mismatch,
-                    segmentFiles.size,
-                    playlist.segments.size,
-                ),
-            )
-        }
-        val mergedPart = partFile(task.id)
-        val mergedTemp = File(mergedPart.parentFile, "${task.id}.merge.mp4")
-        mergedPart.parentFile?.mkdirs()
-        try {
-            HlsDownloader.merge(
-                segmentFiles = segmentFiles,
-                durationsSec = playlist.segments.map { it.durationSec },
-                format = segmentFormat,
-                initFile = hlsInitFile(hlsPackage).takeIf { it.exists() },
-                outputFile = mergedTemp,
-                mergeDispatcher = mergeDispatcher,
-                onMerging = {
-                    manager.update(taskId) { it.copy(isMerging = true, downloadSpeedBps = 0) }
-                    updateNotification(
-                        task = task.copy(isMerging = true, downloadSpeedBps = 0),
-                        taskId = task.id,
-                        merging = true,
-                        force = true,
-                    )
-                },
-            )
-            mergedPart.delete()
-            if (!mergedTemp.renameTo(mergedPart)) {
-                mergedTemp.copyTo(mergedPart, overwrite = true)
-                mergedTemp.delete()
-            }
-        } catch (error: AdvancedDownloadUnavailable) {
-            mergedTemp.delete()
-            mergedPart.delete()
-            throw error
-        } catch (error: Exception) {
-            mergedTemp.delete()
-            mergedPart.delete()
-            val message = when {
-                error.message == "SEGMENTS_CORRUPT" || error.message?.startsWith("SEGMENTS_CORRUPT:") == true ->
-                    getString(R.string.download_hls_segments_corrupt)
-                else -> {
-                    val detail = error.message?.takeIf { it.isNotBlank() }
-                    if (detail != null) {
-                        "${getString(R.string.download_hls_merge_failed)}: $detail"
-                    } else {
-                        getString(R.string.download_hls_merge_failed)
-                    }
-                }
-            }
-            throw IOException(message, error)
-        }
-        if (control.stopped) throw IOException(getString(R.string.download_paused))
-        hlsPackage.listFiles()?.forEach { it.delete() }
-        hlsPackage.delete()
-        manager.update(taskId) {
-            it.copy(
-                partialPath = mergedPart.absolutePath,
-                hlsCompletedSegments = 0,
-                hlsTotalSegments = 0,
-                isMerging = false,
-                hlsPlaylistUrl = null,
-                hlsPlaylistSignature = null,
-                downloadedBytes = mergedPart.length(),
-                totalBytes = mergedPart.length(),
-            )
-        }
-        publishPart(taskId, mergedPart, manager, control)
     }
 
     internal suspend fun reportProgress(
@@ -727,19 +637,6 @@ class DownloadService : Service() {
         taskProgressSnapshots.keys.toList().forEach { cancelTaskNotification(it) }
     }
 
-    private fun resolveMergePlaylist(
-        task: DownloadTask,
-        hlsPackage: File,
-    ): HlsVodPlaylist {
-        val localPlaylist = File(hlsPackage, HLS_SOURCE_PLAYLIST_NAME)
-        if (!localPlaylist.exists()) throw IOException(getString(R.string.download_hls_invalid))
-        return try {
-            HlsVodPlaylistParser.parseMediaPlaylist(task.hlsPlaylistUrl ?: task.url, localPlaylist.readText())
-        } catch (error: HlsVodException) {
-            throw IOException(hlsFailureMessage(error.failure), error)
-        }
-    }
-
     private fun startForegroundSafely(id: Int, notification: android.app.Notification) {
         try {
             startForeground(id, notification)
@@ -863,18 +760,6 @@ class DownloadService : Service() {
     }
 
     internal fun hlsInitFile(hlsPackage: File) = File(hlsPackage, "init.mp4")
-
-    private fun listHlsSegmentFiles(hlsPackage: File, format: HlsSegmentFormat): List<File> {
-        val files = mutableListOf<File>()
-        var index = 0
-        while (true) {
-            val segment = resolveSegmentFile(hlsPackage, format, index)
-            if (!segment.exists()) break
-            files += segment
-            index++
-        }
-        return files
-    }
 
     internal fun directorySize(directory: File): Long =
         directory.listFiles()?.sumOf { if (it.isFile) it.length() else 0L } ?: 0L

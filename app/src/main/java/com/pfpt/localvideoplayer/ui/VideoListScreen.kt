@@ -6,13 +6,8 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -20,46 +15,25 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.BrightnessAuto
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.VideoLibrary
-import androidx.compose.material.icons.outlined.StarOutline
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -85,14 +59,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
 import com.pfpt.localvideoplayer.data.HiddenVideosStore
@@ -117,27 +87,15 @@ import com.pfpt.localvideoplayer.model.showPinnedHomeRow
 import com.pfpt.localvideoplayer.model.partitionWithPinned
 import com.pfpt.localvideoplayer.model.searchLibrary
 import com.pfpt.localvideoplayer.model.sortLibrary
-import com.pfpt.localvideoplayer.model.withoutUris
 import com.pfpt.localvideoplayer.player.PlaylistState
 import com.pfpt.localvideoplayer.cast.CastUiState
 import com.pfpt.localvideoplayer.cast.LocalCastManager
-import com.pfpt.localvideoplayer.ui.components.CastButton
 import com.pfpt.localvideoplayer.ui.components.CastDeviceBottomSheet
 import com.pfpt.localvideoplayer.ui.components.CastMiniController
 import com.pfpt.localvideoplayer.ui.components.rememberCastSheetActions
-import com.pfpt.localvideoplayer.ui.components.DeleteVideoDialog
 import com.pfpt.localvideoplayer.ui.components.LibraryOptionsBottomSheet
-import com.pfpt.localvideoplayer.ui.components.LumenEmptyState
 import com.pfpt.localvideoplayer.ui.components.LumenLibraryTabBar
-import com.pfpt.localvideoplayer.ui.components.LumenListHeader
-import com.pfpt.localvideoplayer.ui.components.PinnedLibraryRow
-import com.pfpt.localvideoplayer.ui.components.RecentPlaybackSection
-import com.pfpt.localvideoplayer.ui.components.SelectionTopBar
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
-import com.pfpt.localvideoplayer.ui.theme.LumenListHorizontalInset
-import com.pfpt.localvideoplayer.ui.theme.LumenListItemGap
-import com.pfpt.localvideoplayer.ui.theme.LumenSpaceMd
-import com.pfpt.localvideoplayer.ui.theme.LumenSpaceSm
 import com.pfpt.localvideoplayer.ui.theme.LumenSpaceXs
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -145,10 +103,11 @@ import com.pfpt.localvideoplayer.ui.theme.ThemeMode
 import com.pfpt.localvideoplayer.ui.theme.ThemeState
 import com.pfpt.localvideoplayer.util.M3uPlaylistParser
 import com.pfpt.localvideoplayer.ui.library.AnyLibraryRow
+import com.pfpt.localvideoplayer.ui.library.LibraryHomeList
+import com.pfpt.localvideoplayer.ui.library.LibraryScreenChrome
 import com.pfpt.localvideoplayer.ui.library.playCountKeyForVideo
 import com.pfpt.localvideoplayer.ui.library.subtitleForDelete
 import com.pfpt.localvideoplayer.ui.library.titleForUri
-import com.pfpt.localvideoplayer.ui.library.titleForUris
 import com.pfpt.localvideoplayer.ui.library.urisForEntry
 import com.pfpt.localvideoplayer.util.isM3u8Title
 import kotlinx.coroutines.Dispatchers
@@ -161,8 +120,6 @@ private val VIDEO_PICKER_MIME_TYPES = arrayOf(
     "application/vnd.apple.mpegurl",
     "application/x-mpegURL",
 )
-
-private val LibraryRowPlacement = tween<IntOffset>(durationMillis = 200)
 
 private data class LibraryProcessCache(
     val signature: String,
@@ -206,7 +163,7 @@ private fun libraryProcessSignature(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoListScreen(
     libraryEntries: List<VideoLibraryEntry>,
@@ -679,20 +636,6 @@ fun VideoListScreen(
         )
     }
 
-    if (showDeleteDialog) {
-        val uris = pendingDeleteUris
-        if (uris != null) {
-            DeleteVideoDialog(
-                count = uris.size,
-                subtitle = pendingDeleteSubtitle,
-                isDeleting = isDeleting,
-                onDismiss = ::closeDeleteDialog,
-                onHideFromList = { hideVideos(uris) },
-                onDeleteFromDevice = { deleteFromDevice(uris) },
-            )
-        }
-    }
-
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets.safeDrawing.only(
@@ -700,167 +643,60 @@ fun VideoListScreen(
         ),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            AnimatedContent(
-                targetState = selectionMode,
-                transitionSpec = {
-                    fadeIn(animationSpec = tween(180)) togetherWith
-                        fadeOut(animationSpec = tween(180))
+            LibraryScreenChrome(
+                selectionMode = selectionMode,
+                isSearching = isSearching,
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
+                onExitSearch = {
+                    isSearching = false
+                    searchQuery = ""
                 },
-                label = "library-top-bar",
-                modifier = Modifier.statusBarsPadding(),
-            ) { selecting ->
-                if (selecting) {
-                    SelectionTopBar(
-                        selectedCount = selectedKeys.size,
-                        totalCount = displayLibrary.size,
-                        onSelectAll = {
-                            selectedKeys = displayLibrary.map { entryKey(it) }.toSet()
-                        },
-                        onDelete = {
-                            openDeleteDialog(urisForKeys(selectedKeys))
-                        },
-                        onCancel = ::exitSelectionMode,
-                    )
-                } else if (isSearching) {
-                    LumenListHeader(
-                        title = stringResource(R.string.search),
-                        onBack = {
-                            isSearching = false
-                            searchQuery = ""
-                        },
-                        applyStatusBarPadding = false,
-                        titleContent = {
-                            BasicTextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
-                                singleLine = true,
-                                textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                    color = MaterialTheme.colorScheme.onBackground,
-                                ),
-                                cursorBrush = SolidColor(theme.accent),
-                                modifier = Modifier.fillMaxWidth(),
-                                decorationBox = { innerTextField ->
-                                    Box(modifier = Modifier.fillMaxWidth()) {
-                                        if (searchQuery.isEmpty()) {
-                                            Text(
-                                                text = stringResource(R.string.search_hint),
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                color = theme.onSurfaceMuted,
-                                            )
-                                        }
-                                        innerTextField()
-                                    }
-                                },
-                            )
-                        },
-                        actions = {
-                            if (searchQuery.isNotEmpty()) {
-                                HeaderIconButton(
-                                    onClick = { searchQuery = "" },
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = stringResource(R.string.search_clear),
-                                )
-                            }
-                        },
-                    )
-                } else {
-                    LumenListHeader(
-                        title = stringResource(R.string.video_list_title),
-                        titleContent = {
-                            Icon(
-                                imageVector = Icons.Filled.VideoLibrary,
-                                contentDescription = stringResource(R.string.video_list_title),
-                                tint = MaterialTheme.colorScheme.onBackground,
-                            )
-                        },
-                        applyStatusBarPadding = false,
-                        actions = {
-                            if (castManager != null) {
-                                CastButton(
-                                    state = castState,
-                                    onClick = { castSheet.open() },
-                                    modifier = Modifier.size(40.dp),
-                                )
-                            }
-                            HeaderIconButton(
-                                onClick = { isSearching = true },
-                                imageVector = Icons.Filled.Search,
-                                contentDescription = stringResource(R.string.search),
-                            )
-                            HeaderIconButton(
-                                onClick = onOpenDownloads,
-                                imageVector = Icons.Filled.Download,
-                                contentDescription = stringResource(R.string.downloads_title),
-                            )
-                            HeaderIconButton(
-                                onClick = {
-                                    val next = if (isMarkedTabActive) {
-                                        LibraryTypeTab.ALL
-                                    } else {
-                                        LibraryTypeTab.MARKED
-                                    }
-                                    scope.launch { libraryPreferencesStore.setTypeTab(next) }
-                                },
-                                imageVector = if (isMarkedTabActive) {
-                                    Icons.Filled.Star
-                                } else {
-                                    Icons.Outlined.StarOutline
-                                },
-                                contentDescription = stringResource(R.string.tab_marked),
-                                tint = if (isMarkedTabActive) {
-                                    theme.accent
-                                } else {
-                                    MaterialTheme.colorScheme.onBackground
-                                },
-                            )
-                            HeaderIconButton(
-                                onClick = {
-                                    val nextMode = when (themeState.mode) {
-                                        ThemeMode.System -> ThemeMode.Light
-                                        ThemeMode.Light -> ThemeMode.Dark
-                                        ThemeMode.Dark -> ThemeMode.System
-                                    }
-                                    scope.launch {
-                                        themeStore.setThemeMode(nextMode)
-                                    }
-                                },
-                                imageVector = when (themeState.mode) {
-                                    ThemeMode.System -> Icons.Default.BrightnessAuto
-                                    ThemeMode.Dark -> Icons.Default.LightMode
-                                    ThemeMode.Light -> Icons.Default.DarkMode
-                                },
-                                contentDescription = when (themeState.mode) {
-                                    ThemeMode.System -> stringResource(R.string.theme_mode_system)
-                                    ThemeMode.Dark -> stringResource(R.string.theme_mode_light)
-                                    ThemeMode.Light -> stringResource(R.string.theme_mode_dark)
-                                },
-                            )
-                            HeaderIconButton(
-                                onClick = onOpenSettings,
-                                imageVector = Icons.Filled.Settings,
-                                contentDescription = stringResource(R.string.settings),
-                            )
-                            Box {
-                                HeaderIconButton(
-                                    onClick = { showOptionsSheet = true },
-                                    imageVector = Icons.AutoMirrored.Filled.Sort,
-                                    contentDescription = stringResource(R.string.library_options),
-                                )
-                                if (hasActiveOptions) {
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .padding(end = 6.dp, top = 6.dp)
-                                            .size(8.dp)
-                                            .clip(CircleShape)
-                                            .background(theme.accent),
-                                    )
-                                }
-                            }
-                        },
-                    )
-                }
-            }
+                onStartSearch = { isSearching = true },
+                selectedCount = selectedKeys.size,
+                totalCount = displayLibrary.size,
+                onSelectAll = {
+                    selectedKeys = displayLibrary.map { entryKey(it) }.toSet()
+                },
+                onDeleteSelection = {
+                    openDeleteDialog(urisForKeys(selectedKeys))
+                },
+                onExitSelection = ::exitSelectionMode,
+                castManager = castManager,
+                castState = castState,
+                onOpenCast = { castSheet.open() },
+                onOpenDownloads = onOpenDownloads,
+                isMarkedTabActive = isMarkedTabActive,
+                onToggleMarked = {
+                    val next = if (isMarkedTabActive) {
+                        LibraryTypeTab.ALL
+                    } else {
+                        LibraryTypeTab.MARKED
+                    }
+                    scope.launch { libraryPreferencesStore.setTypeTab(next) }
+                },
+                themeMode = themeState.mode,
+                onCycleTheme = {
+                    val nextMode = when (themeState.mode) {
+                        ThemeMode.System -> ThemeMode.Light
+                        ThemeMode.Light -> ThemeMode.Dark
+                        ThemeMode.Dark -> ThemeMode.System
+                    }
+                    scope.launch {
+                        themeStore.setThemeMode(nextMode)
+                    }
+                },
+                onOpenSettings = onOpenSettings,
+                onOpenOptions = { showOptionsSheet = true },
+                hasActiveOptions = hasActiveOptions,
+                showDeleteDialog = showDeleteDialog && pendingDeleteUris != null,
+                deleteCount = pendingDeleteUris?.size ?: 0,
+                deleteSubtitle = pendingDeleteSubtitle,
+                isDeleting = isDeleting,
+                onDismissDelete = ::closeDeleteDialog,
+                onHideFromList = { pendingDeleteUris?.let(::hideVideos) },
+                onDeleteFromDevice = { pendingDeleteUris?.let(deleteFromDevice) },
+            )
         },
         floatingActionButton = {
             AnimatedVisibility(
@@ -975,250 +811,35 @@ fun VideoListScreen(
                                     enabled = !selectionMode,
                                 ),
                         ) {
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(
-                                start = LumenListHorizontalInset,
-                                end = LumenListHorizontalInset,
-                                top = LumenSpaceMd,
-                                bottom = 88.dp,
-                            ),
-                            verticalArrangement = Arrangement.spacedBy(LumenListItemGap),
-                        ) {
-                            if (!selectionMode && !isSearching && hasRecentPlayback) {
-                                item(key = "recent-playback") {
-                                    RecentPlaybackSection(
-                                        playbackStore = playbackStore,
-                                        onRecordClick = ::playRecentRecord,
-                                        modifier = Modifier.animateItem(placementSpec = null),
-                                    )
+                        LibraryHomeList(
+                            listState = listState,
+                            selectionMode = selectionMode,
+                            isSearching = isSearching,
+                            hasRecentPlayback = hasRecentPlayback,
+                            playbackStore = playbackStore,
+                            onRecordClick = ::playRecentRecord,
+                            showPinnedRow = showPinnedRow,
+                            pinnedHomeEntries = pinnedHomeEntries,
+                            onPinnedClick = ::openPinned,
+                            cacheResolved = cacheResolved,
+                            libraryEntryCount = libraryEntries.size,
+                            isLibraryLoading = isLibraryLoading,
+                            isSortingLibrary = isSortingLibrary,
+                            visibleLibrary = visibleLibrary,
+                            searchQuery = searchQuery,
+                            viewLayout = viewLayout,
+                            flatLibrary = flatLibrary,
+                            pinnedSections = pinnedSections,
+                            collapseSingles = collapseSingles,
+                            onToggleCollapseSingles = {
+                                scope.launch {
+                                    libraryPreferencesStore.setCollapseSingles(!collapseSingles)
                                 }
-                            }
-                            if (showPinnedRow) {
-                                item(key = "pinned-home-row") {
-                                    PinnedLibraryRow(
-                                        entries = pinnedHomeEntries,
-                                        playbackStore = playbackStore,
-                                        onEntryClick = ::openPinned,
-                                        modifier = Modifier.animateItem(placementSpec = null),
-                                    )
-                                }
-                            }
-
-                            when (
-                                libraryOpening(
-                                    cacheResolved = cacheResolved,
-                                    entryCount = libraryEntries.size,
-                                    isLibraryLoading = isLibraryLoading,
-                                )
-                            ) {
-                                LibraryOpening.Hold, LibraryOpening.List -> Unit
-                                LibraryOpening.Loading -> {
-                                    item(key = "library-loading") {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillParentMaxWidth()
-                                                .padding(vertical = 48.dp)
-                                                .animateItem(placementSpec = null),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            CircularProgressIndicator(color = theme.accent)
-                                        }
-                                    }
-                                }
-                                LibraryOpening.Empty -> {
-                                    if (!hasRecentPlayback) {
-                                        item(key = "empty") {
-                                            LumenEmptyState(
-                                                title = stringResource(R.string.empty_video_list),
-                                                subtitle = stringResource(R.string.empty_video_hint),
-                                                icon = Icons.Default.VideoLibrary,
-                                                modifier = Modifier
-                                                    .fillParentMaxSize()
-                                                    .padding(24.dp)
-                                                    .animateItem(placementSpec = null),
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (
-                                !isLibraryLoading &&
-                                !isSortingLibrary &&
-                                visibleLibrary.isEmpty() &&
-                                libraryEntries.isNotEmpty()
-                            ) {
-                                item(key = "no-filter-results") {
-                                    LumenEmptyState(
-                                        title = stringResource(
-                                            if (searchQuery.isNotBlank()) {
-                                                R.string.no_search_results
-                                            } else {
-                                                R.string.no_filter_results
-                                            },
-                                        ),
-                                        icon = Icons.Filled.Search,
-                                        modifier = Modifier
-                                            .fillParentMaxWidth()
-                                            .padding(24.dp)
-                                            .animateItem(placementSpec = null),
-                                    )
-                                }
-                            }
-
-                            if (viewLayout == LibraryViewLayout.FLAT) {
-                                items(
-                                    items = flatLibrary,
-                                    key = { entry -> "flat-${viewLayout.name}-${entryKey(entry)}" },
-                                    contentType = { entry ->
-                                        when (entry) {
-                                            is VideoLibraryEntry.Series -> 0
-                                            is VideoLibraryEntry.Single -> 1
-                                        }
-                                    },
-                                ) { entry ->
-                                    Box(modifier = Modifier.animateItem(placementSpec = LibraryRowPlacement)) {
-                                        LibraryListRow(
-                                            entry = entry,
-                                            listKey = "flat-${viewLayout.name}-${entryKey(entry)}",
-                                        )
-                                    }
-                                }
-                            } else {
-                                val sections = pinnedSections
-                                if (sections != null) {
-                                    if (sections.pinned.isNotEmpty() && !showPinnedRow) {
-                                        item(key = "header-pinned-${viewLayout.name}") {
-                                            LibrarySectionHeader(
-                                                title = stringResource(R.string.section_pinned),
-                                                modifier = Modifier.animateItem(placementSpec = null),
-                                            )
-                                        }
-                                        items(
-                                            items = sections.pinned,
-                                            key = { entry -> "sectioned-${viewLayout.name}-${entryKey(entry)}" },
-                                            contentType = { entry ->
-                                                when (entry) {
-                                                    is VideoLibraryEntry.Series -> 0
-                                                    is VideoLibraryEntry.Single -> 1
-                                                }
-                                            },
-                                        ) { entry ->
-                                            Box(modifier = Modifier.animateItem(placementSpec = LibraryRowPlacement)) {
-                                                LibraryListRow(
-                                                    entry = entry,
-                                                    listKey = "sectioned-${viewLayout.name}-${entryKey(entry)}",
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    if (sections.episodes.isNotEmpty()) {
-                                        item(key = "header-episodes") {
-                                            LibrarySectionHeader(
-                                                title = stringResource(R.string.section_episodes),
-                                                modifier = Modifier.animateItem(placementSpec = null),
-                                            )
-                                        }
-                                        items(
-                                            items = sections.episodes,
-                                            key = { entry -> entryKey(entry) },
-                                            contentType = { 0 },
-                                        ) { entry ->
-                                            Box(modifier = Modifier.animateItem(placementSpec = LibraryRowPlacement)) {
-                                                LibraryListRow(
-                                                    entry = entry,
-                                                    listKey = entryKey(entry),
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    if (sections.folders.isNotEmpty()) {
-                                        item(key = "header-folders") {
-                                            LibrarySectionHeader(
-                                                title = stringResource(R.string.section_folders),
-                                                modifier = Modifier.animateItem(placementSpec = null),
-                                            )
-                                        }
-                                        items(
-                                            items = sections.folders,
-                                            key = { entry -> entryKey(entry) },
-                                            contentType = { 0 },
-                                        ) { entry ->
-                                            Box(modifier = Modifier.animateItem(placementSpec = LibraryRowPlacement)) {
-                                                LibraryListRow(
-                                                    entry = entry,
-                                                    listKey = entryKey(entry),
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    if (sections.shortClips.isNotEmpty()) {
-                                        item(key = "header-short-clips") {
-                                            LibrarySectionHeader(
-                                                title = stringResource(R.string.section_short_clips),
-                                                modifier = Modifier.animateItem(placementSpec = null),
-                                            )
-                                        }
-                                        items(
-                                            items = sections.shortClips,
-                                            key = { entry -> entryKey(entry) },
-                                            contentType = { 0 },
-                                        ) { entry ->
-                                            Box(modifier = Modifier.animateItem(placementSpec = LibraryRowPlacement)) {
-                                                LibraryListRow(
-                                                    entry = entry,
-                                                    listKey = entryKey(entry),
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                        if (sections.singles.isNotEmpty()) {
-                                            item(key = "singles-header") {
-                                                SinglesCollapseHeader(
-                                                    title = if (collapseSingles) {
-                                                        stringResource(
-                                                            R.string.expand_singles,
-                                                            sections.singles.size,
-                                                        )
-                                                    } else {
-                                                        stringResource(
-                                                            R.string.section_other_videos,
-                                                            sections.singles.size,
-                                                        )
-                                                    },
-                                                    expanded = !collapseSingles,
-                                                    onClick = {
-                                                        scope.launch {
-                                                            libraryPreferencesStore.setCollapseSingles(!collapseSingles)
-                                                        }
-                                                    },
-                                                    modifier = Modifier.animateItem(placementSpec = null),
-                                                )
-                                            }
-                                            if (!collapseSingles) {
-                                                items(
-                                                    items = sections.singles,
-                                                    key = { entry -> entryKey(entry) },
-                                                    contentType = { 1 },
-                                                ) { entry ->
-                                                    Box(modifier = Modifier.animateItem(placementSpec = LibraryRowPlacement)) {
-                                                        LibraryListRow(
-                                                            entry = entry,
-                                                            listKey = entryKey(entry),
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                }
-                            }
-                        }
+                            },
+                            row = { entry, listKey ->
+                                LibraryListRow(entry, listKey)
+                            },
+                        )
                         PullToRefreshDefaults.Indicator(
                             modifier = Modifier.align(Alignment.TopCenter),
                             isRefreshing = isRefreshing,
@@ -1229,60 +850,6 @@ fun VideoListScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun LibrarySectionHeader(
-    title: String,
-    modifier: Modifier = Modifier,
-) {
-    val theme = LocalLumenTheme.current
-    Text(
-        text = title,
-        style = MaterialTheme.typography.labelLarge,
-        color = theme.onSurfaceMuted,
-        modifier = modifier.padding(top = LumenSpaceSm, bottom = LumenSpaceXs),
-    )
-}
-
-@Composable
-private fun SinglesCollapseHeader(
-    title: String,
-    expanded: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val theme = LocalLumenTheme.current
-    val chevronRotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        label = "singles-chevron",
-    )
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .animateContentSize(
-                animationSpec = spring(stiffness = Spring.StiffnessLow),
-            )
-            .clickable(onClick = onClick)
-            .padding(top = LumenSpaceSm, bottom = LumenSpaceXs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LumenSpaceXs),
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (expanded) theme.onSurfaceMuted else theme.accent,
-            modifier = Modifier.weight(1f),
-        )
-        Icon(
-            imageVector = Icons.Default.ExpandMore,
-            contentDescription = null,
-            tint = if (expanded) theme.onSurfaceMuted else theme.accent,
-            modifier = Modifier
-                .size(18.dp)
-                .rotate(chevronRotation),
-        )
     }
 }
 
@@ -1310,25 +877,3 @@ private fun VideoListFab(
     }
 }
 
-@Composable
-private fun HeaderIconButton(
-    onClick: () -> Unit,
-    imageVector: ImageVector,
-    contentDescription: String,
-    tint: Color = MaterialTheme.colorScheme.onBackground,
-) {
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = imageVector,
-            contentDescription = contentDescription,
-            tint = tint,
-            modifier = Modifier.size(22.dp),
-        )
-    }
-}
