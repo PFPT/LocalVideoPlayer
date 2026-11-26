@@ -253,6 +253,7 @@ object TorrentSession {
 
             val info = waitForCachedInfo(torrentInfoRef, infoHashRef, manager, taskId, shouldStop, isCanceled, errorRef)
             onName(info.name())
+            assertPathsInside(saveDir, info)
             if (!prioritized.get()) {
                 withHandle(manager, taskId, infoHashRef.get()) { handle ->
                     if (prioritized.compareAndSet(false, true)) {
@@ -317,7 +318,7 @@ object TorrentSession {
             video
         } catch (error: IOException) {
             outcome = when {
-                isCanceled() -> Outcome.CANCELED
+                error is TorrentPathEscape || isCanceled() -> Outcome.CANCELED
                 shouldStop() -> Outcome.PAUSED
                 else -> Outcome.FAILED
             }
@@ -465,7 +466,7 @@ object TorrentSession {
         runCatching { if (handle.isValid) handle.torrentFile() else null }.getOrNull()
 
     private fun buildSpeedSettings(): SettingsPack = SettingsPack().apply {
-        connectionsLimit(800)
+        connectionsLimit(200)
         downloadRateLimit(0)
         uploadRateLimit(UPLOAD_RATE_LIMIT_BPS)
         activeDownloads(-1)
@@ -553,7 +554,7 @@ object TorrentSession {
             val ext = name.substringAfterLast('.', "").lowercase()
             if (ext !in videoExtensions) continue
             val relative = storage.filePath(index)
-            val file = File(saveDir, relative)
+            val file = com.pfpt.localvideoplayer.download.DownloadPathGuard.resolveInside(saveDir, relative) ?: continue
             if (!file.isFile) continue
             val size = file.length()
             if (size > bestSize) {
@@ -563,9 +564,22 @@ object TorrentSession {
         }
         if (bestFile != null) return bestFile
         return saveDir.walkTopDown()
-            .filter { it.isFile }
+            .filter { it.isFile && com.pfpt.localvideoplayer.download.DownloadPathGuard.isInside(saveDir, it) }
             .filter { it.extension.lowercase() in videoExtensions }
             .maxByOrNull { it.length() }
-            ?: saveDir.walkTopDown().filter { it.isFile }.maxByOrNull { it.length() }
+            ?: saveDir.walkTopDown()
+                .filter { it.isFile && com.pfpt.localvideoplayer.download.DownloadPathGuard.isInside(saveDir, it) }
+                .maxByOrNull { it.length() }
     }
+
+    private fun assertPathsInside(saveDir: File, info: TorrentInfo) {
+        val storage = info.files()
+        for (index in 0 until info.numFiles()) {
+            if (com.pfpt.localvideoplayer.download.DownloadPathGuard.resolveInside(saveDir, storage.filePath(index)) == null) {
+                throw TorrentPathEscape()
+            }
+        }
+    }
+
+    private class TorrentPathEscape : IOException("torrent path escapes save directory")
 }

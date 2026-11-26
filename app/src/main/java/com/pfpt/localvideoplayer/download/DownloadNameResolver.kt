@@ -5,18 +5,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
 import java.io.IOException
-import java.io.InputStreamReader
-import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
-import java.net.ServerSocket
 import java.net.URL
-import java.net.URLDecoder
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
-import kotlin.concurrent.thread
 
 object DownloadNameResolver {
     data class ParsedShare(
@@ -697,113 +688,16 @@ object DownloadNameResolver {
         }
     }.getOrNull()
 
-    private fun fetchFongMiHistory(baseUrl: String): List<FongMiHistoryEntry>? {
+    private suspend fun fetchFongMiHistory(baseUrl: String): List<FongMiHistoryEntry>? {
         val deviceBody = httpGet("$baseUrl/device") ?: return null
-        return runCatching {
-            repeat(HISTORY_SYNC_MAX_ATTEMPTS) { attempt ->
-                val payload = runHistorySyncAttempt(baseUrl, deviceBody)
-                if (!payload.isNullOrBlank()) {
-                    return@runCatching parseHistoryEntries(payload)
-                }
-                if (attempt < HISTORY_SYNC_MAX_ATTEMPTS - 1) {
-                    Thread.sleep(HISTORY_SYNC_RETRY_DELAY_MS)
-                }
+        repeat(HISTORY_SYNC_MAX_ATTEMPTS) { attempt ->
+            val payload = runCatching { FongMiHistorySync.attempt(baseUrl, deviceBody) }.getOrNull()
+            if (!payload.isNullOrBlank()) return parseHistoryEntries(payload)
+            if (attempt < HISTORY_SYNC_MAX_ATTEMPTS - 1) {
+                kotlinx.coroutines.delay(HISTORY_SYNC_RETRY_DELAY_MS)
             }
-            emptyList()
-        }.getOrNull()
-    }
-
-    private fun runHistorySyncAttempt(baseUrl: String, deviceBody: String): String? {
-        val targetsPayload = AtomicReference<String?>(null)
-        val readyLatch = CountDownLatch(1)
-        val doneLatch = CountDownLatch(1)
-        val server = ServerSocket(0)
-        try {
-            val listenPort = server.localPort
-            val syncDevice = JSONObject(deviceBody).apply {
-                put("ip", "http://127.0.0.1:$listenPort")
-            }
-            thread(name = "fongmi-history-sync", isDaemon = true) {
-                try {
-                    readyLatch.countDown()
-                    server.accept().use { socket ->
-                        socket.soTimeout = HISTORY_SYNC_TIMEOUT_MS
-                        val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
-                        val requestLine = reader.readLine().orEmpty()
-                        if (!requestLine.startsWith("POST", ignoreCase = true)) return@thread
-                        val headers = mutableMapOf<String, String>()
-                        while (true) {
-                            val line = reader.readLine() ?: break
-                            if (line.isEmpty()) break
-                            val colon = line.indexOf(':')
-                            if (colon > 0) {
-                                headers[line.substring(0, colon).trim().lowercase()] =
-                                    line.substring(colon + 1).trim()
-                            }
-                        }
-                        val contentLength = headers["content-length"]?.toIntOrNull() ?: 0
-                        val body = if (contentLength > 0) {
-                            val buffer = CharArray(contentLength)
-                            var read = 0
-                            while (read < contentLength) {
-                                val count = reader.read(buffer, read, contentLength - read)
-                                if (count < 0) break
-                                read += count
-                            }
-                            String(buffer, 0, read.coerceAtMost(contentLength))
-                        } else {
-                            reader.readText()
-                        }
-                        targetsPayload.set(parseTargetsPayload(body))
-                        OutputStreamWriter(socket.getOutputStream()).use { writer ->
-                            writer.write("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK")
-                            writer.flush()
-                        }
-                    }
-                } catch (_: IOException) {
-                } finally {
-                    doneLatch.countDown()
-                }
-            }
-            readyLatch.await(HISTORY_SYNC_READY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-            val posted = postFongMiHistorySync(baseUrl, syncDevice.toString())
-            if (!posted) {
-                runCatching { server.close() }
-                doneLatch.await(HISTORY_SYNC_FAIL_FAST_MS, TimeUnit.MILLISECONDS)
-                return targetsPayload.get()
-            }
-            doneLatch.await(HISTORY_SYNC_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
-        } finally {
-            runCatching { server.close() }
         }
-        return targetsPayload.get()
-    }
-
-    private fun postFongMiHistorySync(baseUrl: String, deviceJson: String): Boolean {
-        val configJson = """{"type":0}"""
-        val connection = (
-            URL(
-                "$baseUrl/action?do=sync&type=history&mode=2&force=false" +
-                    "&config=${encodeQuery(configJson)}" +
-                    "&device=${encodeQuery(deviceJson)}",
-            ).openConnection() as HttpURLConnection
-            ).apply {
-            connectTimeout = HISTORY_SYNC_TIMEOUT_MS
-            readTimeout = HISTORY_SYNC_TIMEOUT_MS
-            requestMethod = "POST"
-            doOutput = true
-        }
-        return try {
-            connection.outputStream.use { it.write(ByteArray(0)) }
-            val code = connection.responseCode
-            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-            stream?.bufferedReader()?.use { it.readText() }
-            code in 200..299
-        } catch (_: Exception) {
-            false
-        } finally {
-            connection.disconnect()
-        }
+        return emptyList()
     }
 
     private fun httpGet(url: String): String? {
@@ -844,37 +738,12 @@ object DownloadNameResolver {
         }
     }
 
-    private fun parseTargetsPayload(body: String): String? {
-        if (body.isBlank()) return null
-        extractFormValue(body, "targets")?.let { return it }
-        val trimmed = body.trim()
-        if (trimmed.startsWith("[")) return trimmed
-        if (trimmed.startsWith("{")) {
-            runCatching {
-                JSONObject(trimmed).optString("targets").trim().takeIf { it.isNotBlank() }
-            }.getOrNull()?.let { return it }
-        }
-        return null
-    }
-
-    private fun extractFormValue(body: String, key: String): String? {
-        if (body.isBlank()) return null
-        return body.split('&').firstNotNullOfOrNull { part ->
-            val partKey = part.substringBefore('=')
-            if (!partKey.equals(key, ignoreCase = true)) return@firstNotNullOfOrNull null
-            decodeOnce(part.substringAfter('='))
-        }
-    }
-
-    private fun encodeQuery(value: String): String =
-        java.net.URLEncoder.encode(value, Charsets.UTF_8.name())
-
     internal fun extractTitleFromUrl(url: String): String? {
         titleFromQuery(url)?.let { return it }
-        var current = extractUrlParam(url)
+        var current = DownloadUrlCodec.extractUrlParam(url)?.let(DownloadUrlCodec::decodeOnce)
         while (current != null) {
             titleFromQuery(current)?.let { return it }
-            current = extractUrlParam(current)
+            current = DownloadUrlCodec.extractUrlParam(current)?.let(DownloadUrlCodec::decodeOnce)
         }
         return null
     }
@@ -890,7 +759,7 @@ object DownloadNameResolver {
         return query.split('&').firstNotNullOfOrNull { param ->
             val key = param.substringBefore('=').lowercase()
             if (key !in TITLE_QUERY_KEYS) return@firstNotNullOfOrNull null
-            decodeOnce(param.substringAfter('=')).trim().takeIf { it.isNotEmpty() }
+            DownloadUrlCodec.decodeOnce(param.substringAfter('=')).trim().takeIf { it.isNotEmpty() }
         }
     }
 
@@ -900,20 +769,6 @@ object DownloadNameResolver {
         if (authority.isBlank()) return null
         return "http://$authority"
     }
-
-    private fun extractUrlParam(url: String): String? {
-        val query = url.substringAfter('?', "").substringBefore('#')
-        if (query.isEmpty()) return null
-        return query.split('&')
-            .firstOrNull { it.startsWith("url=", ignoreCase = true) }
-            ?.substringAfter('=')
-            ?.takeIf { it.isNotBlank() }
-            ?.let(::decodeOnce)
-    }
-
-    private fun decodeOnce(value: String): String = runCatching {
-        URLDecoder.decode(value, Charsets.UTF_8.name())
-    }.getOrDefault(value)
 
     private fun String.isHttpUrl(): Boolean =
         startsWith("http://", ignoreCase = true) || startsWith("https://", ignoreCase = true)
@@ -968,8 +823,6 @@ object DownloadNameResolver {
     private val TRAILING_DATE_PATTERN = Regex("""-(\d{8})$""")
 
     private const val HISTORY_SYNC_TIMEOUT_MS = 10_000
-    private const val HISTORY_SYNC_READY_TIMEOUT_MS = 2_000L
-    private const val HISTORY_SYNC_FAIL_FAST_MS = 500L
     private const val HISTORY_SYNC_RETRY_DELAY_MS = 200L
     private const val HISTORY_SYNC_MAX_ATTEMPTS = 2
 

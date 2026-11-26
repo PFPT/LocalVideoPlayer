@@ -488,7 +488,7 @@ fun primaryStorageFile(relativePath: String?, title: String): File? {
     } else {
         "$relative/$title"
     }
-    return File("/storage/emulated/0/$path")
+    return com.pfpt.localvideoplayer.util.StoragePath.resolveInside(File("/storage/emulated/0"), path)
 }
 
 fun shouldSkipFastProbe(header: ByteArray): Boolean = isDisguisedMpegTsHeader(header)

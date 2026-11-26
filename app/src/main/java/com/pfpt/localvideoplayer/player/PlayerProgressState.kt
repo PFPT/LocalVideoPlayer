@@ -50,7 +50,8 @@ fun rememberPlayerProgressState(
             state.syncFromPlayer(player)
         }
     }
-    LaunchedEffect(player) {
+    LaunchedEffect(player, controlsVisible) {
+        if (!controlsVisible) return@LaunchedEffect
         while (true) {
             val duration = player.duration
             if (duration > 0 && duration != state.durationMs) {

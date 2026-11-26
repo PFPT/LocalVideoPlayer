@@ -20,6 +20,7 @@ import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -38,16 +39,32 @@ class LocalCastServer(
     var baseUrl: String? = null
         private set
 
+    @Volatile
+    private var streamToken: String = ""
+
+    private val failure = AtomicReference<String?>(null)
+
+    val lastFailure: String?
+        get() = failure.get()
+
     val streamUrl: String?
-        get() = baseUrl?.let { "$it/video" }
+        get() {
+            val root = baseUrl ?: return null
+            val token = streamToken
+            if (token.isBlank()) return null
+            return root + CastRequest.mediaPath(token)
+        }
 
     @Synchronized
     fun start(uri: Uri, mimeType: String? = null): String {
         stop()
+        failure.set(null)
         clients = newClientPool()
+        if (!canOpen(uri)) throw IllegalStateException("Unable to open media")
         val resolvedMime = mimeType?.takeIf { it.isNotBlank() } ?: guessMime(uri)
         val length = queryLength(uri)
         mediaRef.set(MediaSource(uri, resolvedMime, length))
+        streamToken = UUID.randomUUID().toString().replace("-", "")
 
         val port = bindPort()
         val ip = localIpv4() ?: throw IllegalStateException("No LAN IPv4 address")
@@ -76,13 +93,14 @@ class LocalCastServer(
             it.isDaemon = true
             it.start()
         }
-        return streamUrl!!
+        return streamUrl ?: throw IllegalStateException("Cast stream URL was not created")
     }
 
     @Synchronized
     fun stop() {
         running.set(false)
         baseUrl = null
+        streamToken = ""
         mediaRef.set(null)
         try {
             serverSocket?.close()
@@ -140,7 +158,7 @@ class LocalCastServer(
             }
             val method = parts[0].uppercase(Locale.US)
             val path = parts[1].substringBefore('?')
-            if (path != "/video" && path != "/") {
+            if (!CastRequest.accepts(path, streamToken)) {
                 writeSimple(output, 404, "Not Found")
                 return
             }
@@ -154,7 +172,10 @@ class LocalCastServer(
                 return
             }
             serveMedia(method, media, headers["range"], output)
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            if (!isClientDisconnect(error)) {
+                failure.set(error.message ?: error.javaClass.simpleName)
+            }
         } finally {
             activeClients.decrementAndGet()
             try {
@@ -171,7 +192,7 @@ class LocalCastServer(
         output: BufferedOutputStream,
     ) {
         val total = media.length
-        val range = parseRange(rangeHeader, total)
+        val range = CastRequest.parseRange(rangeHeader, total)
         val start = range?.first ?: 0L
         val end = range?.second ?: if (total > 0) (total - 1) else -1L
         val contentLength = when {
@@ -307,32 +328,22 @@ class LocalCastServer(
         return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: "video/mp4"
     }
 
-    private fun parseRange(header: String?, total: Long): Pair<Long, Long>? {
-        if (header.isNullOrBlank() || total <= 0) return null
-        if (!header.startsWith("bytes=")) return null
-        val spec = header.removePrefix("bytes=").substringBefore(',').trim()
-        val parts = spec.split('-', limit = 2)
-        if (parts.size != 2) return null
+    private fun canOpen(uri: Uri): Boolean {
         return try {
-            when {
-                parts[0].isEmpty() && parts[1].isNotEmpty() -> {
-                    val suffix = parts[1].toLong()
-                    val start = (total - suffix).coerceAtLeast(0L)
-                    start to (total - 1)
-                }
-                parts[0].isNotEmpty() && parts[1].isEmpty() -> {
-                    val start = parts[0].toLong().coerceIn(0L, total - 1)
-                    start to (total - 1)
-                }
-                else -> {
-                    val start = parts[0].toLong().coerceIn(0L, total - 1)
-                    val end = parts[1].toLong().coerceIn(start, total - 1)
-                    start to end
-                }
-            }
-        } catch (_: Exception) {
-            null
+            appContext.contentResolver.openFileDescriptor(uri, "r")?.use { true }
+                ?: (appContext.contentResolver.openInputStream(uri)?.use { true } ?: false)
+        } catch (error: Exception) {
+            failure.set(error.message ?: error.javaClass.simpleName)
+            false
         }
+    }
+
+    private fun isClientDisconnect(error: Exception): Boolean {
+        if (error is SocketException) return true
+        val message = error.message?.lowercase(Locale.US).orEmpty()
+        return message.contains("broken pipe") ||
+            message.contains("connection reset") ||
+            message.contains("socket closed")
     }
 
     private fun skipFully(input: InputStream, bytes: Long) {

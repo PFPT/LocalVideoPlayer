@@ -141,6 +141,12 @@ class LibraryRefreshTest {
     }
 
     @Test
+    fun signatureDoesNotCollapseDifferentFingerprintsThatShareASum() {
+        assertNotEquals(mixSignature(listOf(1L, 4L)), mixSignature(listOf(2L, 3L)))
+        assertEquals(mixSignature(listOf(1L, 4L)), mixSignature(listOf(4L, 1L)))
+    }
+
+    @Test
     fun signatureIgnoresOrder() {
         val first = listOf(video(1, "a.mp4"), video(2, "b.mp4"))
         val second = listOf(video(2, "b.mp4"), video(1, "a.mp4"))

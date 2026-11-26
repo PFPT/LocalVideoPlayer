@@ -28,7 +28,11 @@ class DownloadShareActivity : Activity() {
         DownloadManager.get(appContext).enqueue(
             url = parsedUrl,
             fileName = trusted,
-            headers = extractSharedHeaders(intent),
+            headers = DownloadShareHeaders.accepted(
+                senderPackage = callingPackage ?: referrer?.host,
+                ownPackage = packageName,
+                headers = extractSharedHeaders(intent),
+            ),
             saveToMovies = false,
             trustFileName = trustName,
         ) { usedProxy ->

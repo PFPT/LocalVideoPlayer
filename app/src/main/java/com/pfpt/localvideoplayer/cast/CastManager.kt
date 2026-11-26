@@ -200,6 +200,9 @@ class CastManager(
                 val streamUrl = withContext(Dispatchers.IO) {
                     server.start(contentUri, mimeType)
                 }
+                server.lastFailure?.let { message ->
+                    throw IllegalStateException(message)
+                }
                 val resolvedMime = mimeType
                     ?: appContext.contentResolver.getType(contentUri)
                     ?: "video/mp4"

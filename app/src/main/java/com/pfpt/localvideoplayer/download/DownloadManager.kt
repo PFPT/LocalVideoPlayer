@@ -442,6 +442,7 @@ class DownloadManager private constructor(private val context: Context) {
         DownloadService.cleanupRangeParts(context, task.id)
         task.partialPath?.let { path ->
             val file = File(path)
+            if (!DownloadPathGuard.isInsideAny(listOf(context.filesDir, context.cacheDir), file)) return@let
             if (file.isDirectory) file.deleteRecursively() else file.delete()
         }
         task.outputUri?.let { uriString ->
@@ -465,7 +466,7 @@ class DownloadManager private constructor(private val context: Context) {
         }
     }
 
-    private fun scheduleRecovery() {
+    internal fun scheduleRecovery() {
         WorkManager.getInstance(context).enqueueUniqueWork(
             RECOVERY_WORK_NAME,
             ExistingWorkPolicy.KEEP,

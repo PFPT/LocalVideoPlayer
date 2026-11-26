@@ -246,7 +246,7 @@ fun LocalVideoPlayerApp(
                             }
                         },
                         onPlayPause = { playbackSession.togglePlayPause() },
-                        onClose = { playbackSession.stop() },
+                        onClose = { scope.launch { playbackSession.stop() } },
                         modifier = Modifier
                             .zIndex(1f)
                             .align(Alignment.BottomCenter)

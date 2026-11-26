@@ -244,7 +244,10 @@ class MediaDeleteHelper(private val context: Context) {
                 if (relativePathIndex < 0 || displayNameIndex < 0) return null
                 val relativePath = cursor.getString(relativePathIndex) ?: return null
                 val displayName = cursor.getString(displayNameIndex) ?: return null
-                File(Environment.getExternalStorageDirectory(), relativePath + displayName).absolutePath
+                com.pfpt.localvideoplayer.util.StoragePath.resolveInside(
+                    Environment.getExternalStorageDirectory(),
+                    relativePath + displayName,
+                )?.absolutePath
             } else {
                 @Suppress("DEPRECATION")
                 val dataIndex = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
@@ -334,7 +337,10 @@ class MediaDeleteHelper(private val context: Context) {
         if (!volume.equals("primary", ignoreCase = true)) return null
         val relative = documentId.substring(separator + 1)
         if (relative.isEmpty()) return null
-        return File(Environment.getExternalStorageDirectory(), relative).absolutePath
+        return com.pfpt.localvideoplayer.util.StoragePath.resolveInside(
+            Environment.getExternalStorageDirectory(),
+            relative,
+        )?.absolutePath
     }
 
     private fun isFilesCollectionUri(uri: Uri): Boolean {

@@ -66,6 +66,7 @@ import com.pfpt.localvideoplayer.ui.player.PlayerGestureController
 import com.pfpt.localvideoplayer.ui.player.PlayerSessionActions
 import com.pfpt.localvideoplayer.ui.player.PlayerOverlaySheets
 import com.pfpt.localvideoplayer.ui.player.PlayerSessionEffects
+import com.pfpt.localvideoplayer.ui.player.PlayerSkipPositionEffect
 import com.pfpt.localvideoplayer.ui.player.PlayerSurface
 import com.pfpt.localvideoplayer.ui.player.playerChromeActions
 import com.pfpt.localvideoplayer.ui.player.rememberOpenedPlayer
@@ -528,17 +529,12 @@ private fun PlayerScreenContent(
     }
     val useLandscapeLayout = ui.isLandscape || ui.isFullscreen
     val showsPause = if (isCasting) castPlaying else ui.isPlaying
-    LaunchedEffect(exoPlayer, effectiveIntroSeconds, effectiveOutroSeconds) {
-        if (effectiveIntroSeconds <= 0 && effectiveOutroSeconds <= 0) {
-            ui.skipPositionReady = false
-            return@LaunchedEffect
-        }
-        while (true) {
-            ui.hiddenPlaybackPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
-            ui.skipPositionReady = true
-            delay(250)
-        }
-    }
+    PlayerSkipPositionEffect(
+        exoPlayer = exoPlayer,
+        ui = ui,
+        introSeconds = effectiveIntroSeconds,
+        outroSeconds = effectiveOutroSeconds,
+    )
     LaunchedEffect(ui.controlsVisible, showsPause, ui.isSeeking, useLandscapeLayout, ui.controlsLocked, ui.isAdjustingBrightness, ui.isAdjustingVolume, ui.isFullscreen) {
         if (ui.controlsVisible && !ui.isSeeking && !ui.isAdjustingBrightness && !ui.isAdjustingVolume && (ui.controlsLocked || showsPause)) {
             delay(3000)

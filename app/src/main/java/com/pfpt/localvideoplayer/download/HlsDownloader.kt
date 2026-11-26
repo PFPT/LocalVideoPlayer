@@ -146,23 +146,31 @@ internal object HlsDownloader {
         }
     }
 
-    private fun unwrapPlaylist(service: DownloadService, playlist: HlsVodPlaylist): HlsVodPlaylist = playlist.copy(
-        url = DownloadUrlResolver.mediaFetchUrl(playlist.url),
-        initSegmentUrl = playlist.initSegmentUrl?.let(DownloadUrlResolver::mediaFetchUrl),
+    private fun unwrapPlaylist(taskUrl: String, playlist: HlsVodPlaylist): HlsVodPlaylist = playlist.copy(
+        url = childFetchUrl(taskUrl, playlist.url),
+        initSegmentUrl = playlist.initSegmentUrl?.let { childFetchUrl(taskUrl, it) },
         segments = playlist.segments.map { segment ->
             segment.copy(
-                url = DownloadUrlResolver.mediaFetchUrl(segment.url),
+                url = childFetchUrl(taskUrl, segment.url),
                 encryption = segment.encryption?.let { encryption ->
-                    encryption.copy(keyUrl = DownloadUrlResolver.mediaFetchUrl(encryption.keyUrl))
+                    encryption.copy(keyUrl = childFetchUrl(taskUrl, encryption.keyUrl))
                 },
             )
         },
     )
 
-    private fun unwrapResolved(service: DownloadService, result: HlsVodResolveResult): HlsVodResolveResult =
-        result.copy(playlist = unwrapPlaylist(service, result.playlist))
+    private fun childFetchUrl(taskUrl: String, rawUrl: String): String {
+        val fetched = DownloadUrlResolver.mediaFetchUrl(rawUrl)
+        if (!DownloadFetchPolicy.allowsChildFetch(taskUrl, fetched)) {
+            throw IOException("blocked download target")
+        }
+        return fetched
+    }
 
-    private fun prefetchHlsKeys(
+    private fun unwrapResolved(taskUrl: String, result: HlsVodResolveResult): HlsVodResolveResult =
+        result.copy(playlist = unwrapPlaylist(taskUrl, result.playlist))
+
+    private suspend fun prefetchHlsKeys(
         service: DownloadService,
         playlist: HlsVodPlaylist,
         headers: Map<String, String>,
@@ -172,10 +180,12 @@ internal object HlsDownloader {
     ) {
         playlist.segments.mapNotNull { it.encryption?.keyUrl }.toSet().forEach { keyUrl ->
             if (control.stopped) throw IOException(service.getString(R.string.download_paused))
-            keys.getOrPut(keyUrl) {
-                requestHlsBytes(service, keyUrl, headers, control, playlistUrl).also {
-                    if (it.size != DownloadService.AES_128_KEY_BYTES) throw IOException(service.getString(R.string.download_hls_key_invalid))
+            if (!keys.containsKey(keyUrl)) {
+                val bytes = requestHlsBytes(service, keyUrl, headers, control, playlistUrl)
+                if (bytes.size != DownloadService.AES_128_KEY_BYTES) {
+                    throw IOException(service.getString(R.string.download_hls_key_invalid))
                 }
+                keys[keyUrl] = bytes
             }
         }
     }
@@ -196,7 +206,7 @@ internal object HlsDownloader {
         return average * totalSegments
     }
 
-    private fun requestHlsText(
+    private suspend fun requestHlsText(
         service: DownloadService,
         address: String,
         headers: Map<String, String>,
@@ -204,7 +214,7 @@ internal object HlsDownloader {
         playlistUrl: String? = null,
     ): String = String(requestHlsBytes(service, address, headers, control, playlistUrl), Charsets.UTF_8)
 
-    private fun requestHlsBytes(
+    private suspend fun requestHlsBytes(
         service: DownloadService,
         address: String,
         headers: Map<String, String>,
@@ -234,13 +244,13 @@ internal object HlsDownloader {
                 )
                 if (next == null) break
                 attempt = next
-                Thread.sleep(DownloadService.RETRY_BACKOFF_MS[attempt - 1])
+                delay(DownloadService.RETRY_BACKOFF_MS[attempt - 1])
             }
         }
         throw lastError ?: IOException(service.getString(R.string.download_failed))
     }
 
-    private fun downloadHlsSegmentAtomic(
+    private suspend fun downloadHlsSegmentAtomic(
         service: DownloadService,
         taskId: String,
         address: String,
@@ -311,7 +321,7 @@ internal object HlsDownloader {
                 )
                 if (next == null) break
                 attempt = next
-                Thread.sleep(DownloadService.RETRY_BACKOFF_MS[attempt - 1])
+                delay(DownloadService.RETRY_BACKOFF_MS[attempt - 1])
             }
         }
         throw lastError ?: IOException(service.getString(R.string.download_failed))
@@ -341,7 +351,7 @@ internal object HlsDownloader {
         }
     }
 
-    private fun resolveHlsSource(
+    private suspend fun resolveHlsSource(
         service: DownloadService,
         task: DownloadTask,
         hlsPackage: File,
@@ -355,11 +365,11 @@ internal object HlsDownloader {
             } catch (error: HlsVodException) {
                 throw IOException(service.hlsFailureMessage(error.failure), error)
             }
-            return HlsVodResolveResult(playlist = unwrapPlaylist(service, parsed), mediaText = text)
+            return HlsVodResolveResult(playlist = unwrapPlaylist(task.url, parsed), mediaText = text)
         }
         return try {
             unwrapResolved(
-                service,
+                task.url,
                 HlsVodResolver { address -> requestHlsText(service, address, task.headers, control) }
                     .resolveWithMediaText(task.url),
             )

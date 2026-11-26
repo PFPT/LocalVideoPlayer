@@ -312,7 +312,7 @@ class LibraryViewModel(
             if (forceFolderRescan) {
                 invalidateFolderCache()
             }
-            val folderVideos = loadFolderSourceVideos(force = forceFolderRescan)
+            val folderVideos = loadFolderSourceVideos(force = forceFolderRescan).videos
             val folderSignature = withContext(Dispatchers.Default) { videoSetSignature(folderVideos) }
             if (scanned == null && folderSignature == lastFolderSignature) {
                 return true
@@ -372,13 +372,7 @@ class LibraryViewModel(
     }
 
     private suspend fun saveCaches(videos: List<VideoItem>) {
-        if (videos.isEmpty()) return
-        withContext(Dispatchers.IO) {
-            runCatching {
-                libraryCacheStore.saveVideos(videos)
-                libraryCacheStore.saveLibraryEntries(_libraryEntries.value)
-            }
-        }
+        LibraryCacheWriter(libraryCacheStore).save(videos, _libraryEntries.value)
     }
 
     private suspend fun rememberSignatures(videos: List<VideoItem>) {
@@ -428,7 +422,7 @@ class LibraryViewModel(
         return withoutUris(hiddenUris.map(Uri::parse))
     }
 
-    private suspend fun loadFolderSourceVideos(force: Boolean): List<VideoItem> {
+    private suspend fun loadFolderSourceVideos(force: Boolean): FolderScanResult {
         val sources = folderSourceStore.getSources()
         val canScanExternalDirs = canScanExternalAppDirs()
         val key = buildString {
@@ -438,35 +432,24 @@ class LibraryViewModel(
             append(canScanExternalDirs)
         }
         if (!force && key == cachedFolderSourceKey) {
-            return cachedFolderVideos
+            return FolderScanResult(cachedFolderVideos, failed = false)
         }
-        val videos = withContext(Dispatchers.IO) {
-            val fromTrees = sources.flatMap { source ->
-                val uri = runCatching { Uri.parse(source.treeUri) }.getOrNull() ?: return@flatMap emptyList()
-                try {
-                    folderVideoScanner.loadVideos(uri)
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) {
-                    emptyList()
-                }
-            }
-            val fromPaths = if (canScanExternalDirs) {
-                try {
-                    folderVideoScanner.loadVideosFromDirectories(externalDownloadRoots())
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) {
-                    emptyList()
-                }
-            } else {
-                emptyList()
-            }
-            mergeVideos(fromTrees, fromPaths)
+        val scanned = withContext(Dispatchers.IO) {
+            LibraryFolderScan.collect(
+                sources = sources,
+                canScanExternalDirs = canScanExternalDirs,
+                loadTree = { uri -> folderVideoScanner.loadVideos(uri) },
+                loadDirectories = { folderVideoScanner.loadVideosFromDirectories(externalDownloadRoots()) },
+            )
+        }
+        val deduped = scanned.copy(videos = mergeVideos(scanned.videos, emptyList()))
+        if (deduped.failed) {
+            _refreshError.emit("folder_scan_failed")
+            return deduped
         }
         cachedFolderSourceKey = key
-        cachedFolderVideos = videos
-        return videos
+        cachedFolderVideos = deduped.videos
+        return deduped
     }
 
     private fun canScanExternalAppDirs(): Boolean {
@@ -479,8 +462,8 @@ class LibraryViewModel(
 
     private fun externalDownloadRoots(): List<File> {
         val primary = Environment.getExternalStorageDirectory()
-        return EXTERNAL_DOWNLOAD_ROOTS.map { relative ->
-            File(primary, relative)
+        return EXTERNAL_DOWNLOAD_ROOTS.mapNotNull { relative ->
+            com.pfpt.localvideoplayer.util.StoragePath.resolveInside(primary, relative)
         }.filter { it.isDirectory && it.canRead() }
     }
 

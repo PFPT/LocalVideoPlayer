@@ -12,7 +12,7 @@ object DownloadHttpClient {
     val client: OkHttpClient by lazy {
         val dispatcher = Dispatcher().apply {
             maxRequests = 64
-            maxRequestsPerHost = 48
+            maxRequestsPerHost = ProgressiveRangePlanner.MAX_CONNECTIONS
         }
         OkHttpClient.Builder()
             .dispatcher(dispatcher)

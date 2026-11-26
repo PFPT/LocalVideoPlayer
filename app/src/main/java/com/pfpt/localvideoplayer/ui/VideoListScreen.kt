@@ -375,6 +375,7 @@ fun VideoListScreen(
                     Intent.FLAG_GRANT_READ_URI_PERMISSION,
                 )
             } catch (_: SecurityException) {
+                Toast.makeText(context, R.string.permission_required, Toast.LENGTH_SHORT).show()
             }
             val title = uri.lastPathSegment?.substringAfterLast(':')
                 ?: context.getString(R.string.selected_video_fallback)

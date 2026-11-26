@@ -34,7 +34,7 @@ class PlaybackSessionViewModel(application: Application) : AndroidViewModel(appl
     )
 
     override fun onCleared() {
-        session.stop()
+        kotlinx.coroutines.runBlocking { session.stop() }
     }
 }
 
@@ -222,14 +222,14 @@ class PlaybackSession(
         }
     }
 
-    fun stop() {
+    suspend fun stop() {
         stopping = true
-        player?.pause()
-        publish()
-        scope.launch {
-            gate.withLock {
-                teardown(save = true)
-            }
+        withContext(Dispatchers.Main.immediate) {
+            player?.pause()
+            publish()
+        }
+        gate.withLock {
+            teardown(save = true)
         }
     }
 

@@ -4,11 +4,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.ContentValues
 import android.content.Intent
-import android.net.Uri
 import android.os.IBinder
-import android.provider.MediaStore
 import androidx.core.app.NotificationCompat
 import com.pfpt.localvideoplayer.MainActivity
 import com.pfpt.localvideoplayer.R
@@ -24,7 +21,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
-import java.io.FileInputStream
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.util.concurrent.ConcurrentHashMap
@@ -58,7 +54,7 @@ class DownloadService : Service() {
         createChannel()
         synchronized(queueLock) {
             serviceStartId = startId
-            startForegroundSafely(
+            val foregroundStarted = startForegroundSafely(
                 NOTIFICATION_ID,
                 notification(getString(R.string.download_notification_preparing))
                     .setGroup(NOTIFICATION_GROUP)
@@ -66,6 +62,11 @@ class DownloadService : Service() {
                     .setContentIntent(downloadsContentIntent())
                     .build(),
             )
+            if (!foregroundStarted) {
+                DownloadManager.get(this).scheduleRecovery()
+                stopSelf(startId)
+                return START_NOT_STICKY
+            }
             when (intent?.action) {
                 ACTION_STOP_CURRENT, ACTION_CANCEL_CURRENT -> {
                     intent.getStringExtra(EXTRA_TASK_ID)?.let { taskId -> activeControls[taskId] }?.apply {
@@ -188,7 +189,7 @@ class DownloadService : Service() {
                         mergedPart.exists() && mergedPart.length() > 0L -> mergedPart.length()
                         isMagnet -> task.downloadedBytes
                         isHls -> directorySize(File(partial))
-                        else -> File(partial).takeIf(File::exists)?.length() ?: 0
+                        else -> confinedPartial(partial)?.takeIf(File::exists)?.length() ?: 0
                     },
                     isMerging = false,
                     downloadSpeedBps = 0,
@@ -331,8 +332,10 @@ class DownloadService : Service() {
             publishPart(task.id, merged, manager, control)
             return
         }
-        val part = File(task.partialPath ?: mergedPart.absolutePath)
-        part.parentFile?.mkdirs()
+        val part = confinedPartial(task.partialPath) ?: mergedPart
+        part.parentFile?.let { parent ->
+            if (DownloadPathGuard.isInsideAny(listOf(filesDir, cacheDir), parent)) parent.mkdirs()
+        }
         if (task.totalBytes > 0 && part.exists() && part.length() >= task.totalBytes) {
             if (control.stopped) throw IOException(getString(R.string.download_paused))
             publishPart(task.id, part, manager, control)
@@ -492,78 +495,15 @@ class DownloadService : Service() {
     private suspend fun publishPart(taskId: String, part: File, manager: DownloadManager, control: TaskControl) {
         val task = manager.get(taskId) ?: return
         outputLocks.getOrPut(outputKey(task)) { Mutex() }.withLock {
-            publishPartLocked(task, part, manager, control)
+            mediaPublisher().publish(task, part, manager, control)
         }
     }
 
-    private suspend fun publishPartLocked(task: DownloadTask, part: File, manager: DownloadManager, control: TaskControl) {
-        val displayName = task.fileName
-        val output = createOutput(task, displayName)
-        manager.update(task.id) { it.copy(outputUri = output.toString(), fileName = displayName) }
-        try {
-            contentResolver.openOutputStream(output)?.use { destination ->
-                FileInputStream(part).use { source ->
-                    val buffer = ByteArray(IO_BUFFER_SIZE)
-                    while (true) {
-                        if (control.stopped) throw IOException(getString(R.string.download_paused))
-                        val count = source.read(buffer)
-                        if (count < 0) break
-                        destination.write(buffer, 0, count)
-                    }
-                }
-            } ?: throw IOException(getString(R.string.download_output_failed))
-            contentResolver.update(
-                output,
-                ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) },
-                null,
-                null,
-            )
-            val finalSize = part.length()
-            part.delete()
-            manager.update(task.id) {
-                it.copy(
-                    status = DownloadStatus.COMPLETED,
-                    fileName = displayName,
-                    partialPath = null,
-                    hlsCompletedSegments = 0,
-                    hlsTotalSegments = 0,
-                    isMerging = false,
-                    hlsPlaylistUrl = null,
-                    hlsPlaylistSignature = null,
-                    outputUri = output.toString(),
-                    downloadedBytes = finalSize,
-                    totalBytes = finalSize,
-                    downloadSpeedBps = 0,
-                    error = null,
-                )
-            }
-        } catch (error: Exception) {
-            contentResolver.delete(output, null, null)
-            manager.update(task.id) { it.copy(outputUri = null) }
-            throw error
-        }
-    }
-
-    private fun createOutput(task: DownloadTask, displayName: String): Uri {
-        val collection = if (task.saveToMovies) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Downloads.EXTERNAL_CONTENT_URI
-        val mimeType = when {
-            displayName.endsWith(".ts", true) || displayName.endsWith(".m2ts", true) -> "video/mp2t"
-            displayName.endsWith(".mkv", true) -> "video/x-matroska"
-            displayName.endsWith(".webm", true) -> "video/webm"
-            displayName.endsWith(".avi", true) -> "video/x-msvideo"
-            displayName.endsWith(".mov", true) -> "video/quicktime"
-            else -> "video/mp4"
-        }
-        return contentResolver.insert(
-            collection,
-            ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
-                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-                put(MediaStore.MediaColumns.RELATIVE_PATH, if (task.saveToMovies) "Movies/LocalVideoPlayer" else "Download/LocalVideoPlayer")
-                put(MediaStore.MediaColumns.IS_PENDING, 1)
-            },
-        ) ?: throw IOException(getString(R.string.download_output_failed))
-    }
+    private fun mediaPublisher() = DownloadMediaPublisher(
+        resolver = contentResolver,
+        pausedMessage = getString(R.string.download_paused),
+        outputFailedMessage = getString(R.string.download_output_failed),
+    )
 
     private fun updateNotification(task: DownloadTask, taskId: String, merging: Boolean = false, force: Boolean = false) {
         val snapshot = when {
@@ -596,7 +536,9 @@ class DownloadService : Service() {
                 .setGroupSummary(true)
                 .setContentIntent(downloadsContentIntent())
                 .build()
-            startForegroundSafely(NOTIFICATION_ID, preparing)
+            if (!startForegroundSafely(NOTIFICATION_ID, preparing)) {
+                DownloadManager.get(this).scheduleRecovery()
+            }
             return
         }
 
@@ -622,7 +564,9 @@ class DownloadService : Service() {
             .setGroupSummary(true)
             .setContentIntent(downloadsContentIntent())
             .build()
-        startForegroundSafely(NOTIFICATION_ID, summary)
+        if (!startForegroundSafely(NOTIFICATION_ID, summary)) {
+            DownloadManager.get(this).scheduleRecovery()
+        }
     }
 
     private fun cancelTaskNotification(taskId: String) {
@@ -637,10 +581,12 @@ class DownloadService : Service() {
         taskProgressSnapshots.keys.toList().forEach { cancelTaskNotification(it) }
     }
 
-    private fun startForegroundSafely(id: Int, notification: android.app.Notification) {
-        try {
+    private fun startForegroundSafely(id: Int, notification: android.app.Notification): Boolean {
+        return try {
             startForeground(id, notification)
+            true
         } catch (_: SecurityException) {
+            false
         }
     }
 
@@ -748,8 +694,16 @@ class DownloadService : Service() {
 
     private fun torrentDir(id: String) = File(filesDir, "torrent_downloads/$id")
 
-    internal fun hlsSegmentFile(hlsPackage: File, format: HlsSegmentFormat, index: Int) =
-        File(hlsPackage, "seg%05d.${format.segmentExtension()}".format(index))
+    internal fun hlsSegmentFile(hlsPackage: File, format: HlsSegmentFormat, index: Int): File {
+        val file = File(hlsPackage, "seg%05d.${format.segmentExtension()}".format(index))
+        return DownloadPathGuard.requireInside(hlsPackage, file)
+    }
+
+    private fun confinedPartial(path: String?): File? {
+        if (path.isNullOrBlank()) return null
+        val file = File(path)
+        return file.takeIf { DownloadPathGuard.isInsideAny(listOf(filesDir, cacheDir), it) }
+    }
 
     internal fun resolveSegmentFile(hlsPackage: File, format: HlsSegmentFormat, index: Int): File {
         val primary = hlsSegmentFile(hlsPackage, format, index)

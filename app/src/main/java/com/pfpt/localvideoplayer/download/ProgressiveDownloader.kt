@@ -13,6 +13,8 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 internal object ProgressiveDownloader {
@@ -132,28 +134,35 @@ internal object ProgressiveDownloader {
         manager.update(task.id) { it.copy(downloadedBytes = currentDownloaded(), totalBytes = totalBytes) }
         service.reportProgress(task, manager, currentDownloaded(), totalBytes, force = true)
         coroutineScope {
-            ranges.mapIndexed { index, range ->
-                async {
-                    val piece = rangePartFile(service, task.id, index)
-                    if (piece.exists() && piece.length() == range.length) return@async
-                    downloadByteRange(
-                        service,
-                        url = task.url,
-                        headers = task.headers,
-                        range = range,
-                        dest = piece,
-                        control = control,
-                    ) { written ->
-                        inFlight[index] = written
-                        service.launchOnScope {
-                            service.reportProgress(task, manager, currentDownloaded(), totalBytes)
-                        }
-                    }
-                    inFlight.remove(index)
-                    completedBytes.addAndGet(range.length)
-                    service.reportProgress(task, manager, currentDownloaded(), totalBytes, force = true)
+            val ticker = launch {
+                while (isActive) {
+                    delay(DownloadService.LIVE_PROGRESS_INTERVAL_MS)
+                    service.reportProgress(task, manager, currentDownloaded(), totalBytes)
                 }
-            }.awaitAll()
+            }
+            try {
+                ranges.mapIndexed { index, range ->
+                    async {
+                        val piece = rangePartFile(service, task.id, index)
+                        if (piece.exists() && piece.length() == range.length) return@async
+                        downloadByteRange(
+                            service,
+                            url = task.url,
+                            headers = task.headers,
+                            range = range,
+                            dest = piece,
+                            control = control,
+                        ) { written ->
+                            inFlight[index] = written
+                        }
+                        inFlight.remove(index)
+                        completedBytes.addAndGet(range.length)
+                        service.reportProgress(task, manager, currentDownloaded(), totalBytes, force = true)
+                    }
+                }.awaitAll()
+            } finally {
+                ticker.cancel()
+            }
         }
         if (control.stopped) throw IOException(service.getString(R.string.download_paused))
         ranges.forEachIndexed { index, range ->
@@ -176,7 +185,7 @@ internal object ProgressiveDownloader {
         service.reportProgress(task, manager, totalBytes, totalBytes, force = true)
     }
 
-    private fun downloadByteRange(
+    private suspend fun downloadByteRange(
         service: DownloadService,
         url: String,
         headers: Map<String, String>,
@@ -233,7 +242,7 @@ internal object ProgressiveDownloader {
                 )
                 if (next == null) break
                 attempt = next
-                Thread.sleep(DownloadService.RETRY_BACKOFF_MS[attempt - 1])
+                delay(DownloadService.RETRY_BACKOFF_MS[attempt - 1])
             }
         }
         throw lastError ?: IOException(service.getString(R.string.download_failed))

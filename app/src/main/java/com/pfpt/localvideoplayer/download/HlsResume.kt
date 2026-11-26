@@ -17,26 +17,24 @@ internal object HlsResume {
         val total = playlist.segments.size
         if (total == 0) return HlsResumeState(completedSegments = 0, shouldWipe = hlsPackage.exists())
 
-        val allOnDisk = (0 until total).all { index ->
+        fun exists(index: Int): Boolean =
             segmentFile(index).exists() || legacySegmentFile(hlsPackage, playlist.segmentFormat(), index).exists()
-        }
+
+        val allOnDisk = (0 until total).all(::exists)
         if (allOnDisk) return HlsResumeState(completedSegments = total, shouldWipe = false)
 
         val metadataMatches = task.hlsPlaylistUrl == playlist.url &&
-            task.hlsPlaylistSignature == playlist.signature &&
-            task.hlsCompletedSegments in 0..total
-        if (metadataMatches) {
-            val completed = task.hlsCompletedSegments
-            val contiguous = completed == 0 || (0 until completed).all { index ->
-                segmentFile(index).exists() || legacySegmentFile(hlsPackage, playlist.segmentFormat(), index).exists()
-            }
-            if (contiguous) return HlsResumeState(completedSegments = completed, shouldWipe = false)
+            task.hlsPlaylistSignature == playlist.signature
+        if (!metadataMatches) {
+            return HlsResumeState(
+                completedSegments = 0,
+                shouldWipe = hlsPackage.listFiles()?.isNotEmpty() == true,
+            )
         }
 
-        return HlsResumeState(
-            completedSegments = 0,
-            shouldWipe = hlsPackage.listFiles()?.isNotEmpty() == true,
-        )
+        var contiguous = 0
+        while (contiguous < total && exists(contiguous)) contiguous++
+        return HlsResumeState(completedSegments = contiguous, shouldWipe = false)
     }
 
     fun legacySegmentFile(hlsPackage: File, format: HlsSegmentFormat, index: Int): File {

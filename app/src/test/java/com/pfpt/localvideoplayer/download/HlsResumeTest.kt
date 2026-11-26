@@ -61,6 +61,32 @@ class HlsResumeTest {
     }
 
     @Test
+    fun resumeFromDiskPrefixWhenStoredCountIsStale() {
+        val dir = createTempDir()
+        try {
+            File(dir, "seg00000.ts").writeText("segment")
+            val task = DownloadTask(
+                url = "https://example.com/stream.m3u8",
+                fileName = "video.mp4",
+                hlsCompletedSegments = 4,
+                hlsTotalSegments = 4,
+                hlsPlaylistUrl = "https://example.com/stream.m3u8",
+                hlsPlaylistSignature = "same-signature",
+            )
+            val playlist = HlsVodPlaylist(
+                url = "https://example.com/stream.m3u8",
+                signature = "same-signature",
+                segments = listOf(segment(), segment(), segment(), segment()),
+            )
+            val state = HlsResume.resolve(task, dir, playlist) { index -> File(dir, "seg%05d.ts".format(index)) }
+            assertEquals(1, state.completedSegments)
+            assertFalse(state.shouldWipe)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun wipeWhenPartialSegmentsDoNotMatchMetadata() {
         val dir = createTempDir()
         try {

@@ -1,7 +1,6 @@
 package com.pfpt.localvideoplayer.download
 
 import java.net.URI
-import java.net.URLDecoder
 
 object DownloadUrlResolver {
     const val DEFAULT_USER_AGENT =
@@ -11,11 +10,11 @@ object DownloadUrlResolver {
         var current = url.trim()
         if (current.isEmpty()) return current
         while (DownloadUrlClassifier.isLocalProxyUrl(current)) {
-            val inner = extractUrlParam(current)?.let(::fullyDecode) ?: break
+            val inner = DownloadUrlCodec.extractUrlParam(current)?.let(DownloadUrlCodec::fullyDecode) ?: break
             if (inner == current) break
             current = inner
         }
-        return fullyDecode(current)
+        return DownloadUrlCodec.fullyDecode(current)
     }
 
     fun resolveDownloadUrl(url: String): String {
@@ -109,7 +108,7 @@ object DownloadUrlResolver {
         var current: String? = url.trim()
         while (current != null) {
             appendQueryHeaders(current, result)
-            current = extractUrlParam(current)?.let(::fullyDecode)
+            current = DownloadUrlCodec.extractUrlParam(current)?.let(DownloadUrlCodec::fullyDecode)
         }
         return result
     }
@@ -121,7 +120,7 @@ object DownloadUrlResolver {
             val key = param.substringBefore('=')
             if (key.isBlank() || !param.contains('=')) return@forEach
             val normalized = key.lowercase()
-            val value = decodeOnce(param.substringAfter('='))
+            val value = DownloadUrlCodec.decodeOnce(param.substringAfter('='))
             when (normalized) {
                 "referer", "referrer" -> out.putIfAbsent("Referer", value)
                 "ua", "user-agent", "useragent" -> out.putIfAbsent("User-Agent", value)
@@ -159,26 +158,4 @@ object DownloadUrlResolver {
         else -> -1
     }
 
-    private fun extractUrlParam(url: String): String? {
-        val query = url.substringAfter('?', "").substringBefore('#')
-        if (query.isEmpty()) return null
-        return query.split('&')
-            .firstOrNull { it.startsWith("url=", ignoreCase = true) }
-            ?.substringAfter('=')
-            ?.takeIf { it.isNotBlank() }
-    }
-
-    private fun fullyDecode(value: String): String {
-        var decoded = value
-        repeat(4) {
-            val next = decodeOnce(decoded)
-            if (next == decoded) return decoded
-            decoded = next
-        }
-        return decoded
-    }
-
-    private fun decodeOnce(value: String): String = runCatching {
-        URLDecoder.decode(value, Charsets.UTF_8.name())
-    }.getOrDefault(value)
 }

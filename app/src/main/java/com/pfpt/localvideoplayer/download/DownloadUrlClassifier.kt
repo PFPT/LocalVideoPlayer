@@ -1,7 +1,5 @@
 package com.pfpt.localvideoplayer.download
 
-import java.net.URLDecoder
-
 object DownloadUrlClassifier {
     fun isMagnetUrl(url: String): Boolean =
         url.trim().startsWith("magnet:?", ignoreCase = true)
@@ -23,7 +21,7 @@ object DownloadUrlClassifier {
         val dn = query.split('&')
             .firstOrNull { it.startsWith("dn=", ignoreCase = true) }
             ?.substringAfter('=')
-            ?.let { decodeOnce(it).trim() }
+            ?.let { DownloadUrlCodec.decodeOnce(it).trim() }
             ?.takeIf { it.isNotBlank() }
         if (dn != null) return dn
         val xt = query.split('&')
@@ -49,11 +47,11 @@ object DownloadUrlClassifier {
         var current: String? = url.trim()
         var deepest: String? = null
         while (current != null) {
-            val decoded = fullyDecode(current)
+            val decoded = DownloadUrlCodec.fullyDecode(current)
             if (decoded.substringBefore('?').substringBefore('#').endsWith(".m3u8", ignoreCase = true)) {
                 deepest = decoded
             }
-            current = extractUrlParam(current)?.let(::fullyDecode)
+            current = DownloadUrlCodec.extractUrlParam(current)?.let(DownloadUrlCodec::fullyDecode)
         }
         return deepest
     }
@@ -82,26 +80,4 @@ object DownloadUrlClassifier {
             normalized.startsWith("http://[::1]")
     }
 
-    private fun extractUrlParam(url: String): String? {
-        val query = url.substringAfter('?', "").substringBefore('#')
-        if (query.isEmpty()) return null
-        return query.split('&')
-            .firstOrNull { it.startsWith("url=", ignoreCase = true) }
-            ?.substringAfter('=')
-            ?.takeIf { it.isNotBlank() }
-    }
-
-    private fun fullyDecode(value: String): String {
-        var decoded = value
-        repeat(4) {
-            val next = decodeOnce(decoded)
-            if (next == decoded) return decoded
-            decoded = next
-        }
-        return decoded
-    }
-
-    private fun decodeOnce(value: String): String = runCatching {
-        URLDecoder.decode(value, Charsets.UTF_8.name())
-    }.getOrDefault(value)
 }

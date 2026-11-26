@@ -61,11 +61,11 @@ internal data class HlsVodResolveResult(
 )
 
 internal class HlsVodResolver(
-    private val requestText: (String) -> String,
+    private val requestText: suspend (String) -> String,
 ) {
-    fun resolve(playlistUrl: String): HlsVodPlaylist = resolveWithMediaText(playlistUrl).playlist
+    suspend fun resolve(playlistUrl: String): HlsVodPlaylist = resolveWithMediaText(playlistUrl).playlist
 
-    fun resolveWithMediaText(playlistUrl: String): HlsVodResolveResult {
+    suspend fun resolveWithMediaText(playlistUrl: String): HlsVodResolveResult {
         val initialText = requestText(playlistUrl)
         val selectedUrl = HlsVodPlaylistParser.selectVariant(playlistUrl, initialText)
         val mediaText = if (selectedUrl == null) initialText else requestText(selectedUrl)

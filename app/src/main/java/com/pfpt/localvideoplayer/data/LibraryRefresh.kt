@@ -57,11 +57,17 @@ fun resolveIncrementalMedia(
 
 fun videoSetSignature(videos: List<VideoItem>): String {
     if (videos.isEmpty()) return ""
-    var hash = videos.size.toLong()
-    for (video in videos) {
-        hash += videoFingerprint(video)
+    return mixSignature(videos.map(::videoFingerprint))
+}
+
+internal fun mixSignature(parts: List<Long>): String {
+    var hash = 0x811C9DC5.toInt()
+    for (part in parts.sorted()) {
+        hash = hash xor part.hashCode()
+        hash *= 0x01000193
     }
-    return hash.toString()
+    hash = hash xor parts.size
+    return hash.toUInt().toString(16)
 }
 
 private fun videoFingerprint(video: VideoItem): Long {

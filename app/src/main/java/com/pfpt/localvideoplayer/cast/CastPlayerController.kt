@@ -76,7 +76,6 @@ class CastPlayerController : CastPlaybackFacade {
 
     fun startListening() {
         _isCasting.value = castPlayer != null
-        castPlayer?.addListener(listener)
         refreshOnce()
         syncPositionTicker()
     }
