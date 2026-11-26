@@ -17,10 +17,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -57,6 +53,7 @@ import com.pfpt.localvideoplayer.ui.components.LumenModalBottomSheet
 import com.pfpt.localvideoplayer.ui.components.RenameDownloadDialog
 import com.pfpt.localvideoplayer.ui.components.SwipeableListItem
 import com.pfpt.localvideoplayer.ui.download.DownloadTaskCard
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenListHorizontalInset
 import com.pfpt.localvideoplayer.ui.theme.LumenListItemGap
@@ -123,14 +120,14 @@ fun DownloadManagerScreen(
             actions = {
                 IconButton(onClick = { showSettingsSheet = true }) {
                     Icon(
-                        Icons.Default.Settings,
+                        LocalAppIcons.current.settings,
                         contentDescription = stringResource(R.string.download_settings),
                         tint = MaterialTheme.colorScheme.onBackground,
                     )
                 }
                 IconButton(onClick = { openAddSheet() }) {
                     Icon(
-                        Icons.Default.Add,
+                        LocalAppIcons.current.add,
                         contentDescription = stringResource(R.string.download_add),
                         tint = MaterialTheme.colorScheme.onBackground,
                     )
@@ -142,7 +139,7 @@ fun DownloadManagerScreen(
             LumenEmptyState(
                 title = stringResource(R.string.downloads_title),
                 subtitle = stringResource(R.string.download_empty_hint),
-                icon = Icons.Default.Download,
+                icon = LocalAppIcons.current.download,
                 actionLabel = stringResource(R.string.download_add),
                 onAction = { openAddSheet() },
                 modifier = Modifier

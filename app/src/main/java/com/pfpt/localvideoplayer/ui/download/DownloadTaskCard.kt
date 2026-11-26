@@ -14,11 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
@@ -46,6 +41,7 @@ import com.pfpt.localvideoplayer.download.DownloadManager
 import com.pfpt.localvideoplayer.download.DownloadStatus
 import com.pfpt.localvideoplayer.download.DownloadTask
 import com.pfpt.localvideoplayer.ui.components.GlassSurface
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenCardPadding
 import com.pfpt.localvideoplayer.ui.theme.LumenSpaceMd
@@ -100,7 +96,7 @@ internal fun DownloadTaskCard(
                 DownloadStatusBadge(task)
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more_actions))
+                        Icon(LocalAppIcons.current.moreVert, contentDescription = stringResource(R.string.more_actions))
                     }
                     DownloadTaskMenu(
                         expanded = menuExpanded,
@@ -251,7 +247,7 @@ private fun DownloadPrimaryActions(
                 onClick = onPause,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Default.Pause, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(LocalAppIcons.current.pause, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.size(8.dp))
                 Text(stringResource(R.string.pause))
             }
@@ -261,7 +257,7 @@ private fun DownloadPrimaryActions(
                 onClick = onResume,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(LocalAppIcons.current.play, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.size(8.dp))
                 Text(stringResource(R.string.download_resume))
             }
@@ -275,12 +271,12 @@ private fun DownloadPrimaryActions(
                     onClick = onResume,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(LocalAppIcons.current.play, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.size(8.dp))
                     Text(stringResource(R.string.download_resume))
                 }
                 TextButton(onClick = onRedownload) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(LocalAppIcons.current.refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.size(4.dp))
                     Text(stringResource(R.string.download_redownload))
                 }
@@ -291,7 +287,7 @@ private fun DownloadPrimaryActions(
                 onClick = onPlay,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(LocalAppIcons.current.play, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.size(8.dp))
                 Text(stringResource(R.string.download_play))
             }

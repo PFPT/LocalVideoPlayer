@@ -25,8 +25,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -65,8 +63,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
 import com.pfpt.localvideoplayer.model.LibraryTypeTab
+import com.pfpt.localvideoplayer.ui.theme.AppIcons
 import com.pfpt.localvideoplayer.ui.theme.HsvColor
+import com.pfpt.localvideoplayer.ui.theme.IconStyle
 import com.pfpt.localvideoplayer.ui.theme.LauncherIcon
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenThemeColors
 import com.pfpt.localvideoplayer.ui.theme.LumenThumbCorner
@@ -76,6 +77,14 @@ import com.pfpt.localvideoplayer.ui.theme.toColor
 import com.pfpt.localvideoplayer.ui.theme.toHexArgb
 import com.pfpt.localvideoplayer.ui.theme.toHsv
 import kotlinx.coroutines.launch
+
+private fun IconStyle.labelRes(): Int {
+    return when (this) {
+        IconStyle.Filled -> R.string.theme_icon_style_filled
+        IconStyle.Outlined -> R.string.theme_icon_style_outlined
+        IconStyle.Rounded -> R.string.theme_icon_style_rounded
+    }
+}
 
 private enum class ThemeColorTarget {
     Background,
@@ -89,6 +98,8 @@ fun ThemeColorBottomSheet(
     themeMode: ThemeMode,
     initialColors: LumenThemeColors,
     selectedLauncherIcon: LauncherIcon,
+    iconStyle: IconStyle,
+    onIconStyleChange: (IconStyle) -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
     onApplyLauncherIcon: suspend (LauncherIcon) -> Boolean,
     onSave: (LumenThemeColors, LauncherIcon) -> Unit,
@@ -225,6 +236,32 @@ fun ThemeColorBottomSheet(
                     }
 
                     ThemePreviewBar(colors = draftColors)
+
+                    Text(
+                        text = stringResource(R.string.theme_icon_style),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        IconStyle.entries.forEachIndexed { index, style ->
+                            SegmentedButton(
+                                selected = iconStyle == style,
+                                onClick = { onIconStyleChange(style) },
+                                shape = SegmentedButtonDefaults.itemShape(
+                                    index = index,
+                                    count = IconStyle.entries.size,
+                                ),
+                                icon = {
+                                    Icon(
+                                        imageVector = AppIcons(style).play,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                },
+                            ) {
+                                Text(text = stringResource(style.labelRes()))
+                            }
+                        }
+                    }
 
                     LauncherIconPicker(
                         selected = draftLauncherIcon,
@@ -468,7 +505,7 @@ private fun LauncherIconPicker(
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Check,
+                                imageVector = LocalAppIcons.current.check,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(12.dp),

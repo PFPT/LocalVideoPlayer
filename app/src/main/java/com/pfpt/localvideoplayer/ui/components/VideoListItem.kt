@@ -5,10 +5,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
@@ -25,6 +21,7 @@ import com.pfpt.localvideoplayer.model.SeriesGroupKind
 import com.pfpt.localvideoplayer.model.VideoItem
 import com.pfpt.localvideoplayer.model.VideoSeries
 import com.pfpt.localvideoplayer.ui.rememberPlayerSharedOpen
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.util.formatDuration
 import java.text.SimpleDateFormat
@@ -219,7 +216,7 @@ fun SeriesFolderItem(
                             )
                         }
                         Icon(
-                            imageVector = Icons.Default.Folder,
+                            imageVector = LocalAppIcons.current.folder,
                             contentDescription = null,
                             tint = LocalLumenTheme.current.accent.copy(alpha = 0.85f),
                             modifier = Modifier
@@ -322,7 +319,7 @@ private fun MarkToggleButton(
     val theme = LocalLumenTheme.current
     IconButton(onClick = onToggleMark) {
         Icon(
-            imageVector = if (marked) Icons.Filled.Star else Icons.Outlined.StarOutline,
+            imageVector = LocalAppIcons.current.star(marked),
             contentDescription = stringResource(if (marked) R.string.unmark else R.string.mark),
             tint = if (marked) theme.accent else theme.accent.copy(alpha = 0.45f),
             modifier = Modifier.size(22.dp),

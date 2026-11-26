@@ -234,6 +234,10 @@
     <string name="theme_mode_light_short">浅色</string>
     <string name="theme_mode_dark_short">深色</string>
     <string name="theme_material_you_enabled">当前已启用 Material You 动态取色</string>
+    <string name="theme_icon_style">图标风格</string>
+    <string name="theme_icon_style_filled">填充</string>
+    <string name="theme_icon_style_outlined">线框</string>
+    <string name="theme_icon_style_rounded">圆角</string>
     <string name="theme_launcher_icon">桌面图标</string>
     <string name="theme_launcher_icon_updated">图标已更换，桌面生效可能需要几秒钟，若应用退出属正常现象</string>
     <string name="theme_mode_dark">深色主题</string>

@@ -13,9 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BrightnessMedium
-import androidx.compose.material.icons.filled.VolumeUp
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -55,7 +53,7 @@ fun BrightnessFeedbackOverlay(
         modifier = modifier,
     ) {
         Icon(
-            imageVector = Icons.Default.BrightnessMedium,
+            imageVector = LocalAppIcons.current.brightnessMedium,
             contentDescription = stringResource(R.string.brightness_label),
             tint = LumenOnVideo,
             modifier = Modifier.height(20.dp),
@@ -80,7 +78,7 @@ fun VolumeFeedbackOverlay(
         modifier = modifier,
     ) {
         Icon(
-            imageVector = Icons.Default.VolumeUp,
+            imageVector = LocalAppIcons.current.volumeUp,
             contentDescription = stringResource(R.string.volume_label),
             tint = LumenOnVideo,
             modifier = Modifier.height(20.dp),

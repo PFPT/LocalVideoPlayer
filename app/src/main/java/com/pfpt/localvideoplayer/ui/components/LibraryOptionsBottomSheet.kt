@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -29,6 +27,7 @@ import com.pfpt.localvideoplayer.model.DurationFilter
 import com.pfpt.localvideoplayer.model.LibraryFilter
 import com.pfpt.localvideoplayer.model.LibraryViewLayout
 import com.pfpt.localvideoplayer.model.VideoSortOrder
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import kotlinx.coroutines.launch
 
@@ -202,7 +201,7 @@ private fun SelectableOptionRow(
         )
         if (selected) {
             Icon(
-                imageVector = Icons.Default.Check,
+                imageVector = LocalAppIcons.current.check,
                 contentDescription = null,
                 tint = theme.accent,
             )

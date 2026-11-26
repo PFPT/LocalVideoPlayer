@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,6 +31,7 @@ import com.pfpt.localvideoplayer.model.SeriesGroupKind
 import com.pfpt.localvideoplayer.model.VideoLibraryEntry
 import com.pfpt.localvideoplayer.model.entryKey
 import com.pfpt.localvideoplayer.ui.rememberPlayerSharedOpen
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenCardPadding
 import com.pfpt.localvideoplayer.ui.theme.LumenListItemGap
@@ -128,7 +127,7 @@ private fun PinnedLibraryCard(
             }
             if (entry is VideoLibraryEntry.Series) {
                 Icon(
-                    imageVector = Icons.Default.Folder,
+                    imageVector = LocalAppIcons.current.folder,
                     contentDescription = null,
                     tint = theme.accent.copy(alpha = 0.85f),
                     modifier = Modifier

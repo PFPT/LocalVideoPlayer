@@ -171,6 +171,7 @@ private fun lumenFromScheme(scheme: ColorScheme, base: LumenThemeColors): LumenT
 fun LocalVideoPlayerTheme(
     mode: ThemeMode = ThemeMode.System,
     colors: LumenThemeColors = LumenThemeColors.defaults(mode),
+    iconStyle: IconStyle = IconStyle.Filled,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -226,6 +227,7 @@ fun LocalVideoPlayerTheme(
     CompositionLocalProvider(
         LocalLumenTheme provides effectiveLumen,
         LocalThemeMode provides mode,
+        LocalAppIcons provides AppIcons(iconStyle),
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

@@ -10,10 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenListHorizontalInset
 import com.pfpt.localvideoplayer.ui.theme.LumenMiniBarCorner
@@ -69,14 +66,14 @@ fun CastMiniController(
                 )
                 IconButton(onClick = onPlayPause) {
                     Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        imageVector = if (isPlaying) LocalAppIcons.current.pause else LocalAppIcons.current.play,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }
                 IconButton(onClick = onDisconnect) {
                     Icon(
-                        imageVector = Icons.Default.Close,
+                        imageVector = LocalAppIcons.current.close,
                         contentDescription = stringResource(R.string.cast_disconnect),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

@@ -31,9 +31,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -99,6 +96,7 @@ import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenSpaceXs
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.ThemeMode
 import com.pfpt.localvideoplayer.ui.theme.ThemeState
 import com.pfpt.localvideoplayer.util.M3uPlaylistParser
@@ -736,13 +734,13 @@ fun VideoListScreen(
                                     )
                                 }
                             },
-                            icon = Icons.Default.ExpandLess,
+                            icon = LocalAppIcons.current.expandLess,
                             contentDescription = stringResource(R.string.scroll_to_top),
                         )
                     }
                     VideoListFab(
                         onClick = { filePickerLauncher.launch(VIDEO_PICKER_MIME_TYPES) },
-                        icon = Icons.Default.Add,
+                        icon = LocalAppIcons.current.add,
                         contentDescription = stringResource(R.string.pick_video),
                     )
                 }

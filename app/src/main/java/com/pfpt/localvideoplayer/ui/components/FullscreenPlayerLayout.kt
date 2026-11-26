@@ -13,9 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Lock
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -95,7 +93,7 @@ internal fun FullscreenPlayerLayout(
             ) {
                 SideRailButton(onClick = onLockToggle) {
                     Icon(
-                        imageVector = Icons.Default.Lock,
+                        imageVector = LocalAppIcons.current.lock,
                         contentDescription = stringResource(R.string.unlock_controls),
                         tint = LocalLumenTheme.current.accent,
                         modifier = Modifier.size(22.dp),
@@ -123,7 +121,7 @@ internal fun FullscreenPlayerLayout(
                 ) {
                     SideRailButton(onClick = onBack) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = LocalAppIcons.current.arrowBack,
                             contentDescription = stringResource(R.string.back),
                             tint = LumenOnVideo,
                             modifier = Modifier.size(22.dp),

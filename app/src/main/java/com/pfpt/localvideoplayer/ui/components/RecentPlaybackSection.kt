@@ -25,8 +25,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -54,6 +52,7 @@ import com.pfpt.localvideoplayer.model.PlaybackRecord
 import com.pfpt.localvideoplayer.model.VideoLibraryEntry
 import com.pfpt.localvideoplayer.ui.library.recentHomeRows
 import com.pfpt.localvideoplayer.ui.rememberPlayerSharedOpen
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenCardPadding
 import com.pfpt.localvideoplayer.ui.theme.LumenDelete
@@ -220,7 +219,7 @@ fun SwipeableListItem(
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Delete,
+                        imageVector = LocalAppIcons.current.delete,
                         contentDescription = stringResource(R.string.delete),
                         tint = Color.White,
                         modifier = Modifier.height(24.dp),

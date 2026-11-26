@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.pfpt.localvideoplayer.ui.theme.IconStyle
 import com.pfpt.localvideoplayer.ui.theme.LauncherIcon
 import com.pfpt.localvideoplayer.ui.theme.LumenThemeColors
 import com.pfpt.localvideoplayer.ui.theme.ThemeMode
@@ -51,6 +52,16 @@ class ThemePreferencesStore(private val context: Context) {
 
     val launcherIcon: Flow<LauncherIcon> = context.themeDataStore.data.map { prefs ->
         LauncherIcon.fromId(prefs[LAUNCHER_ICON_KEY])
+    }
+
+    val iconStyle: Flow<IconStyle> = context.themeDataStore.data.map { prefs ->
+        IconStyle.fromStorage(prefs[ICON_STYLE_KEY])
+    }
+
+    suspend fun setIconStyle(style: IconStyle) {
+        context.themeDataStore.edit { prefs ->
+            prefs[ICON_STYLE_KEY] = style.name
+        }
     }
 
     suspend fun getLauncherIcon(): LauncherIcon = launcherIcon.first()
@@ -110,6 +121,7 @@ class ThemePreferencesStore(private val context: Context) {
     companion object {
         private val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
         private val LAUNCHER_ICON_KEY = stringPreferencesKey("launcher_icon_id")
+        private val ICON_STYLE_KEY = stringPreferencesKey("icon_style")
         private val BACKGROUND_COLOR_KEY = intPreferencesKey("background_color_argb")
         private val TEXT_COLOR_KEY = intPreferencesKey("text_color_argb")
         private val LIST_OPTION_COLOR_KEY = intPreferencesKey("list_option_color_argb")

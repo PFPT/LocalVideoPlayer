@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -39,6 +37,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenThumbCorner
 import com.pfpt.localvideoplayer.util.VideoThumbnailCache
@@ -406,7 +405,7 @@ private fun FlightThumbnail(bitmap: ImageBitmap?) {
     }
     val theme = LocalLumenTheme.current
     Icon(
-        imageVector = Icons.Filled.Movie,
+        imageVector = LocalAppIcons.current.movie,
         contentDescription = null,
         tint = theme.onSurfaceMuted.copy(alpha = 0.35f),
         modifier = Modifier.size(28.dp),

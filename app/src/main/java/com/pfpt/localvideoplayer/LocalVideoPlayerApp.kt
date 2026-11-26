@@ -57,6 +57,7 @@ import com.pfpt.localvideoplayer.ui.PlayerFlightOverlay
 import com.pfpt.localvideoplayer.ui.PlayerFlightState
 import com.pfpt.localvideoplayer.ui.ProvidePlayerFlight
 import com.pfpt.localvideoplayer.ui.components.PlaybackMiniBar
+import com.pfpt.localvideoplayer.ui.theme.IconStyle
 import com.pfpt.localvideoplayer.ui.theme.LocalVideoPlayerTheme
 import com.pfpt.localvideoplayer.ui.theme.ThemeState
 import com.pfpt.localvideoplayer.util.LauncherIconSwitcher
@@ -89,6 +90,7 @@ fun LocalVideoPlayerApp(
     val flight = remember { PlayerFlightState() }
     val castManager = remember { CastManager(context, playbackStore) }
     val themeState by themeStore.themeState.collectAsState(initial = ThemeState())
+    val iconStyle by themeStore.iconStyle.collectAsState(initial = IconStyle.Filled)
 
     DisposableEffect(castManager) {
         onDispose { castManager.release() }
@@ -189,6 +191,7 @@ fun LocalVideoPlayerApp(
     LocalVideoPlayerTheme(
         mode = themeState.mode,
         colors = themeState.colors,
+        iconStyle = iconStyle,
     ) {
         val navBackStack by navController.currentBackStackEntryAsState()
         val sessionState by playbackSession.state.collectAsState()

@@ -12,10 +12,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pfpt.localvideoplayer.R
 import com.pfpt.localvideoplayer.player.SleepChoice
 import com.pfpt.localvideoplayer.player.formatSleepRemaining
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenListHorizontalInset
 import com.pfpt.localvideoplayer.ui.theme.LumenMiniBarCorner
@@ -103,7 +100,7 @@ fun PlaybackMiniBar(
                 }
                 IconButton(onClick = onPlayPause) {
                     Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        imageVector = if (isPlaying) LocalAppIcons.current.pause else LocalAppIcons.current.play,
                         contentDescription = stringResource(
                             if (isPlaying) R.string.pip_pause else R.string.pip_play,
                         ),
@@ -112,7 +109,7 @@ fun PlaybackMiniBar(
                 }
                 IconButton(onClick = onClose) {
                     Icon(
-                        imageVector = Icons.Default.Close,
+                        imageVector = LocalAppIcons.current.close,
                         contentDescription = stringResource(R.string.playback_stop),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

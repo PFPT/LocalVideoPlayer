@@ -18,10 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +42,7 @@ import com.pfpt.localvideoplayer.ui.components.LumenEmptyState
 import com.pfpt.localvideoplayer.ui.components.PinnedLibraryRow
 import com.pfpt.localvideoplayer.ui.components.RecentPlaybackSection
 import com.pfpt.localvideoplayer.ui.libraryOpening
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenListHorizontalInset
 import com.pfpt.localvideoplayer.ui.theme.LumenListItemGap
@@ -141,7 +138,7 @@ internal fun LibraryHomeList(
                         LumenEmptyState(
                             title = stringResource(R.string.empty_video_list),
                             subtitle = stringResource(R.string.empty_video_hint),
-                            icon = Icons.Default.VideoLibrary,
+                            icon = LocalAppIcons.current.videoLibrary,
                             modifier = Modifier
                                 .fillParentMaxSize()
                                 .padding(24.dp)
@@ -167,7 +164,7 @@ internal fun LibraryHomeList(
                             R.string.no_filter_results
                         },
                     ),
-                    icon = Icons.Filled.Search,
+                    icon = LocalAppIcons.current.search,
                     modifier = Modifier
                         .fillParentMaxWidth()
                         .padding(24.dp)
@@ -357,7 +354,7 @@ private fun SinglesCollapseHeader(
             modifier = Modifier.weight(1f),
         )
         Icon(
-            imageVector = Icons.Default.ExpandMore,
+            imageVector = LocalAppIcons.current.expandMore,
             contentDescription = null,
             tint = if (expanded) theme.onSurfaceMuted else theme.accent,
             modifier = Modifier

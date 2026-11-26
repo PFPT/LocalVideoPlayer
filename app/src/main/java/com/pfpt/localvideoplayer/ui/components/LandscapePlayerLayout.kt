@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -29,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.player.PlayerProgressState
 import com.pfpt.localvideoplayer.ui.PlayerUiState
@@ -226,7 +225,7 @@ private fun LandscapePlayerLayoutContent(
             ) {
                 SideRailButton(onClick = onLockToggle) {
                     Icon(
-                        imageVector = Icons.Default.Lock,
+                        imageVector = LocalAppIcons.current.lock,
                         contentDescription = stringResource(R.string.unlock_controls),
                         tint = LocalLumenTheme.current.accent,
                         modifier = Modifier.size(22.dp),

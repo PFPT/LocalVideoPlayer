@@ -8,9 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.RemoveCircleOutline
-import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -28,6 +25,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenDelete
 import kotlinx.coroutines.launch
@@ -90,7 +88,7 @@ fun DeleteVideoDialog(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
                 )
                 DeleteActionRow(
-                    icon = Icons.Default.RemoveCircleOutline,
+                    icon = LocalAppIcons.current.removeCircle,
                     label = stringResource(R.string.hide_from_list),
                     labelColor = theme.onBackground,
                     iconTint = theme.onBackground,
@@ -98,7 +96,7 @@ fun DeleteVideoDialog(
                     onClick = { dismissSheet(onHideFromList) },
                 )
                 DeleteActionRow(
-                    icon = Icons.Default.DeleteForever,
+                    icon = LocalAppIcons.current.deleteForever,
                     label = stringResource(R.string.delete_from_device),
                     labelColor = LumenDelete,
                     iconTint = LumenDelete,

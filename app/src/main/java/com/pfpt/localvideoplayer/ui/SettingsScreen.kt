@@ -20,9 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,7 +61,9 @@ import com.pfpt.localvideoplayer.ui.components.LumenListHeader
 import com.pfpt.localvideoplayer.ui.components.SpeedSelectorSheet
 import com.pfpt.localvideoplayer.ui.components.ThemeColorBottomSheet
 import com.pfpt.localvideoplayer.ui.components.labelRes
+import com.pfpt.localvideoplayer.ui.theme.IconStyle
 import com.pfpt.localvideoplayer.ui.theme.LauncherIcon
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenListHorizontalInset
 import com.pfpt.localvideoplayer.ui.theme.LumenSpaceLg
@@ -103,6 +102,7 @@ fun SettingsScreen(
     val folderSources by folderSourceStore.sources.collectAsStateWithLifecycle(initialValue = emptyList())
     val hiddenEntries by hiddenVideosStore.hiddenEntries.collectAsStateWithLifecycle(initialValue = emptyList())
     val selectedLauncherIcon by themeStore.launcherIcon.collectAsStateWithLifecycle(initialValue = LauncherIcon.Default)
+    val selectedIconStyle by themeStore.iconStyle.collectAsStateWithLifecycle(initialValue = IconStyle.Filled)
     var showThemeSheet by remember { mutableStateOf(false) }
     var showSpeedSheet by remember { mutableStateOf(false) }
     var showAspectSheet by remember { mutableStateOf(false) }
@@ -154,6 +154,10 @@ fun SettingsScreen(
             themeMode = themeState.mode,
             initialColors = themeState.colors,
             selectedLauncherIcon = selectedLauncherIcon,
+            iconStyle = selectedIconStyle,
+            onIconStyleChange = { style ->
+                scope.launch { themeStore.setIconStyle(style) }
+            },
             onThemeModeChange = { mode ->
                 scope.launch { themeStore.setThemeMode(mode) }
             },
@@ -311,7 +315,7 @@ fun SettingsScreen(
                                 },
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Delete,
+                                    imageVector = LocalAppIcons.current.delete,
                                     contentDescription = stringResource(R.string.settings_remove_folder),
                                     tint = theme.onSurfaceMuted,
                                 )
@@ -323,7 +327,7 @@ fun SettingsScreen(
                     onClick = { folderPicker.launch(null) },
                     modifier = Modifier.padding(horizontal = LumenSpaceXs),
                 ) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = null)
+                    Icon(imageVector = LocalAppIcons.current.add, contentDescription = null)
                     Text(
                         text = stringResource(R.string.settings_add_folder),
                         modifier = Modifier.padding(start = LumenSpaceSm),

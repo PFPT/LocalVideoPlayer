@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -41,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.geometry.Rect
 import com.pfpt.localvideoplayer.ui.flightHidesThumbnail
 import com.pfpt.localvideoplayer.ui.trackFlightSource
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenCardPadding
 import com.pfpt.localvideoplayer.ui.theme.LumenSpaceMd
@@ -237,7 +236,7 @@ fun MediaThumbnail(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Movie,
+                        imageVector = LocalAppIcons.current.movie,
                         contentDescription = null,
                         tint = theme.onSurfaceMuted.copy(alpha = 0.35f),
                         modifier = Modifier.size(28.dp),

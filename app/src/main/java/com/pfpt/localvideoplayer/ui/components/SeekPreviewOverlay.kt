@@ -12,9 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -86,7 +84,7 @@ fun SeekPreviewOverlay(
                         modifier = Modifier.padding(top = 6.dp),
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                            imageVector = LocalAppIcons.current.keyboardArrowLeft,
                             contentDescription = null,
                             tint = LumenOnVideo,
                         )
@@ -97,7 +95,7 @@ fun SeekPreviewOverlay(
                             modifier = Modifier.padding(horizontal = 12.dp),
                         )
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            imageVector = LocalAppIcons.current.keyboardArrowRight,
                             contentDescription = null,
                             tint = LumenOnVideo,
                         )

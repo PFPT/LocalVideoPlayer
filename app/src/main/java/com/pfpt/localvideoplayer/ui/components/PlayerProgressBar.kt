@@ -13,9 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.FullscreenExit
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -268,7 +266,7 @@ fun PlayerProgressBar(
                     modifier = Modifier.size(32.dp),
                 ) {
                     Icon(
-                        imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                        imageVector = if (isFullscreen) LocalAppIcons.current.fullscreenExit else LocalAppIcons.current.fullscreen,
                         contentDescription = stringResource(
                             if (isFullscreen) R.string.exit_fullscreen else R.string.fullscreen,
                         ),

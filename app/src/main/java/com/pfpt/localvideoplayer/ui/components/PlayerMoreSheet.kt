@@ -10,9 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +30,7 @@ import com.pfpt.localvideoplayer.data.SubtitleTextSize
 import com.pfpt.localvideoplayer.player.PlaybackSession
 import com.pfpt.localvideoplayer.player.SleepChoice
 import com.pfpt.localvideoplayer.player.formatSleepRemaining
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import kotlin.math.roundToInt
 
@@ -378,12 +376,12 @@ private fun MoreActionRow(
         )
         when {
             selected -> Icon(
-                imageVector = Icons.Default.Check,
+                imageVector = LocalAppIcons.current.check,
                 contentDescription = null,
                 tint = theme.accent,
             )
             trailing -> Icon(
-                imageVector = Icons.Default.ChevronRight,
+                imageVector = LocalAppIcons.current.chevronRight,
                 contentDescription = null,
                 tint = theme.onSurfaceMuted,
             )

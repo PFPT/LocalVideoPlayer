@@ -7,9 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cast
-import androidx.compose.material.icons.filled.CastConnected
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -53,7 +51,7 @@ fun CastButton(
 
     IconButton(onClick = onClick, modifier = modifier) {
         Icon(
-            imageVector = if (connected) Icons.Default.CastConnected else Icons.Default.Cast,
+            imageVector = if (connected) LocalAppIcons.current.castConnected else LocalAppIcons.current.cast,
             contentDescription = stringResource(R.string.cast),
             tint = if (connected) {
                 MaterialTheme.colorScheme.primary

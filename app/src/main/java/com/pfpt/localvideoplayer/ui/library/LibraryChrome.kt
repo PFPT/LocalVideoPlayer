@@ -14,18 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.BrightnessAuto
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.VideoLibrary
-import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -45,6 +33,7 @@ import com.pfpt.localvideoplayer.ui.components.CastButton
 import com.pfpt.localvideoplayer.ui.components.DeleteVideoDialog
 import com.pfpt.localvideoplayer.ui.components.LumenListHeader
 import com.pfpt.localvideoplayer.ui.components.SelectionTopBar
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.ThemeMode
 
@@ -141,7 +130,7 @@ internal fun LibraryScreenChrome(
                     if (searchQuery.isNotEmpty()) {
                         HeaderIconButton(
                             onClick = { onSearchQueryChange("") },
-                            imageVector = Icons.Default.Close,
+                            imageVector = LocalAppIcons.current.close,
                             contentDescription = stringResource(R.string.search_clear),
                         )
                     }
@@ -152,7 +141,7 @@ internal fun LibraryScreenChrome(
                 title = stringResource(R.string.video_list_title),
                 titleContent = {
                     Icon(
-                        imageVector = Icons.Filled.VideoLibrary,
+                        imageVector = LocalAppIcons.current.videoLibrary,
                         contentDescription = stringResource(R.string.video_list_title),
                         tint = MaterialTheme.colorScheme.onBackground,
                     )
@@ -168,21 +157,17 @@ internal fun LibraryScreenChrome(
                     }
                     HeaderIconButton(
                         onClick = onStartSearch,
-                        imageVector = Icons.Filled.Search,
+                        imageVector = LocalAppIcons.current.search,
                         contentDescription = stringResource(R.string.search),
                     )
                     HeaderIconButton(
                         onClick = onOpenDownloads,
-                        imageVector = Icons.Filled.Download,
+                        imageVector = LocalAppIcons.current.download,
                         contentDescription = stringResource(R.string.downloads_title),
                     )
                     HeaderIconButton(
                         onClick = onToggleMarked,
-                        imageVector = if (isMarkedTabActive) {
-                            Icons.Filled.Star
-                        } else {
-                            Icons.Outlined.StarOutline
-                        },
+                        imageVector = LocalAppIcons.current.star(isMarkedTabActive),
                         contentDescription = stringResource(R.string.tab_marked),
                         tint = if (isMarkedTabActive) {
                             theme.accent
@@ -193,9 +178,9 @@ internal fun LibraryScreenChrome(
                     HeaderIconButton(
                         onClick = onCycleTheme,
                         imageVector = when (themeMode) {
-                            ThemeMode.System -> Icons.Default.BrightnessAuto
-                            ThemeMode.Dark -> Icons.Default.LightMode
-                            ThemeMode.Light -> Icons.Default.DarkMode
+                            ThemeMode.System -> LocalAppIcons.current.brightnessAuto
+                            ThemeMode.Dark -> LocalAppIcons.current.lightMode
+                            ThemeMode.Light -> LocalAppIcons.current.darkMode
                         },
                         contentDescription = when (themeMode) {
                             ThemeMode.System -> stringResource(R.string.theme_mode_system)
@@ -205,13 +190,13 @@ internal fun LibraryScreenChrome(
                     )
                     HeaderIconButton(
                         onClick = onOpenSettings,
-                        imageVector = Icons.Filled.Settings,
+                        imageVector = LocalAppIcons.current.settings,
                         contentDescription = stringResource(R.string.settings),
                     )
                     Box {
                         HeaderIconButton(
                             onClick = onOpenOptions,
-                            imageVector = Icons.AutoMirrored.Filled.Sort,
+                            imageVector = LocalAppIcons.current.sort,
                             contentDescription = stringResource(R.string.library_options),
                         )
                         if (hasActiveOptions) {

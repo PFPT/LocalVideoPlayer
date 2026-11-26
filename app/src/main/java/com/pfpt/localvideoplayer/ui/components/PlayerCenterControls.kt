@@ -5,11 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -54,7 +50,7 @@ fun PlayerCenterControls(
             fillAlpha = 0.35f,
         ) {
             Icon(
-                imageVector = Icons.Default.SkipPrevious,
+                imageVector = LocalAppIcons.current.skipPrevious,
                 contentDescription = stringResource(R.string.previous),
                 tint = if (hasPrevious) LumenOnVideo else LumenOnVideo.copy(alpha = 0.3f),
                 modifier = Modifier
@@ -70,7 +66,7 @@ fun PlayerCenterControls(
             fillAlpha = 0.35f,
         ) {
             Icon(
-                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                imageVector = if (isPlaying) LocalAppIcons.current.pause else LocalAppIcons.current.play,
                 contentDescription = stringResource(if (isPlaying) R.string.pause else R.string.play),
                 tint = LumenOnVideo,
                 modifier = Modifier
@@ -86,7 +82,7 @@ fun PlayerCenterControls(
             fillAlpha = 0.35f,
         ) {
             Icon(
-                imageVector = Icons.Default.SkipNext,
+                imageVector = LocalAppIcons.current.skipNext,
                 contentDescription = stringResource(R.string.next),
                 tint = if (hasNext) LumenOnVideo else LumenOnVideo.copy(alpha = 0.3f),
                 modifier = Modifier

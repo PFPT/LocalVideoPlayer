@@ -4,14 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.FullscreenExit
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.PictureInPictureAlt
-import androidx.compose.material.icons.filled.ScreenRotation
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
@@ -42,7 +35,7 @@ internal fun PlayerSideActions(
         if (showBack) {
             SideRailButton(onClick = onBack) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    imageVector = LocalAppIcons.current.arrowBack,
                     contentDescription = stringResource(R.string.back),
                     tint = LumenOnVideo,
                     modifier = Modifier.size(22.dp),
@@ -51,7 +44,7 @@ internal fun PlayerSideActions(
         }
         SideRailButton(onClick = onLockToggle) {
             Icon(
-                imageVector = if (controlsLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                imageVector = if (controlsLocked) LocalAppIcons.current.lock else LocalAppIcons.current.lockOpen,
                 contentDescription = stringResource(
                     if (controlsLocked) R.string.unlock_controls else R.string.lock_controls,
                 ),
@@ -61,7 +54,7 @@ internal fun PlayerSideActions(
         }
         SideRailButton(onClick = onRotateClick) {
             Icon(
-                imageVector = Icons.Default.ScreenRotation,
+                imageVector = LocalAppIcons.current.screenRotation,
                 contentDescription = stringResource(R.string.rotate_screen),
                 tint = LumenOnVideo,
                 modifier = Modifier.size(22.dp),
@@ -70,7 +63,7 @@ internal fun PlayerSideActions(
         if (pipSupported) {
             SideRailButton(onClick = onPipClick) {
                 Icon(
-                    imageVector = Icons.Default.PictureInPictureAlt,
+                    imageVector = LocalAppIcons.current.pictureInPicture,
                     contentDescription = stringResource(R.string.picture_in_picture),
                     tint = LumenOnVideo,
                     modifier = Modifier.size(22.dp),
@@ -79,7 +72,7 @@ internal fun PlayerSideActions(
         }
         SideRailButton(onClick = onFullscreenClick) {
             Icon(
-                imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                imageVector = if (isFullscreen) LocalAppIcons.current.fullscreenExit else LocalAppIcons.current.fullscreen,
                 contentDescription = stringResource(
                     if (isFullscreen) R.string.exit_fullscreen else R.string.fullscreen,
                 ),

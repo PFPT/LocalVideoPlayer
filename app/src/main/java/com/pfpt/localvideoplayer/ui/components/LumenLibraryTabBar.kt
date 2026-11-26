@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pfpt.localvideoplayer.R
 import com.pfpt.localvideoplayer.model.LibraryTypeTab
+import com.pfpt.localvideoplayer.ui.theme.LocalAppIcons
 import com.pfpt.localvideoplayer.ui.theme.LocalLumenTheme
 import com.pfpt.localvideoplayer.ui.theme.LumenChipCorner
 import com.pfpt.localvideoplayer.ui.theme.LumenListHorizontalInset
@@ -76,7 +74,7 @@ fun LumenLibraryTabBar(
             ) {
                 if (tab == LibraryTypeTab.MARKED) {
                     Icon(
-                        imageVector = if (selected) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                        imageVector = LocalAppIcons.current.star(selected),
                         contentDescription = null,
                         tint = textColor,
                         modifier = Modifier.size(14.dp),
