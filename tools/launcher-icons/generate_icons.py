@@ -42,7 +42,7 @@ DENSITIES = {
 }
 
 FOREGROUND_SIZE = 432
-ICON_FILL = 0.72
+ICON_FILL = 0.56
 BLACK_LUMA_THRESHOLD = 28
 BG_RGB = (255, 255, 255)
 
@@ -144,8 +144,13 @@ def cleanup_vector_artifacts(fg_names: list[str]) -> None:
                 print(f"removed {path}")
 
 
+def local_sources_ready() -> bool:
+    return all((SRC / png_name).is_file() for png_name, _, _ in ICONS)
+
+
 def main() -> int:
-    copy_sources_from_downloads()
+    if not local_sources_ready():
+        copy_sources_from_downloads()
 
     drawable = RES / "drawable"
     anydpi = RES / "mipmap-anydpi-v26"
