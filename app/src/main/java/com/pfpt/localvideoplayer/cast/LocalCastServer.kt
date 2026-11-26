@@ -9,6 +9,8 @@ import java.io.BufferedOutputStream
 import java.io.FileInputStream
 import java.io.InputStream
 import java.net.Inet4Address
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
@@ -66,8 +68,8 @@ class LocalCastServer(
         mediaRef.set(MediaSource(uri, resolvedMime, length))
         streamToken = UUID.randomUUID().toString().replace("-", "")
 
-        val port = bindPort()
         val ip = localIpv4() ?: throw IllegalStateException("No LAN IPv4 address")
+        val port = bindPort(InetAddress.getByName(ip))
         baseUrl = "http://$ip:$port"
         running.set(true)
         acceptThread = Thread({
@@ -121,13 +123,17 @@ class LocalCastServer(
         return Executors.newFixedThreadPool(MAX_CONCURRENT_CLIENTS) as ThreadPoolExecutor
     }
 
-    private fun bindPort(): Int {
+    private fun bindPort(address: InetAddress): Int {
         var lastError: Exception? = null
         for (port in PORT_START..PORT_END) {
+            val socket = ServerSocket()
             try {
-                serverSocket = ServerSocket(port).also { it.reuseAddress = true }
+                socket.reuseAddress = true
+                socket.bind(InetSocketAddress(address, port))
+                serverSocket = socket
                 return port
             } catch (e: Exception) {
+                runCatching { socket.close() }
                 lastError = e
             }
         }

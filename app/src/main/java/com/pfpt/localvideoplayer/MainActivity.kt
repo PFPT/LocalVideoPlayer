@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModelProvider
+import com.pfpt.localvideoplayer.player.FloatingPlayerWindow
 import com.pfpt.localvideoplayer.player.PlaybackMediaService
 import com.pfpt.localvideoplayer.player.PlaybackSessionViewModel
 import com.pfpt.localvideoplayer.util.PictureInPictureHelper
@@ -60,6 +61,9 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         ViewModelProvider(this)[PlaybackSessionViewModel::class.java].session.onHostStarted()
+        if (FloatingPlayerWindow.isAttached()) {
+            FloatingPlayerWindow.dismiss(pause = false)
+        }
     }
 
     override fun onStop() {

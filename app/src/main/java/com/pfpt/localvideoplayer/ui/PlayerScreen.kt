@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -45,6 +46,8 @@ import com.pfpt.localvideoplayer.data.SeriesSkipStore
 import com.pfpt.localvideoplayer.player.SeriesPlaybackSettings
 import com.pfpt.localvideoplayer.player.playbackSpeedAfterSeriesLoad
 import com.pfpt.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.player.FloatingPlayback
+import com.pfpt.localvideoplayer.player.FloatingPlayerWindow
 import com.pfpt.localvideoplayer.player.PlaybackSession
 import com.pfpt.localvideoplayer.player.PlayerViewModel
 import com.pfpt.localvideoplayer.player.PlayerProgressState
@@ -307,7 +310,6 @@ private fun PlayerScreenContent(
         playerViewModel = playerViewModel,
         scope = scope,
         activity = activity,
-        pipSupported = pipSupported,
         seriesSkipStore = seriesSkipStore,
         seriesKey = seriesKey,
         seriesPlaylistFor = seriesPlaylistFor,
@@ -527,6 +529,23 @@ private fun PlayerScreenContent(
     } else {
         null
     }
+    val floating by FloatingPlayback.visible.collectAsStateWithLifecycle()
+    LaunchedEffect(floating) {
+        if (!floating || FloatingPlayerWindow.isAttached()) return@LaunchedEffect
+        withFrameNanos { }
+        withFrameNanos { }
+        if (!FloatingPlayback.isShowing() || FloatingPlayerWindow.isAttached()) return@LaunchedEffect
+        val attached = FloatingPlayerWindow.attach(
+            context = context,
+            videoWidth = ui.videoWidth,
+            videoHeight = ui.videoHeight,
+        )
+        if (!attached) {
+            FloatingPlayback.setShowing(false)
+            return@LaunchedEffect
+        }
+        activity?.moveTaskToBack(true)
+    }
     val useLandscapeLayout = ui.isLandscape || ui.isFullscreen
     val showsPause = if (isCasting) castPlaying else ui.isPlaying
     PlayerSkipPositionEffect(
@@ -648,6 +667,7 @@ private fun PlayerScreenContent(
             seriesSkip = seriesSkip,
             chrome = chrome,
             gestures = gestures,
+            floating = floating,
             pipSupported = pipSupported,
             castManager = castManager,
             castState = castState,

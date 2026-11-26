@@ -24,6 +24,8 @@ import com.pfpt.localvideoplayer.appDurationResolver
 import com.pfpt.localvideoplayer.cast.CastManager
 import com.pfpt.localvideoplayer.data.PlayerPreferences
 import com.pfpt.localvideoplayer.model.VideoItem
+import com.pfpt.localvideoplayer.player.FloatingPlayback
+import com.pfpt.localvideoplayer.player.FloatingPlayerWindow
 import com.pfpt.localvideoplayer.player.PlaybackSession
 import com.pfpt.localvideoplayer.player.PlayerSession
 import com.pfpt.localvideoplayer.player.PlayerViewModel
@@ -279,8 +281,15 @@ internal fun PlayerSessionEffects(
 
         val lifecycleObserver = LifecycleEventObserver { _, event ->
             when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    FloatingPlayerWindow.openIfOverlayGranted(context)
+                }
                 Lifecycle.Event.ON_STOP -> {
-                    if (activity?.isInPipMode != true && activity?.isFinishing == true) {
+                    if (
+                        activity?.isInPipMode != true &&
+                        activity?.isFinishing == true &&
+                        !FloatingPlayback.isShowing()
+                    ) {
                         exoPlayer.pause()
                     }
                 }
@@ -290,6 +299,7 @@ internal fun PlayerSessionEffects(
         lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
 
         onDispose {
+            FloatingPlayerWindow.clearOverlayRetry()
             SeekPreviewFrames.release()
             ui.brightnessHideJob?.cancel()
             ui.volumeHideJob?.cancel()

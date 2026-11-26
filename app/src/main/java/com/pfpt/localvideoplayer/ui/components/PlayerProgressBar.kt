@@ -62,6 +62,8 @@ fun PlayerProgressBar(
     showFullscreen: Boolean = false,
     isFullscreen: Boolean = false,
     onFullscreenClick: (() -> Unit)? = null,
+    showPip: Boolean = false,
+    onPipClick: (() -> Unit)? = null,
     compact: Boolean = false,
     introEndMs: Long = 0L,
     outroStartMs: Long = -1L,
@@ -259,6 +261,19 @@ fun PlayerProgressBar(
                     color = LumenOnVideo,
                     modifier = Modifier.padding(start = 8.dp),
                 )
+            }
+            if (showPip && onPipClick != null) {
+                IconButton(
+                    onClick = onPipClick,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        imageVector = LocalAppIcons.current.pictureInPicture,
+                        contentDescription = stringResource(R.string.picture_in_picture),
+                        tint = LumenOnVideo,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
             if (showFullscreen && onFullscreenClick != null) {
                 IconButton(

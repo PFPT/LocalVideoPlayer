@@ -74,6 +74,9 @@
     <string name="portrait_mode">竖屏</string>
     <string name="picture_in_picture">悬浮窗播放</string>
     <string name="pip_not_supported">当前设备不支持悬浮窗播放</string>
+    <string name="overlay_permission_required">请先允许显示在其他应用上层</string>
+    <string name="floating_close">关闭</string>
+    <string name="floating_return">回到播放器</string>
     <string name="seek_forward">快进</string>
     <string name="seek_forward_desc">快进10秒</string>
     <string name="pip_play">播放</string>

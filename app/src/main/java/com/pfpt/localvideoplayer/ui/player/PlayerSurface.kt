@@ -59,6 +59,7 @@ internal fun PlayerSurface(
     seriesSkip: SeriesSkipSettings,
     chrome: PlayerChromeActions,
     gestures: PlayerGestureController,
+    floating: Boolean,
     pipSupported: Boolean,
     castManager: CastManager?,
     castState: CastUiState,
@@ -96,6 +97,13 @@ internal fun PlayerSurface(
             ),
     ) {
         when {
+            floating -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black),
+                )
+            }
             ui.isInPipMode -> {
                 FittedPlayerSurface(
                     player = exoPlayer,
@@ -266,6 +274,8 @@ internal fun PlayerSurface(
                         onSkipOutro = onSkipOutro,
                         onVideoDoubleTap = onDoubleTap,
                         onFullscreenClick = onEnterLandscapeFullscreen,
+                        pipSupported = pipSupported,
+                        onPipClick = onPipClick,
                         contentScale = ui.aspectRatioMode.contentScale,
                         frameAspectRatio = ui.aspectRatioMode.frameAspectRatio,
                         useTextureView = preferences.useTextureView,

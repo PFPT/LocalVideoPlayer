@@ -93,6 +93,14 @@ class PlaybackSession(
     private var subtitleOffOverride: SubtitleOffOverride? = null
     private var listener: Player.Listener? = null
 
+    init {
+        scope.launch {
+            FloatingPlayback.visible.collect {
+                applyVideoSuppression()
+            }
+        }
+    }
+
     fun setSeriesTextOff(seriesKey: String?, videoUri: String, off: Boolean) {
         subtitleOffOverride = SubtitleOffOverride(
             key = textOffOverrideKey(seriesKey, videoUri),
@@ -365,6 +373,9 @@ class PlaybackSession(
         if (save) {
             saveProgress()
         }
+        withContext(Dispatchers.Main.immediate) {
+            FloatingPlayerWindow.dismiss(pause = false)
+        }
         clearSleep()
         progressJob?.cancel()
         preloadJob?.cancel()
@@ -526,7 +537,11 @@ class PlaybackSession(
 
     private fun applyVideoSuppression() {
         val current = player ?: return
-        val suppress = !onPlayerScreen || !hostStarted
+        val suppress = shouldSuppressVideo(
+            onPlayerScreen = onPlayerScreen,
+            hostStarted = hostStarted,
+            floating = FloatingPlayback.isShowing(),
+        )
         val videoDisabled = current.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_VIDEO)
         if (videoDisabled == suppress) return
         current.trackSelectionParameters = current.trackSelectionParameters

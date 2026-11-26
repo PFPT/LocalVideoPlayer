@@ -156,6 +156,96 @@ class PlaybackSessionLogicTest {
     }
 
     @Test
+    fun floatingWindowKeepsVideoAndStaysInsideTheScreen() {
+        assertFalse(
+            shouldSuppressVideo(onPlayerScreen = false, hostStarted = false, floating = true),
+        )
+        assertTrue(
+            shouldSuppressVideo(onPlayerScreen = true, hostStarted = false, floating = false),
+        )
+        assertFalse(
+            shouldSuppressVideo(onPlayerScreen = true, hostStarted = true, floating = false),
+        )
+        assertEquals(450 to 253, floatingWindowSize(1000, 2000, 1920, 1080))
+        assertEquals(0, clampWindowOffset(-20, 0, 100))
+        assertEquals(40, clampWindowOffset(80, 0, 40))
+        assertEquals(0, clampWindowOffset(12, 0, -1))
+        val grown = resizeFloatingFrame(
+            origin = FloatingFrame(10, 20, 160, 90),
+            corner = FloatingCorner.BottomRight,
+            fingerX = 330,
+            fingerY = 200,
+            ratio = 16f / 9f,
+            minWidth = 160,
+            screenWidth = 1000,
+            screenHeight = 1000,
+        )
+        assertEquals(10, grown.x)
+        assertEquals(20, grown.y)
+        assertEquals(320, grown.width)
+        assertEquals(180, grown.height)
+        val shrunk = resizeFloatingFrame(
+            origin = FloatingFrame(200, 200, 320, 180),
+            corner = FloatingCorner.TopLeft,
+            fingerX = 40,
+            fingerY = 110,
+            ratio = 16f / 9f,
+            minWidth = 160,
+            screenWidth = 1000,
+            screenHeight = 1000,
+        )
+        assertEquals(520, shrunk.x + shrunk.width)
+        assertEquals(380, shrunk.y + shrunk.height)
+        assertTrue(kotlin.math.abs(shrunk.width.toFloat() / shrunk.height - 16f / 9f) < 0.05f)
+        val fitted = fitFloatingFrame(
+            FloatingFrame(900, 40, 400, 200),
+            screenWidth = 1000,
+            screenHeight = 800,
+        )
+        assertTrue(fitted.x + fitted.width <= 1000)
+        assertEquals(400, fitted.width)
+        assertFalse(
+            shouldSuppressVideo(onPlayerScreen = false, hostStarted = false, floating = true),
+        )
+    }
+
+    @Test
+    fun floatingTapOpensThePlayerOnlyOnTheSecondTap() {
+        assertEquals(
+            FloatingPointerAction.ToggleControls,
+            floatingPointerAction(movedPastSlop = false, secondTapWithinTimeout = false),
+        )
+        assertEquals(
+            FloatingPointerAction.OpenPlayer,
+            floatingPointerAction(movedPastSlop = false, secondTapWithinTimeout = true),
+        )
+        assertEquals(
+            FloatingPointerAction.Move,
+            floatingPointerAction(movedPastSlop = true, secondTapWithinTimeout = true),
+        )
+    }
+
+    @Test
+    fun floatingCornerHandlesSitOnTheirOwnCorners() {
+        val width = 200
+        val height = 100
+        val handle = 28
+        val topLeft = floatingCornerHandle(width, height, handle, FloatingCorner.TopLeft)
+        val topRight = floatingCornerHandle(width, height, handle, FloatingCorner.TopRight)
+        val bottomLeft = floatingCornerHandle(width, height, handle, FloatingCorner.BottomLeft)
+        val bottomRight = floatingCornerHandle(width, height, handle, FloatingCorner.BottomRight)
+        assertEquals(FloatingFrame(0, 0, handle, handle), topLeft)
+        assertEquals(FloatingFrame(width - handle, 0, handle, handle), topRight)
+        assertEquals(FloatingFrame(0, height - handle, handle, handle), bottomLeft)
+        assertEquals(FloatingFrame(width - handle, height - handle, handle, handle), bottomRight)
+        assertTrue(topRight.x > width / 2)
+        assertTrue(bottomLeft.y > height / 2)
+        assertEquals(112, floatingMinWidthPx(screenShortSidePx = 400, density = 3f))
+        assertEquals(120, floatingMinWidthPx(screenShortSidePx = 1000, density = 1f))
+        assertEquals(302, floatingMinWidthPx(screenShortSidePx = 1080, density = 3f))
+    }
+
+    @Test
     fun skipButtonsUseAnOpenEndAndNeedAKnownDuration() {
         assertTrue(showSkipIntro(positionMs = 0L, introEndMs = 90_000L, isSeeking = false))
         assertFalse(showSkipIntro(positionMs = 90_000L, introEndMs = 90_000L, isSeeking = false))

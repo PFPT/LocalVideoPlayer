@@ -18,6 +18,7 @@ import com.pfpt.localvideoplayer.player.SeekCommit
 import com.pfpt.localvideoplayer.player.episodeStartPositionMs
 import com.pfpt.localvideoplayer.player.seekCommit
 import com.pfpt.localvideoplayer.player.seekTargetMs
+import com.pfpt.localvideoplayer.player.FloatingPlayerWindow
 import com.pfpt.localvideoplayer.player.showsPauseIcon
 import com.pfpt.localvideoplayer.ui.PlayerUiState
 import com.pfpt.localvideoplayer.util.PictureInPictureHelper
@@ -35,7 +36,6 @@ internal class PlayerSessionActions(
     private val playerViewModel: PlayerViewModel,
     private val scope: CoroutineScope,
     private val activity: MainActivity?,
-    private val pipSupported: Boolean,
     private val seriesSkipStore: SeriesSkipStore,
     private val seriesKey: String?,
     private val seriesPlaylistFor: (VideoItem) -> PlaylistState,
@@ -155,19 +155,7 @@ internal class PlayerSessionActions(
     fun onPipClick() {
         if (ui.controlsLocked) return
         ui.resetControlsTimer()
-        if (pipSupported) {
-            activity?.enterPipMode(
-                hasNext = ui.currentIndex < playlist.lastIndex,
-                isPlaying = showsPauseIcon(exoPlayer.playWhenReady, exoPlayer.playbackState),
-                aspectRatio = currentPipAspectRatio(),
-            )
-        } else {
-            Toast.makeText(
-                context,
-                context.getString(R.string.pip_not_supported),
-                Toast.LENGTH_SHORT,
-            ).show()
-        }
+        FloatingPlayerWindow.request(context)
     }
 
     fun markIntro() {
